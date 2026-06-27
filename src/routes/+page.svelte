@@ -95,6 +95,60 @@ Bali Starburst (Large),8,Silver,OK to sub similar if OOS
 
 Sent via Instagram DM 6/1: "Do you have more wave cuffs in stock?"`;
 
+	const samples: Record<(typeof sourceTypes)[number], string> = {
+		sourceEmail: `From: Mia Chen <mia@driftwoodcollective.com>
+Subject: Re: New pieces for Summer
+
+Hi Heather,
+Here's what we're hoping to get for our July drop.
+PO#: DC-0725
+Ship to: Driftwood Collective, 123 Ocean Ave, Santa Cruz, CA 95060
+
+Item                   Qty   Finish             Notes
+---------------------------------------------------------------
+Horse Pin Medium       12    Silver             Please match last order
+Mountain Pendant       6     Mother of Pearl    Can we get with longer chain?
+Starburst Studs        24    Gold Vermeil       12 pr per card?`,
+
+		sourceDm: `Mia Chen [Instagram DM 6/1 14:22]
+Hey Heather! Do you have more wave cuffs in stock?
+We'd love to order 4 of the Wave Cuff in Silver (6.5" if possible).
+Also, we want to add 8 of the Bali Starburst (Large) studs in Silver. If you're out of stock, ok to sub similar.
+Let me know if we can add these to our July PO!`,
+
+		sourceSpreadsheet: `Item,Qty,Material/Finish,Notes
+Cable Chain 18",10,Silver,Need by 7/10
+Thin Stacking Ring,20,Silver,Size 7 & 8 mix
+Horse Pin,6,Silver,Awaiting size resolution`,
+
+		sourcePoText: `PURCHASE ORDER
+DRIFTWOOD COLLECTIVE
+PO Number: DC-0725
+Date: June 27, 2026
+
+Bill To: Driftwood Collective Account Payables
+Ship To: Driftwood Collective, 123 Ocean Ave, Santa Cruz, CA 95060
+
+Line  Item Code      Description                  Qty  Unit Price
+-----------------------------------------------------------------
+1     HB-HORSE-M     Horse Pin Medium             12   $32.00
+2     HB-MTN-P       Mountain Pendant             6    $42.00
+3     HB-WAVE-C      Wave Cuff                    4    $75.00
+4     HB-SB-STUD     Starburst Studs (Gold)       24   $38.00
+5     HB-TSR-2       Thin Stacking Ring           20   $12.00`
+	};
+
+	function handleSourceChange(source: (typeof sourceTypes)[number]) {
+		const oldSource = selectedSource;
+		selectedSource = source;
+		
+		const isCurrentEmpty = !intakeText.trim();
+		const isOldSample = Object.values(samples).map(s => s.trim()).includes(intakeText.trim()) || intakeText.trim() === sampleOrder.trim();
+		if (isCurrentEmpty || isOldSample) {
+			intakeText = samples[source];
+		}
+	}
+
 	const catalog: CatalogItem[] = [
 		{ 
 			styleCode: 'HB-HORSE-M', 
@@ -346,7 +400,7 @@ Heather Benjamin Jewelry`;
 
 	let currentStep = $state<Step>(1);
 	let selectedSource = $state<(typeof sourceTypes)[number]>('sourceEmail');
-	let intakeText = $state(sampleOrder);
+	let intakeText = $state(samples.sourceEmail);
 	let blockers = $state<Blocker[]>(initialBlockers());
 	let lineItems = $state<LineItem[]>(initialLineItems());
 	let activeTab = $state<Tab>('production');
@@ -443,7 +497,7 @@ Heather Benjamin Jewelry`;
 				selectedSource = sourceTypes.includes(parsed.selectedSource)
 					? parsed.selectedSource
 					: 'sourceEmail';
-				intakeText = parsed.intakeText ?? sampleOrder;
+				intakeText = parsed.intakeText ?? samples.sourceEmail;
 				blockers = parsed.blockers ?? initialBlockers();
 				lineItems = parsed.lineItems ?? initialLineItems();
 				activeTab = parsed.activeTab ?? 'production';
@@ -530,8 +584,7 @@ Heather Benjamin Jewelry`;
 	}
 
 	function useSampleOrder() {
-		intakeText = sampleOrder;
-		selectedSource = 'sourceEmail';
+		intakeText = samples[selectedSource];
 		uploadedFiles = [];
 		sampleUsed = true;
 		resetDemoState();
@@ -543,7 +596,7 @@ Heather Benjamin Jewelry`;
 		if (target.files && target.files.length > 0) {
 			const files = Array.from(target.files);
 			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
-			intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + sampleOrder;
+			intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + samples[selectedSource];
 			resetDemoState();
 			showToast(`${files.length} ${t.fileUploaded}`);
 		}
@@ -554,14 +607,14 @@ Heather Benjamin Jewelry`;
 		if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
 			const files = Array.from(event.dataTransfer.files);
 			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
-			intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + sampleOrder;
+			intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + samples[selectedSource];
 			resetDemoState();
 			showToast(`${files.length} ${t.fileUploaded}`);
 		}
 	}
 	function processOrder() {
 		if (!intakeText.trim()) {
-			intakeText = sampleOrder;
+			intakeText = samples[selectedSource];
 		}
 		processClicked = true;
 		resetDemoState();
@@ -1257,7 +1310,7 @@ Heather Benjamin Jewelry`;
 												<button
 													class={`chip ${selectedSource === source ? 'chip-active' : ''}`}
 													type="button"
-													onclick={() => (selectedSource = source)}
+													onclick={() => handleSourceChange(source)}
 												>
 													{sourceLabel(source)}
 												</button>
@@ -1325,7 +1378,7 @@ Heather Benjamin Jewelry`;
 															onclick={() => {
 																uploadedFiles = uploadedFiles.filter((_, i) => i !== index);
 																if (uploadedFiles.length > 0) {
-																	intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + sampleOrder;
+																	intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + samples[selectedSource];
 																} else {
 																	intakeText = '';
 																}
