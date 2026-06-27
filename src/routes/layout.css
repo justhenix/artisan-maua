@@ -46,12 +46,93 @@ button:disabled {
 	letter-spacing: 0;
 }
 
+.app-shell {
+	display: grid;
+	height: 100vh;
+	grid-template-columns: 252px minmax(0, 1fr);
+}
+
+.app-shell-collapsed {
+	grid-template-columns: 76px minmax(0, 1fr);
+}
+
+.app-main {
+	display: grid;
+	height: 100vh;
+	min-height: 0;
+	grid-template-rows: 56px 68px minmax(0, 1fr) auto;
+}
+
+.sidebar {
+	background: white;
+	border-right: 1px solid var(--line);
+	height: 100vh;
+	overflow: auto;
+	padding: 28px 16px;
+	transition:
+		transform 180ms ease,
+		width 180ms ease;
+	z-index: 30;
+}
+
+.sidebar-heading {
+	align-items: flex-start;
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.sidebar-collapsed {
+	padding-left: 12px;
+	padding-right: 12px;
+}
+
+.sidebar-collapsed .sidebar-title,
+.sidebar-collapsed .sidebar-label {
+	display: none;
+}
+
+.sidebar-collapsed nav button {
+	justify-content: center;
+	padding-left: 0;
+	padding-right: 0;
+}
+
+.sidebar-backdrop {
+	background: rgb(0 0 0 / 0.22);
+	inset: 0;
+	position: fixed;
+	z-index: 20;
+}
+
+.icon-button {
+	align-items: center;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: white;
+	color: var(--ink);
+	display: inline-flex;
+	font-weight: 800;
+	height: 38px;
+	justify-content: center;
+	width: 38px;
+}
+
+.icon-button:hover {
+	border-color: var(--brand);
+}
+
+.step-scroll {
+	overflow-x: auto;
+	overflow-y: hidden;
+}
+
 .primary-button {
 	border-radius: 6px;
 	background: var(--brand);
 	color: white;
 	font-weight: 700;
-	min-width: 240px;
+	min-width: 220px;
 	padding: 15px 24px;
 	transition:
 		background 160ms ease,
@@ -292,4 +373,71 @@ button:disabled {
 .status-warn {
 	border-color: var(--warning);
 	color: var(--warning);
+}
+
+@media (max-width: 1023px) {
+	.app-shell,
+	.app-shell-collapsed {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.sidebar {
+		box-shadow: 12px 0 32px rgb(0 0 0 / 0.16);
+		left: 0;
+		position: fixed;
+		top: 0;
+		transform: translateX(-100%);
+		width: min(82vw, 300px);
+	}
+
+	.sidebar-open {
+		transform: translateX(0);
+	}
+
+	.sidebar-collapsed .sidebar-title,
+	.sidebar-collapsed .sidebar-label {
+		display: initial;
+	}
+
+	.sidebar-collapsed nav button {
+		justify-content: flex-start;
+		padding-left: 16px;
+		padding-right: 16px;
+	}
+
+	.primary-button,
+	.secondary-button,
+	.ghost-button {
+		min-width: auto;
+		padding: 11px 14px;
+	}
+
+	.step-button {
+		gap: 8px;
+		padding: 0 8px;
+	}
+
+	.step-index {
+		height: 32px;
+		width: 32px;
+	}
+}
+
+@media (max-width: 640px) {
+	.app-main {
+		grid-template-rows: 54px 62px minmax(0, 1fr) auto;
+	}
+
+	.step-label {
+		font-size: 0.9rem;
+	}
+
+	.next-card {
+		padding: 18px;
+	}
+
+	.status-dot {
+		height: 32px;
+		width: 32px;
+	}
 }

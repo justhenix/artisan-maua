@@ -190,6 +190,8 @@ Heather Benjamin Jewelry`;
 	let toast = $state('');
 	let sent = $state(false);
 	let contentPanel = $state<HTMLDivElement | undefined>();
+	let sidebarCollapsed = $state(false);
+	let mobileSidebarOpen = $state(false);
 
 	const remainingAnswers = $derived(blockers.filter((blocker) => !blocker.answer).length);
 	const allAnswered = $derived(remainingAnswers === 0);
@@ -271,8 +273,24 @@ Heather Benjamin Jewelry`;
 
 	function setStep(step: Step) {
 		currentStep = step;
+		mobileSidebarOpen = false;
 		if (!browser) return;
 		window.requestAnimationFrame(() => contentPanel?.scrollTo({ top: 0, left: 0 }));
+	}
+
+	function previousStep() {
+		if (currentStep > 1) {
+			setStep((currentStep - 1) as Step);
+		}
+	}
+
+	function toggleSidebar() {
+		if (browser && window.innerWidth < 1024) {
+			mobileSidebarOpen = !mobileSidebarOpen;
+			return;
+		}
+
+		sidebarCollapsed = !sidebarCollapsed;
 	}
 
 	function chooseAnswer(blockerId: string, answer: string) {
@@ -416,14 +434,27 @@ Heather Benjamin Jewelry`;
 </svelte:head>
 
 <main class="h-screen overflow-hidden bg-[var(--bg)] text-[var(--ink)]">
-	<div class="grid h-screen lg:grid-cols-[252px_1fr]">
-		<aside class="hidden h-screen overflow-auto border-r border-[var(--line)] bg-white px-4 py-7 lg:block">
-			<div class="flex items-center gap-4">
-				<div class="font-display text-5xl leading-none text-[var(--hb)]">HB</div>
-				<div>
+	<div class={`app-shell ${sidebarCollapsed ? 'app-shell-collapsed' : ''}`}>
+		{#if mobileSidebarOpen}
+			<button
+				class="sidebar-backdrop"
+				type="button"
+				aria-label="Close sidebar"
+				onclick={() => (mobileSidebarOpen = false)}
+			></button>
+		{/if}
+
+		<aside
+			class={`sidebar ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileSidebarOpen ? 'sidebar-open' : ''}`}
+		>
+			<div class="sidebar-heading">
+				<div class="sidebar-title">
 					<p class="font-display text-2xl leading-tight">Artisan</p>
 					<p class="text-sm text-[var(--muted)]">Order-to-Production Assistant</p>
 				</div>
+				<button class="icon-button lg:hidden" type="button" aria-label="Close sidebar" onclick={() => (mobileSidebarOpen = false)}>
+					×
+				</button>
 			</div>
 
 			<nav class="mt-10 space-y-2">
@@ -432,32 +463,30 @@ Heather Benjamin Jewelry`;
 					type="button"
 				>
 					<span aria-hidden="true">▤</span>
-					Orders
+					<span class="sidebar-label">Orders</span>
 				</button>
 				<button
 					class="flex w-full items-center justify-between rounded-md px-4 py-3 text-left text-[var(--ink)]"
 					type="button"
 				>
-					<span class="flex items-center gap-3"><span aria-hidden="true">□</span> Catalog</span>
-					<span class="rounded bg-[var(--surface-muted)] px-2 py-1 text-xs text-[var(--muted)]">Later</span>
+					<span class="flex items-center gap-3"><span aria-hidden="true">□</span> <span class="sidebar-label">Catalog</span></span>
+					<span class="sidebar-label rounded bg-[var(--surface-muted)] px-2 py-1 text-xs text-[var(--muted)]">Later</span>
 				</button>
 			</nav>
 		</aside>
 
-		<section class="grid h-screen min-h-0 grid-rows-[64px_76px_minmax(0,1fr)_98px]">
+		<section class="app-main">
 			<header
-				class="flex items-center justify-end gap-4 border-b border-[var(--line)] bg-white px-7 text-sm text-[var(--muted)]"
+				class="flex items-center justify-between gap-4 border-b border-[var(--line)] bg-white px-4 text-sm text-[var(--muted)] md:px-7"
 			>
-				<span>Demo order flow</span>
-				<span>·</span>
-				<span>Fictional data</span>
-				<span>·</span>
+				<button class="icon-button" type="button" aria-label="Toggle sidebar" onclick={toggleSidebar}>
+					☰
+				</button>
 				<span>Last saved {lastSaved}</span>
-				<span class="rounded-full bg-[var(--surface-muted)] px-3 py-2 font-semibold text-[var(--ink)]">HB</span>
 			</header>
 
-			<div class="border-b border-[var(--line)] bg-white px-10">
-				<div class="mx-auto flex h-full max-w-6xl items-center justify-between gap-4">
+			<div class="step-scroll border-b border-[var(--line)] bg-white px-4 md:px-10">
+				<div class="mx-auto flex h-full min-w-max max-w-6xl items-center justify-between gap-3 md:gap-4">
 					{#each steps as step, index (step.id)}
 						<button
 							class={`step-button ${currentStep === step.id ? 'step-button-active' : ''}`}
@@ -468,7 +497,7 @@ Heather Benjamin Jewelry`;
 							}}
 						>
 							<span class="step-index">{step.id}</span>
-							<span>{step.label}</span>
+							<span class="step-label">{step.label}</span>
 						</button>
 						{#if index < steps.length - 1}
 							<div class="hidden h-px flex-1 bg-[var(--line)] md:block"></div>
@@ -480,9 +509,9 @@ Heather Benjamin Jewelry`;
 			<div class="min-h-0 overflow-auto" bind:this={contentPanel}>
 				{#if currentStep === 1}
 					<section class="grid min-h-full xl:grid-cols-[1fr_368px]">
-						<div class="px-10 py-10">
+						<div class="px-4 py-6 md:px-10 md:py-10">
 							<div class="mx-auto max-w-4xl">
-								<h1 class="font-display text-5xl leading-tight">Add messy order</h1>
+								<h1 class="font-display text-4xl leading-tight md:text-5xl">Add messy order</h1>
 								<p class="mt-4 max-w-3xl text-lg leading-8">
 									Paste a purchase order, email, DM, copied spreadsheet rows, or PDF text.
 									Artisan finds line items and flags unclear production details.
@@ -563,7 +592,7 @@ Heather Benjamin Jewelry`;
 					</section>
 				{:else if currentStep === 2}
 					<section class="grid min-h-full xl:grid-cols-[1fr_352px]">
-						<div class="px-10 py-8">
+						<div class="px-4 py-6 md:px-10 md:py-8">
 							<div class="mx-auto max-w-5xl">
 								<div class="flex flex-wrap items-start justify-between gap-4">
 									<div>
@@ -574,7 +603,7 @@ Heather Benjamin Jewelry`;
 											>
 											<span class="ml-3 normal-case tracking-normal">Client: {client}</span>
 										</p>
-										<h1 class="mt-5 font-display text-5xl leading-tight">Review order</h1>
+										<h1 class="mt-5 font-display text-4xl leading-tight md:text-5xl">Review order</h1>
 										<p class="mt-3 text-lg">Artisan found 8 items</p>
 										<p class="mt-1">
 											{remainingAnswers} production {remainingAnswers === 1 ? 'detail needs' : 'details need'}
@@ -690,7 +719,7 @@ Heather Benjamin Jewelry`;
 						</aside>
 					</section>
 				{:else if currentStep === 3}
-					<section class="px-8 py-8">
+					<section class="px-4 py-6 md:px-8 md:py-8">
 						<div class="mx-auto max-w-7xl">
 							<div class="flex flex-wrap items-start justify-between gap-5">
 								<div>
@@ -701,7 +730,7 @@ Heather Benjamin Jewelry`;
 										>
 										<span class="ml-3 normal-case tracking-normal">Client: {client}</span>
 									</p>
-									<h1 class="mt-5 font-display text-5xl leading-tight">Sheets</h1>
+									<h1 class="mt-5 font-display text-4xl leading-tight md:text-5xl">Sheets</h1>
 									<p class="mt-3">
 										Clean production and packing documents generated from messy order input.
 									</p>
@@ -855,7 +884,7 @@ Heather Benjamin Jewelry`;
 					</section>
 				{:else}
 					<section class="grid min-h-full xl:grid-cols-[1fr_352px]">
-						<div class="px-10 py-9">
+						<div class="px-4 py-6 md:px-10 md:py-9">
 							<div class="mx-auto max-w-5xl">
 								<p class="text-sm uppercase tracking-wide text-[var(--muted)]">
 									Order #{orderId}
@@ -866,7 +895,7 @@ Heather Benjamin Jewelry`;
 								</p>
 								<div class="mt-5 flex flex-wrap items-start justify-between gap-4">
 									<div>
-										<h1 class="font-display text-5xl leading-tight">Update customer</h1>
+										<h1 class="font-display text-4xl leading-tight md:text-5xl">Update customer</h1>
 										<p class="mt-3 text-lg">Edit the customer update before copying or marking sent.</p>
 									</div>
 									<button class="secondary-button" type="button">Preview</button>
@@ -924,8 +953,8 @@ Heather Benjamin Jewelry`;
 				{/if}
 			</div>
 
-			<footer class="border-t border-[var(--line)] bg-white px-8">
-				<div class="flex h-full items-center justify-between gap-5">
+			<footer class="border-t border-[var(--line)] bg-white px-4 md:px-8">
+				<div class="flex h-full flex-col items-stretch justify-center gap-3 md:flex-row md:items-center md:justify-between md:gap-5">
 					<div class="flex items-center gap-4">
 						<span class={`status-dot ${remainingAnswers && currentStep === 2 ? 'status-warn' : ''}`}>
 							{currentStep === 2 && remainingAnswers ? '?' : '✓'}
@@ -948,7 +977,10 @@ Heather Benjamin Jewelry`;
 						</div>
 					</div>
 
-					<div class="flex items-center gap-4">
+					<div class="flex flex-wrap items-center justify-end gap-3 md:gap-4">
+						{#if currentStep > 1}
+							<button class="secondary-button" type="button" onclick={previousStep}>Previous</button>
+						{/if}
 						{#if currentStep === 2}
 							<button class="ghost-button" type="button" onclick={() => showToast('Progress saved.')}>
 								Save progress
@@ -959,9 +991,6 @@ Heather Benjamin Jewelry`;
 						{:else if currentStep === 1}
 							<button class="primary-button" type="button" onclick={processOrder}>Process order →</button>
 						{:else if currentStep === 3}
-							<button class="secondary-button" type="button" onclick={() => setStep(2)}>
-								Back to review
-							</button>
 							<button class="primary-button" type="button" onclick={() => setStep(4)}>
 								Continue to customer update →
 							</button>
