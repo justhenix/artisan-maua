@@ -1953,7 +1953,7 @@ Heather Benjamin Jewelry`;
 								<i class="ri-check-line text-xs font-bold"></i>
 							</span>
 							<div>
-								<strong class="font-semibold text-[var(--brand-dark)]">Composer</strong> · {t.welcomeFeature1}
+								<strong class="font-semibold text-[var(--brand-dark)]">{t.welcomeLabel1}</strong> · {t.welcomeFeature1}
 							</div>
 						</li>
 						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-[var(--ink)]">
@@ -1961,7 +1961,7 @@ Heather Benjamin Jewelry`;
 								<i class="ri-check-line text-xs font-bold"></i>
 							</span>
 							<div>
-								<strong class="font-semibold text-[var(--brand-dark)]">SKU Match</strong> · {t.welcomeFeature2}
+								<strong class="font-semibold text-[var(--brand-dark)]">{t.welcomeLabel2}</strong> · {t.welcomeFeature2}
 							</div>
 						</li>
 						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-[var(--ink)]">
@@ -1969,7 +1969,7 @@ Heather Benjamin Jewelry`;
 								<i class="ri-check-line text-xs font-bold"></i>
 							</span>
 							<div>
-								<strong class="font-semibold text-[var(--brand-dark)]">Guardrail</strong> · {t.welcomeFeature3}
+								<strong class="font-semibold text-[var(--brand-dark)]">{t.welcomeLabel3}</strong> · {t.welcomeFeature3}
 							</div>
 						</li>
 						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-[var(--ink)]">
@@ -1977,7 +1977,7 @@ Heather Benjamin Jewelry`;
 								<i class="ri-check-line text-xs font-bold"></i>
 							</span>
 							<div>
-								<strong class="font-semibold text-[var(--brand-dark)]">Automation</strong> · {t.welcomeFeature4}
+								<strong class="font-semibold text-[var(--brand-dark)]">{t.welcomeLabel4}</strong> · {t.welcomeFeature4}
 							</div>
 						</li>
 					</ul>
