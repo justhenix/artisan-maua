@@ -1919,26 +1919,30 @@ Heather Benjamin Jewelry`;
 
 				<!-- Modal Content -->
 				<div class="p-6 md:p-8 overflow-y-auto">
-					<!-- Version & Subtitle -->
-					<div class="flex items-center gap-2 mb-4 text-[10px] text-[var(--muted)] font-semibold">
-						<span class="px-2 py-0.5 rounded bg-[var(--brand)]/10 text-[var(--brand)] font-semibold tracking-wide">
-							What's new
-						</span>
-						<span>
-							{t.welcomeSubtitle}
-						</span>
+					<!-- Header Section (Side-by-Side) -->
+					<div class="flex items-start gap-4 mb-6">
+						<!-- Icon Box -->
+						<div class="flex items-center justify-center w-14 h-14 rounded-xl bg-[var(--surface-soft)] text-[var(--brand)] shadow-sm border border-[var(--line)] shrink-0">
+							<i class="ri-sparkling-2-line text-2xl"></i>
+						</div>
+						
+						<!-- Header Text -->
+						<div class="flex-1 min-w-0">
+							<div class="flex items-center gap-2 mb-1.5 text-[10px] text-[var(--muted)] font-semibold">
+								<span class="px-2 py-0.5 rounded bg-[var(--brand)]/10 text-[var(--brand)] font-semibold tracking-wide">
+									What's new
+								</span>
+								<span>
+									{t.welcomeSubtitle}
+								</span>
+							</div>
+							<h2 class="font-display text-xl md:text-2xl tracking-tight text-[var(--ink)] leading-snug">
+								{t.welcomeHeading}
+							</h2>
+						</div>
 					</div>
 
-					<!-- Header Illustration / Icon -->
-					<div class="flex items-center justify-center w-14 h-14 rounded-xl bg-[var(--surface-soft)] text-[var(--brand)] mb-6 shadow-sm border border-[var(--line)]">
-						<i class="ri-sparkling-2-line text-2xl"></i>
-					</div>
-
-					<!-- Headings -->
-					<h2 class="font-display text-2xl md:text-3xl tracking-tight text-[var(--ink)]">
-						{t.welcomeHeading}
-					</h2>
-					<p class="mt-3 text-sm text-[var(--muted)] leading-relaxed">
+					<p class="text-sm text-[var(--muted)] leading-relaxed">
 						{t.welcomeSubheading}
 					</p>
 
