@@ -973,14 +973,22 @@ Heather Benjamin Jewelry`;
 					</button>
 					<span class="text-xs text-[var(--muted)]">Last saved {lastSaved}</span>
 				</div>
-				<!-- i18n Language Toggle Button -->
-				<a
-					href={resolve(localizeHref(page.url.pathname, { locale: currentLocale === 'en' ? 'id' : 'en' }) as Pathname)}
-					class="secondary-button flex items-center gap-1.5 px-3 py-1.5 text-xs rounded border border-[var(--line)] bg-white hover:bg-[var(--surface-soft)] transition"
-				>
-					<i class="ri-translate-2 text-sm"></i>
-					<span class="font-semibold">{currentLocale === 'en' ? 'Bahasa Indonesia' : 'English'}</span>
-				</a>
+				<!-- i18n Language Segment Control -->
+				<div class="flex items-center gap-1 border border-[var(--line)] rounded bg-[var(--surface-soft)] p-0.5 text-xs shadow-sm">
+					<i class="ri-translate-2 text-[var(--muted)] px-1 text-sm"></i>
+					<a
+						href={resolve(localizeHref(page.url.pathname, { locale: 'en' }) as Pathname)}
+						class={`px-2 py-1 rounded font-semibold text-xs transition-all ${currentLocale === 'en' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
+					>
+						English
+					</a>
+					<a
+						href={resolve(localizeHref(page.url.pathname, { locale: 'id' }) as Pathname)}
+						class={`px-2 py-1 rounded font-semibold text-xs transition-all ${currentLocale === 'id' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
+					>
+						Indonesia
+					</a>
+				</div>
 			</header>
 
 			<div class="step-scroll border-b border-[var(--line)] bg-white px-4 md:px-10">
