@@ -7,6 +7,12 @@
 	import { page } from '$app/state';
 	import { localizeHref } from '$lib/paraglide/runtime';
 	import type { Pathname } from '$app/types';
+	import CustomerUpdateEditor from '$lib/components/artisan/CustomerUpdateEditor.svelte';
+	import OriginalOrderDrawer from '$lib/components/artisan/OriginalOrderDrawer.svelte';
+	import PackingChecklistTable from '$lib/components/artisan/PackingChecklistTable.svelte';
+	import ProductionSheetTable from '$lib/components/artisan/ProductionSheetTable.svelte';
+	import ReadyChecklist from '$lib/components/artisan/ReadyChecklist.svelte';
+	import ReviewBlockerList from '$lib/components/artisan/ReviewBlockerList.svelte';
 	import enMessages from '../../messages/en.json';
 	import idMessages from '../../messages/id.json';
 
@@ -358,7 +364,6 @@ Heather Benjamin Jewelry`;
 	// New States
 	let uploadedFiles = $state<string[]>([]);
 	let showOriginalDrawer = $state(false);
-	let silverSpotRate = $state(1.05); // Global silver spot price slider
 	let productionGrouping = $state<'material' | 'category'>('material'); // Production group toggle
 	let packedItems = $state<Record<string, boolean>>({}); // Checkbox state for Packing checklist
 	let completedSteps = $state<number>(1);
@@ -399,41 +404,6 @@ Heather Benjamin Jewelry`;
 		return t[source];
 	}
 
-	// Formulaic Weight-Based Pricing Auditor
-	const markupMargin = 1.5;
-	function getCalculatedCost(styleCode: string, spotRate: number): number {
-		const cat = catalog.find(x => x.styleCode === styleCode);
-		if (!cat) return 0;
-		return Number(((cat.baseLabor + (cat.silverWeight * spotRate) + cat.stoneCost) * markupMargin).toFixed(2));
-	}
-
-	const pricingWarnings = $derived(
-		lineItems.filter(item => {
-			if (!item.styleCode) return false;
-			const calc = getCalculatedCost(item.styleCode, silverSpotRate);
-			return calc > item.unitPrice;
-		})
-	);
-
-	function applySafeSpotRate() {
-		let minRate = 1.05;
-		let found = false;
-		pricingWarnings.forEach(item => {
-			if (!item.styleCode) return;
-			const cat = catalog.find(x => x.styleCode === item.styleCode);
-			if (!cat || cat.silverWeight <= 0) return;
-			const rate = (item.unitPrice / markupMargin - cat.baseLabor - cat.stoneCost) / cat.silverWeight;
-			if (rate < minRate) {
-				minRate = rate;
-				found = true;
-			}
-		});
-		if (found) {
-			silverSpotRate = Number(Math.max(0, minRate).toFixed(2));
-			showToast(t.changesSaved);
-		}
-	}
-
 	// Dynamic Blocker & Ready Tracking
 	const remainingAnswers = $derived(blockers.filter((blocker) => !blocker.answer).length);
 	const allAnswered = $derived(remainingAnswers === 0);
@@ -461,11 +431,6 @@ Heather Benjamin Jewelry`;
 		Array.from(new Set(lineItems.map((item) => item.finish))).join(', ')
 	);
 
-	$effect(() => {
-		if (currentStep > completedSteps) {
-			completedSteps = currentStep;
-		}
-	});
 	const maxStep = $derived(allAnswered ? Math.max(completedSteps, 3) as Step : completedSteps as Step);
 
 	// Session Restoration
@@ -487,7 +452,6 @@ Heather Benjamin Jewelry`;
 				lastSaved = parsed.lastSaved ?? '10:42 AM';
 				sent = parsed.sent ?? false;
 				uploadedFiles = parsed.uploadedFiles ?? [];
-				silverSpotRate = parsed.silverSpotRate ?? 1.05;
 				productionGrouping = parsed.productionGrouping ?? 'material';
 				packedItems = parsed.packedItems ?? {};
 				completedSteps = parsed.completedSteps ?? 1;
@@ -517,7 +481,6 @@ Heather Benjamin Jewelry`;
 				lastSaved,
 				sent,
 				uploadedFiles,
-				silverSpotRate,
 				productionGrouping,
 				packedItems,
 				completedSteps,
@@ -607,6 +570,9 @@ Heather Benjamin Jewelry`;
 
 	function setStep(step: Step) {
 		currentStep = step;
+		if (step > completedSteps) {
+			completedSteps = step;
+		}
 		mobileSidebarOpen = false;
 		if (!browser) return;
 		window.requestAnimationFrame(() => contentPanel?.scrollTo({ top: 0, left: 0 }));
@@ -682,8 +648,40 @@ Heather Benjamin Jewelry`;
 		return cat ? cat.category === 'Others' : false;
 	}));
 
+	const materialProductionGroups = $derived([
+		{ name: t.silverProduction, items: silverProduction },
+		{ name: t.goldProduction, items: goldProduction },
+		{ name: t.otherMaterials, items: otherProduction }
+	]);
+
+	const categoryProductionGroups = $derived([
+		{ name: t.pinsAndBrim, items: pinsProduction },
+		{ name: t.traditionalJewelry, items: traditionalProduction },
+		{ name: t.otherAccessories, items: otherCatProduction }
+	]);
+
 	function markDirty() {
 		sheetDirty = true;
+	}
+
+	function updateLineItem(id: string, field: 'styleCode' | 'qty' | 'notes', value: string | number) {
+		const item = lineItems.find((entry) => entry.id === id);
+		if (!item) return;
+		if (field === 'qty') {
+			item.qty = Number(value) || 0;
+		} else {
+			item[field] = String(value);
+		}
+		markDirty();
+	}
+
+	function setPackedItem(id: string, checked: boolean) {
+		packedItems = { ...packedItems, [id]: checked };
+		markDirty();
+	}
+
+	function updateCustomerUpdate(value: string) {
+		customerUpdate = value;
 	}
 
 	function saveChanges() {
@@ -796,6 +794,15 @@ Heather Benjamin Jewelry`;
 		showToast(t.markedAsSentToast);
 	}
 
+	function waitForElement(selector: string, callback: () => void, attempts = 0) {
+		if (!browser) return;
+		if (document.querySelector(selector)) {
+			callback();
+		} else if (attempts < 50) {
+			setTimeout(() => waitForElement(selector, callback, attempts + 1), 50);
+		}
+	}
+
 	// Onboarding Tour logic
 	function startTour() {
 		const d = driver({
@@ -835,8 +842,146 @@ Heather Benjamin Jewelry`;
 					popover: { 
 						title: t.tourProcessTitle,
 						description: t.tourProcessDesc,
-						side: 'top' 
+						side: 'top',
+						onNextClick: () => {
+							processOrder();
+							waitForElement('#blockers-section', () => {
+								d.moveNext();
+							});
+						}
 					} 
+				},
+				{
+					element: '#blockers-section',
+					popover: {
+						title: t.tourReviewBlockersTitle,
+						description: t.tourReviewBlockersDesc,
+						side: 'top',
+						onNextClick: () => {
+							chooseAnswer('starburst-size', 'Large');
+							chooseAnswer('horse-pin-size', 'Medium');
+							setTimeout(() => {
+								d.moveNext();
+							}, 400);
+						},
+						onPrevClick: () => {
+							setStep(1);
+							waitForElement('#process-order-btn', () => {
+								d.movePrevious();
+							});
+						}
+					}
+				},
+				{
+					element: '#ready-checklist-section',
+					popover: {
+						title: t.tourReadyChecklistTitle,
+						description: t.tourReadyChecklistDesc,
+						side: 'top',
+						onNextClick: () => {
+							d.moveNext();
+						},
+						onPrevClick: () => {
+							d.movePrevious();
+						}
+					}
+				},
+				{
+					element: '#continue-to-sheets-btn',
+					popover: {
+						title: t.tourContinueToSheetsTitle,
+						description: t.tourContinueToSheetsDesc,
+						side: 'top',
+						onNextClick: () => {
+							continueToSheets();
+							waitForElement('#sheets-tabs', () => {
+								d.moveNext();
+							});
+						},
+						onPrevClick: () => {
+							d.movePrevious();
+						}
+					}
+				},
+				{
+					element: '#sheets-tabs',
+					popover: {
+						title: t.tourSheetsTabsTitle,
+						description: t.tourSheetsTabsDesc,
+						side: 'bottom',
+						onNextClick: () => {
+							d.moveNext();
+						},
+						onPrevClick: () => {
+							setStep(2);
+							waitForElement('#continue-to-sheets-btn', () => {
+								d.movePrevious();
+							});
+						}
+					}
+				},
+				{
+					element: '#export-dropdown-btn',
+					popover: {
+						title: t.tourExportTitle,
+						description: t.tourExportDesc,
+						side: 'bottom',
+						onNextClick: () => {
+							d.moveNext();
+						},
+						onPrevClick: () => {
+							d.movePrevious();
+						}
+					}
+				},
+				{
+					element: '#continue-to-update-btn',
+					popover: {
+						title: t.tourContinueToUpdateTitle,
+						description: t.tourContinueToUpdateDesc,
+						side: 'top',
+						onNextClick: () => {
+							setStep(4);
+							waitForElement('#customer-update-editor', () => {
+								d.moveNext();
+							});
+						},
+						onPrevClick: () => {
+							d.movePrevious();
+						}
+					}
+				},
+				{
+					element: '#customer-update-editor',
+					popover: {
+						title: t.tourCustomerUpdateTitle,
+						description: t.tourCustomerUpdateDesc,
+						side: 'top',
+						onNextClick: () => {
+							d.moveNext();
+						},
+						onPrevClick: () => {
+							setStep(3);
+							waitForElement('#continue-to-update-btn', () => {
+								d.movePrevious();
+							});
+						}
+					}
+				},
+				{
+					element: '#mark-sent-btn',
+					popover: {
+						title: t.tourMarkSentTitle,
+						description: t.tourMarkSentDesc,
+						side: 'top',
+						onDoneClick: () => {
+							markSent();
+							d.destroy();
+						},
+						onPrevClick: () => {
+							d.movePrevious();
+						}
+					}
 				}
 			]
 		});
@@ -1309,92 +1454,25 @@ Heather Benjamin Jewelry`;
 									</div>
 								</div>
 
-								<h2 class="mt-8 text-sm font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-									{t.needsAnswer} ({remainingAnswers})
-								</h2>
-								<div class="mt-3 space-y-4">
-									{#each blockers as blocker (blocker.id)}
-										<article class={`blocker-card ${blocker.answer ? 'blocker-card-done' : ''}`}>
-											<div class="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-center">
-												<div>
-													<div class="flex flex-wrap items-center gap-3">
-														<span
-															class={`impact flex items-center gap-1.5 ${blocker.impact === 'High impact' ? 'impact-high text-[var(--warning-ink)]' : 'text-[var(--warning-ink)]'}`}
-														>
-															<i class="ri-alert-line" aria-hidden="true"></i>
-															{blocker.impact}
-														</span>
-														{#if blocker.answer}
-															<span class="answered-pill flex items-center gap-1">
-																<i class="ri-checkbox-circle-line" aria-hidden="true"></i>
-																{t.answered}: {blocker.answer}
-															</span>
-														{/if}
-													</div>
-													<h3 class="mt-3 text-lg font-semibold">{blocker.question}</h3>
-													<p class="mt-1 text-sm text-[var(--muted)]">
-														{t.found}: “{blocker.evidence}” ({blocker.source})
-													</p>
-												</div>
-												<div class="flex flex-wrap gap-3 w-full md:w-auto">
-													{#each blocker.options as option (option)}
-														<button
-															class={`choice-card flex flex-col items-start p-3 rounded-lg border text-left transition-all duration-200 cursor-pointer min-w-[130px] flex-1 md:flex-none ${blocker.answer === option ? 'border-[var(--brand)] bg-[var(--surface-soft)] ring-2 ring-[var(--brand)]/10' : 'border-[var(--line)] bg-white hover:border-[var(--brand)] hover:bg-[var(--surface-soft)]'}`}
-															type="button"
-															onclick={() => chooseAnswer(blocker.id, option)}
-														>
-															<span class="font-bold text-sm text-[var(--ink)]">{option}</span>
-															<span class="text-[10px] text-[var(--muted)] mt-1 leading-tight">{getOptionDetail(blocker.id, option)}</span>
-														</button>
-													{/each}
-												</div>
-											</div>
-											<div class="border-t border-[var(--line)] bg-[var(--warning-bg)]/20 px-4 py-3 text-xs text-[var(--warning-ink)] flex items-center gap-2 leading-relaxed">
-												<i class="ri-error-warning-line text-sm text-[var(--warning)] shrink-0" aria-hidden="true"></i>
-												<div>
-													<strong class="font-semibold uppercase tracking-wider text-[10px] text-[var(--brand-dark)] block mb-0.5">
-														{t.productionRisk}:
-													</strong>
-													{blocker.risk}
-												</div>
-											</div>
-										</article>
-									{/each}
+								<div id="blockers-section">
+									<ReviewBlockerList
+										{blockers}
+										{remainingAnswers}
+										{t}
+										{getOptionDetail}
+										onAnswer={chooseAnswer}
+									/>
 								</div>
 
-								<section class="mt-8 rounded-md border border-[var(--line)] bg-white/70 px-4 py-3">
-									<div class="flex flex-wrap items-center justify-between gap-3">
-										<div>
-											<h2 class="text-sm font-semibold text-[var(--muted)]">
-												{t.looksReady} ({readyItems.length})
-											</h2>
-											<p class="mt-1 text-sm text-[var(--muted)]">
-												{formatMessage(t.readySummary, { count: readyItems.length })}
-											</p>
-										</div>
-										<button
-											class="ghost-button px-3 py-2 text-sm"
-											type="button"
-											aria-expanded={readyItemsExpanded}
-											onclick={() => (readyItemsExpanded = !readyItemsExpanded)}
-										>
-											{readyItemsExpanded ? t.hideReadyItems : t.showReadyItems}
-										</button>
-									</div>
-
-									{#if readyItemsExpanded}
-										<ul class="mt-3 space-y-2">
-											{#each readyItems as item (item.id)}
-												<li class="rounded-md bg-[var(--surface-soft)] px-3 py-2">
-													<p class="text-sm font-medium text-[var(--ink)]">{item.item}</p>
-													<p class="mt-0.5 text-sm text-[var(--muted)]">
-														{t.qty} {item.qty} · {item.finish}{item.notes ? ` · ${item.notes}` : ''}
-													</p>
-												</li>
-											{/each}
-										</ul>
-									{/if}
-								</section>
+								<div id="ready-checklist-section">
+									<ReadyChecklist
+										items={readyItems}
+										expanded={readyItemsExpanded}
+										summary={formatMessage(t.readySummary, { count: readyItems.length })}
+										{t}
+										onToggle={(expanded) => (readyItemsExpanded = expanded)}
+									/>
+								</div>
 							</div>
 						</div>
 
@@ -1476,7 +1554,7 @@ Heather Benjamin Jewelry`;
 										{t.saveChanges}
 									</button>
 									<div class="relative">
-										<button class="secondary-button flex items-center" type="button" onclick={() => (exportOpen = !exportOpen)}>
+										<button id="export-dropdown-btn" class="secondary-button flex items-center" type="button" onclick={() => (exportOpen = !exportOpen)}>
 											{t.exportBtn} <i class="ri-arrow-down-s-line ml-1" aria-hidden="true"></i>
 										</button>
 										{#if exportOpen}
@@ -1513,7 +1591,7 @@ Heather Benjamin Jewelry`;
 								</div>
 							</div>
 
-							<div class="mt-9 flex gap-8 border-b border-[var(--line)]">
+							<div id="sheets-tabs" class="mt-9 flex gap-8 border-b border-[var(--line)]">
 								{#each [
 									['production', t.productionSheet],
 									['packing', t.packingChecklist],
@@ -1532,218 +1610,37 @@ Heather Benjamin Jewelry`;
 							<div class={`output-grid ${rightSidebarCollapsed ? 'output-grid-collapsed' : ''}`}>
 								<div class="output-card shadow-sm">
 									{#if activeTab === 'production'}
-										<div class="mb-5 flex flex-wrap items-center justify-between gap-4">
-											<div>
-												<h2 class="font-display text-2xl">{t.productionSheet}</h2>
-												<p class="mt-1 text-sm text-[var(--muted)]">
-													Heather Benjamin Jewelry · Order {orderId} · {client}
-												</p>
-											</div>
-											<!-- Grouping Mode Selector -->
-											<div class="flex items-center gap-2 border border-[var(--line)] rounded bg-[var(--surface-soft)] p-1 text-xs">
-												<span class="px-2 text-[var(--muted)] font-medium">{t.groupBy}</span>
-												<button
-													class={`px-2 py-1 rounded transition font-semibold ${productionGrouping === 'material' ? 'bg-white shadow-sm border border-[var(--line)] text-[var(--brand-dark)]' : 'text-[var(--muted)]'}`}
-													type="button"
-													onclick={() => (productionGrouping = 'material')}
-												>
-													{t.materialFinish}
-												</button>
-												<button
-													class={`px-2 py-1 rounded transition font-semibold ${productionGrouping === 'category' ? 'bg-white shadow-sm border border-[var(--line)] text-[var(--brand-dark)]' : 'text-[var(--muted)]'}`}
-													type="button"
-													onclick={() => (productionGrouping = 'category')}
-												>
-													{t.styleCategory}
-												</button>
-											</div>
-										</div>
-
-										<div class="space-y-8">
-											{#if productionGrouping === 'material'}
-												<!-- GROUP BY MATERIAL -->
-												{#each [
-													{ name: t.silverProduction, items: silverProduction },
-													{ name: t.goldProduction, items: goldProduction },
-													{ name: t.otherMaterials, items: otherProduction }
-												] as group (group.name)}
-													{#if group.items.length > 0}
-														<div class="border border-[var(--line)] rounded-md overflow-hidden bg-white shadow-sm">
-															<div class="bg-[var(--surface-muted)] px-4 py-2 border-b border-[var(--line)]">
-																<h3 class="text-sm font-bold uppercase tracking-wider text-[var(--brand-dark)]">{group.name}</h3>
-															</div>
-															<table class="w-full text-left text-sm">
-																<thead class="bg-[var(--surface-soft)] border-b border-[var(--line)]">
-																	<tr>
-																		<th class="w-24 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.styleCode}</th>
-																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.itemDescription}</th>
-																		<th class="w-16 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.qty}</th>
-																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.technicalInstructions}</th>
-																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.orderNotes}</th>
-																	</tr>
-																</thead>
-																<tbody>
-																	{#each group.items as item (item.id)}
-																		<tr class="border-t border-[var(--line)]">
-																			<td class="px-2 py-2">
-																				<input class="cell-input font-mono text-xs" aria-label={`${t.styleCode}: ${item.item}`} autocomplete="off" bind:value={item.styleCode} oninput={markDirty} />
-																			</td>
-																			<td class="px-3 py-2 font-medium">{item.item}</td>
-																			<td class="px-2 py-2">
-																				<input class="cell-input w-16" type="number" min="0" aria-label={`${t.qty}: ${item.item}`} autocomplete="off" bind:value={item.qty} oninput={markDirty} />
-																			</td>
-																			<td class="px-3 py-2 text-xs leading-relaxed">
-																				{#if item.styleCode}
-																					{@const cat = catalog.find(x => x.styleCode === item.styleCode)}
-																					{#if cat}
-																						<div class="text-[var(--ink)] font-medium">🇬🇧 {cat.notes_en}</div>
-																						<div class="text-[var(--muted)] mt-1 italic">🇮🇩 {cat.notes_id}</div>
-																					{:else}
-																						<span class="text-[var(--muted)]">{t.noInstructionsMapped}</span>
-																					{/if}
-																				{:else}
-																					<span class="text-[var(--warning)] font-semibold flex items-center gap-1">
-																						<i class="ri-error-warning-line" aria-hidden="true"></i>
-																						{t.pendingResolution}
-																					</span>
-																				{/if}
-																			</td>
-																			<td class="px-2 py-2">
-																				<input class="cell-input cell-input-wide text-xs" aria-label={`${t.orderNotes}: ${item.item}`} autocomplete="off" bind:value={item.notes} oninput={markDirty} />
-																			</td>
-																		</tr>
-																	{/each}
-																</tbody>
-															</table>
-														</div>
-													{/if}
-												{/each}
-											{:else}
-												<!-- GROUP BY CATEGORY -->
-												{#each [
-													{ name: t.pinsAndBrim, items: pinsProduction },
-													{ name: t.traditionalJewelry, items: traditionalProduction },
-													{ name: t.otherAccessories, items: otherCatProduction }
-												] as group (group.name)}
-													{#if group.items.length > 0}
-														<div class="border border-[var(--line)] rounded-md overflow-hidden bg-white shadow-sm">
-															<div class="bg-[var(--surface-muted)] px-4 py-2 border-b border-[var(--line)]">
-																<h3 class="text-sm font-bold uppercase tracking-wider text-[var(--brand-dark)]">{group.name}</h3>
-															</div>
-															<table class="w-full text-left text-sm">
-																<thead class="bg-[var(--surface-soft)] border-b border-[var(--line)]">
-																	<tr>
-																		<th class="w-24 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.styleCode}</th>
-																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.itemDescription}</th>
-																		<th class="w-16 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.qty}</th>
-																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.technicalInstructions}</th>
-																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.orderNotes}</th>
-																	</tr>
-																</thead>
-																<tbody>
-																	{#each group.items as item (item.id)}
-																		<tr class="border-t border-[var(--line)]">
-																			<td class="px-2 py-2">
-																				<input class="cell-input font-mono text-xs" aria-label={`${t.styleCode}: ${item.item}`} autocomplete="off" bind:value={item.styleCode} oninput={markDirty} />
-																			</td>
-																			<td class="px-3 py-2 font-medium">{item.item}</td>
-																			<td class="px-2 py-2">
-																				<input class="cell-input w-16" type="number" min="0" aria-label={`${t.qty}: ${item.item}`} autocomplete="off" bind:value={item.qty} oninput={markDirty} />
-																			</td>
-																			<td class="px-3 py-2 text-xs leading-relaxed">
-																				{#if item.styleCode}
-																					{@const cat = catalog.find(x => x.styleCode === item.styleCode)}
-																					{#if cat}
-																						<div class="text-[var(--ink)] font-medium">🇬🇧 {cat.notes_en}</div>
-																						<div class="text-[var(--muted)] mt-1 italic">🇮🇩 {cat.notes_id}</div>
-																					{:else}
-																						<span class="text-[var(--muted)]">{t.noInstructionsMapped}</span>
-																					{/if}
-																				{:else}
-																					<span class="text-[var(--warning)] font-semibold flex items-center gap-1">
-																						<i class="ri-error-warning-line" aria-hidden="true"></i>
-																						{t.pendingResolution}
-																					</span>
-																				{/if}
-																			</td>
-																			<td class="px-2 py-2">
-																				<input class="cell-input cell-input-wide text-xs" aria-label={`${t.orderNotes}: ${item.item}`} autocomplete="off" bind:value={item.notes} oninput={markDirty} />
-																			</td>
-																		</tr>
-																	{/each}
-																</tbody>
-															</table>
-														</div>
-													{/if}
-												{/each}
-											{/if}
-										</div>
+										<ProductionSheetTable
+											{t}
+											{orderId}
+											{client}
+											grouping={productionGrouping}
+											materialGroups={materialProductionGroups}
+											categoryGroups={categoryProductionGroups}
+											{catalog}
+											onGroupingChange={(grouping) => (productionGrouping = grouping)}
+											onUpdateItem={updateLineItem}
+										/>
 									{:else if activeTab === 'packing'}
-										<div class="mb-5">
-											<h2 class="font-display text-2xl">{t.packingChecklist}</h2>
-											<p class="mt-1 text-sm text-[var(--muted)]">
-												{t.baliPackingCheck} · Order {orderId} · {client}
-											</p>
-										</div>
-										<div class="mt-5 overflow-hidden rounded-md border border-[var(--line)] bg-white shadow-sm">
-											<table class="w-full text-left text-sm">
-												<thead class="bg-[var(--surface-soft)] border-b border-[var(--line)]">
-													<tr>
-														<th class="w-12 px-3 py-3 text-center text-xs font-bold text-[var(--muted)]">{t.packed}</th>
-														<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.item}</th>
-														<th class="w-20 px-3 py-3 text-center text-xs font-bold text-[var(--muted)]">{t.qty}</th>
-														<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.packagingSpecifics}</th>
-														<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.fulfillmentFlags}</th>
-														<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.orderNotes}</th>
-													</tr>
-												</thead>
-												<tbody>
-													{#each lineItems as item (item.id)}
-														{@const isBack = isBackordered(item.styleCode)}
-														<tr class={`border-t border-[var(--line)] transition-all duration-150 ${packedItems[item.id] ? 'bg-emerald-50/40' : ''}`}>
-															<td class="px-3 py-3 text-center">
-																<input
-																	type="checkbox"
-																	aria-label={`${t.packed}: ${item.item}`}
-																	bind:checked={packedItems[item.id]}
-																	class="w-4 h-4 rounded border-[var(--line)] accent-[var(--brand)] cursor-pointer"
-																/>
-															</td>
-															<td class="px-3 py-3 font-medium">
-																<span class={packedItems[item.id] ? 'line-through text-[var(--muted)]' : ''}>
-																	{item.item}
-																</span>
-															</td>
-															<td class="px-3 py-3 text-center font-bold">{item.qty}</td>
-															<td class="px-3 py-3 text-xs text-[var(--muted)]">{getPackagingSpecifics(item.styleCode)}</td>
-															<td class="px-3 py-3">
-																{#if isBack}
-																	<span class="inline-flex items-center gap-1 rounded bg-red-100 text-red-700 text-[10px] font-bold px-2 py-1 uppercase tracking-wide border border-red-200">
-																		<i class="ri-time-line" aria-hidden="true"></i>
-																		{t.backorder}
-																	</span>
-																	<span class="text-[10px] text-[var(--muted)] block mt-1">{t.splitShipAfterCasting}</span>
-																{:else}
-																	<span class="inline-flex items-center gap-1 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-1 uppercase tracking-wide border border-emerald-200">
-																		<i class="ri-send-plane-line" aria-hidden="true"></i>
-																		{t.directShip}
-																	</span>
-																{/if}
-															</td>
-															<td class="px-3 py-3 text-xs text-[var(--muted)] italic">{item.notes}</td>
-														</tr>
-													{/each}
-												</tbody>
-											</table>
-										</div>
+										<PackingChecklistTable
+											{t}
+											{orderId}
+											{client}
+											{lineItems}
+											{packedItems}
+											{getPackagingSpecifics}
+											{isBackordered}
+											onTogglePacked={setPackedItem}
+										/>
 									{:else}
 										<h2 class="font-display text-2xl">{t.customerUpdateDraft}</h2>
 										<p class="mt-1 text-sm text-[var(--muted)]">{t.editDraftDirectly}</p>
-										<textarea
-											class="mt-5 h-[420px] w-full resize-none rounded-md border border-[var(--line)] bg-[var(--surface-soft)] p-4 leading-7 outline-none focus:border-[var(--brand)] focus:bg-white"
-											aria-label={t.message}
-											bind:value={customerUpdate}
-										></textarea>
+										<CustomerUpdateEditor
+											label={t.message}
+											value={customerUpdate}
+											onInput={updateCustomerUpdate}
+											textareaClass="mt-5 h-[420px] w-full resize-none rounded-md border border-[var(--line)] bg-[var(--surface-soft)] p-4 leading-7 outline-none focus:border-[var(--brand)] focus:bg-white"
+										/>
 									{/if}
 								</div>
 
@@ -1812,16 +1709,14 @@ Heather Benjamin Jewelry`;
 									</div>
 								</div>
 
-								<label class="mt-8 block">
-									<span class="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-										{t.message}
-									</span>
-									<textarea
-										class="customer-textarea shadow-inner"
-										aria-label={t.message}
-										bind:value={customerUpdate}
-									></textarea>
-								</label>
+								<div id="customer-update-editor" class="mt-8">
+									<CustomerUpdateEditor
+										label={t.message}
+										value={customerUpdate}
+										onInput={updateCustomerUpdate}
+										labelClass="text-sm font-semibold text-[var(--muted)]"
+									/>
+								</div>
 							</div>
 						</div>
 					</section>
@@ -1869,20 +1764,20 @@ Heather Benjamin Jewelry`;
 											{t.resolveToContinue}
 										</span>
 									{/if}
-									<button class="primary-button flex items-center justify-center font-bold" type="button" disabled={!allAnswered} onclick={continueToSheets}>
+									<button id="continue-to-sheets-btn" class="primary-button flex items-center justify-center font-bold" type="button" disabled={!allAnswered} onclick={continueToSheets}>
 										{t.continueToSheets} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
 									</button>
 								</div>
 							{:else}
 								{#if currentStep === 3}
-									<button class="primary-button flex items-center justify-center font-bold" type="button" onclick={() => setStep(4)}>
+									<button id="continue-to-update-btn" class="primary-button flex items-center justify-center font-bold" type="button" onclick={() => setStep(4)}>
 										{t.continueToCustomerUpdate} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
 									</button>
 								{:else}
 									<button class="secondary-button flex items-center gap-1.5" type="button" onclick={copyCustomerUpdate}>
 										<i class="ri-file-copy-line" aria-hidden="true"></i> {t.copyUpdate}
 									</button>
-									<button class="primary-button flex items-center gap-1.5 font-bold" type="button" onclick={markSent}>
+									<button id="mark-sent-btn" class="primary-button flex items-center gap-1.5 font-bold" type="button" onclick={markSent}>
 										<i class="ri-send-plane-line" aria-hidden="true"></i> {t.markSent}
 									</button>
 								{/if}
@@ -1894,31 +1789,13 @@ Heather Benjamin Jewelry`;
 		</section>
 	</div>
 
-	<!-- Original Order Drawer -->
 	{#if showOriginalDrawer}
-		<button
-			class="drawer-backdrop"
-			type="button"
-			aria-label={t.closeDrawer}
-			onclick={() => (showOriginalDrawer = false)}
-		></button>
-		<div class="drawer">
-			<div class="drawer-header">
-				<h2 class="font-display text-2xl">{t.viewOriginal}</h2>
-				<button class="icon-button font-bold" type="button" aria-label={t.closeDrawer} onclick={() => (showOriginalDrawer = false)}>
-					<i class="ri-close-line text-lg" aria-hidden="true"></i>
-				</button>
-			</div>
-			<div class="drawer-content">
-				<div class="rounded bg-[var(--surface-soft)] p-4 border border-[var(--line)] shadow-inner">
-					<p class="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] mb-2">{t.pastedSourceContent}</p>
-					<pre class="font-mono text-xs whitespace-pre-wrap leading-5 select-text">{intakeText}</pre>
-				</div>
-				<div class="mt-4 text-xs text-[var(--muted)]">
-					{t.sourceChannel}: {sourceLabel(selectedSource)} {uploadedFiles.length > 0 ? `(${t.uploaded}: ${uploadedFiles.join(', ')})` : ''}
-				</div>
-			</div>
-		</div>
+		<OriginalOrderDrawer
+			{t}
+			{intakeText}
+			sourceDetail={`${t.sourceChannel}: ${sourceLabel(selectedSource)} ${uploadedFiles.length > 0 ? `(${t.uploaded}: ${uploadedFiles.join(', ')})` : ''}`}
+			onClose={() => (showOriginalDrawer = false)}
+		/>
 	{/if}
 
 	{#if toast}
