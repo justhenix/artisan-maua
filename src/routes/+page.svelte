@@ -889,187 +889,196 @@ Heather Benjamin Jewelry`;
 
 	// Onboarding Tour logic
 	function startTour() {
-		const d = driver({
-			showProgress: true,
-			nextBtnText: t.tourNext,
-			prevBtnText: t.tourBack,
-			doneBtnText: t.tourDone,
-			animate: true, // Animations enabled as viewport fits clean and scroll-free
-			steps: [
-				{ 
-					element: '#sidebar-logo', 
-					popover: { 
-						title: t.tourWelcomeTitle,
-						description: t.tourWelcomeDesc,
-						side: 'right', 
-						align: 'start' 
-					} 
-				},
-				{ 
-					element: '#intake-scratchpad', 
-					popover: { 
-						title: t.tourIntakeTitle,
-						description: t.tourIntakeDesc,
-						side: 'bottom' 
-					} 
-				},
-				{ 
-					element: '#try-sample-container', 
-					popover: { 
-						title: t.tourSampleTitle,
-						description: t.tourSampleDesc,
-						side: 'top' 
-					} 
-				},
-				{ 
-					element: '#process-order-btn', 
-					popover: { 
-						title: t.tourProcessTitle,
-						description: t.tourProcessDesc,
-						side: 'top',
-						onNextClick: () => {
-							processOrder();
-							waitForElement('#blockers-section', () => {
-								d.moveNext();
-							});
+		// Reset page step and demo answers before tour starts
+		setStep(1);
+		resetDemoState();
+		intakeText = samples.sourceEmail;
+		selectedSource = 'sourceEmail';
+
+		waitForElement('#intake-scratchpad', () => {
+			const d = driver({
+				showProgress: true,
+				nextBtnText: t.tourNext,
+				prevBtnText: t.tourBack,
+				doneBtnText: t.tourDone,
+				animate: true, // Animations enabled as viewport fits clean and scroll-free
+				steps: [
+					{ 
+						element: '#sidebar-logo', 
+						popover: { 
+							title: t.tourWelcomeTitle,
+							description: t.tourWelcomeDesc,
+							side: 'right', 
+							align: 'start' 
+						} 
+					},
+					{ 
+						element: '#intake-scratchpad', 
+						popover: { 
+							title: t.tourIntakeTitle,
+							description: t.tourIntakeDesc,
+							side: 'bottom' 
+						} 
+					},
+					{ 
+						element: '#try-sample-container', 
+						popover: { 
+							title: t.tourSampleTitle,
+							description: t.tourSampleDesc,
+							side: 'top' 
+						} 
+					},
+					{ 
+						element: '#process-order-btn', 
+						popover: { 
+							title: t.tourProcessTitle,
+							description: t.tourProcessDesc,
+							side: 'top',
+							onNextClick: () => {
+								processOrder();
+								waitForElement('#blockers-section', () => {
+									d.moveNext();
+								});
+							}
+						} 
+					},
+					{
+						element: '#blockers-section',
+						popover: {
+							title: t.tourReviewBlockersTitle,
+							description: t.tourReviewBlockersDesc,
+							side: 'top',
+							onNextClick: () => {
+								chooseAnswer('starburst-size', 'Large');
+								chooseAnswer('horse-pin-size', 'Medium');
+								setTimeout(() => {
+									d.moveNext();
+								}, 400);
+							},
+							onPrevClick: () => {
+								setStep(1);
+								resetDemoState();
+								waitForElement('#process-order-btn', () => {
+									d.movePrevious();
+								});
+							}
 						}
-					} 
-				},
-				{
-					element: '#blockers-section',
-					popover: {
-						title: t.tourReviewBlockersTitle,
-						description: t.tourReviewBlockersDesc,
-						side: 'top',
-						onNextClick: () => {
-							chooseAnswer('starburst-size', 'Large');
-							chooseAnswer('horse-pin-size', 'Medium');
-							setTimeout(() => {
+					},
+					{
+						element: '#ready-checklist-section',
+						popover: {
+							title: t.tourReadyChecklistTitle,
+							description: t.tourReadyChecklistDesc,
+							side: 'top',
+							onNextClick: () => {
 								d.moveNext();
-							}, 400);
-						},
-						onPrevClick: () => {
-							setStep(1);
-							waitForElement('#process-order-btn', () => {
+							},
+							onPrevClick: () => {
 								d.movePrevious();
-							});
+							}
 						}
-					}
-				},
-				{
-					element: '#ready-checklist-section',
-					popover: {
-						title: t.tourReadyChecklistTitle,
-						description: t.tourReadyChecklistDesc,
-						side: 'top',
-						onNextClick: () => {
-							d.moveNext();
-						},
-						onPrevClick: () => {
-							d.movePrevious();
-						}
-					}
-				},
-				{
-					element: '#continue-to-sheets-btn',
-					popover: {
-						title: t.tourContinueToSheetsTitle,
-						description: t.tourContinueToSheetsDesc,
-						side: 'top',
-						onNextClick: () => {
-							continueToSheets();
-							waitForElement('#sheets-tabs', () => {
-								d.moveNext();
-							});
-						},
-						onPrevClick: () => {
-							d.movePrevious();
-						}
-					}
-				},
-				{
-					element: '#sheets-tabs',
-					popover: {
-						title: t.tourSheetsTabsTitle,
-						description: t.tourSheetsTabsDesc,
-						side: 'bottom',
-						onNextClick: () => {
-							d.moveNext();
-						},
-						onPrevClick: () => {
-							setStep(2);
-							waitForElement('#continue-to-sheets-btn', () => {
+					},
+					{
+						element: '#continue-to-sheets-btn',
+						popover: {
+							title: t.tourContinueToSheetsTitle,
+							description: t.tourContinueToSheetsDesc,
+							side: 'top',
+							onNextClick: () => {
+								continueToSheets();
+								waitForElement('#sheets-tabs', () => {
+									d.moveNext();
+								});
+							},
+							onPrevClick: () => {
 								d.movePrevious();
-							});
+							}
 						}
-					}
-				},
-				{
-					element: '#export-dropdown-btn',
-					popover: {
-						title: t.tourExportTitle,
-						description: t.tourExportDesc,
-						side: 'bottom',
-						onNextClick: () => {
-							d.moveNext();
-						},
-						onPrevClick: () => {
-							d.movePrevious();
-						}
-					}
-				},
-				{
-					element: '#continue-to-update-btn',
-					popover: {
-						title: t.tourContinueToUpdateTitle,
-						description: t.tourContinueToUpdateDesc,
-						side: 'top',
-						onNextClick: () => {
-							setStep(4);
-							waitForElement('#customer-update-editor', () => {
+					},
+					{
+						element: '#sheets-tabs',
+						popover: {
+							title: t.tourSheetsTabsTitle,
+							description: t.tourSheetsTabsDesc,
+							side: 'bottom',
+							onNextClick: () => {
 								d.moveNext();
-							});
-						},
-						onPrevClick: () => {
-							d.movePrevious();
+							},
+							onPrevClick: () => {
+								setStep(2);
+								waitForElement('#continue-to-sheets-btn', () => {
+									d.movePrevious();
+								});
+							}
 						}
-					}
-				},
-				{
-					element: '#customer-update-editor',
-					popover: {
-						title: t.tourCustomerUpdateTitle,
-						description: t.tourCustomerUpdateDesc,
-						side: 'top',
-						onNextClick: () => {
-							d.moveNext();
-						},
-						onPrevClick: () => {
-							setStep(3);
-							waitForElement('#continue-to-update-btn', () => {
+					},
+					{
+						element: '#export-dropdown-btn',
+						popover: {
+							title: t.tourExportTitle,
+							description: t.tourExportDesc,
+							side: 'bottom',
+							onNextClick: () => {
+								d.moveNext();
+							},
+							onPrevClick: () => {
 								d.movePrevious();
-							});
+							}
+						}
+					},
+					{
+						element: '#continue-to-update-btn',
+						popover: {
+							title: t.tourContinueToUpdateTitle,
+							description: t.tourContinueToUpdateDesc,
+							side: 'top',
+							onNextClick: () => {
+								setStep(4);
+								waitForElement('#customer-update-editor', () => {
+									d.moveNext();
+								});
+							},
+							onPrevClick: () => {
+								d.movePrevious();
+							}
+						}
+					},
+					{
+						element: '#customer-update-editor',
+						popover: {
+							title: t.tourCustomerUpdateTitle,
+							description: t.tourCustomerUpdateDesc,
+							side: 'top',
+							onNextClick: () => {
+								d.moveNext();
+							},
+							onPrevClick: () => {
+								setStep(3);
+								waitForElement('#continue-to-update-btn', () => {
+									d.movePrevious();
+								});
+							}
+						}
+					},
+					{
+						element: '#mark-sent-btn',
+						popover: {
+							title: t.tourMarkSentTitle,
+							description: t.tourMarkSentDesc,
+							side: 'top',
+							onDoneClick: () => {
+								markSent();
+								d.destroy();
+							},
+							onPrevClick: () => {
+								d.movePrevious();
+							}
 						}
 					}
-				},
-				{
-					element: '#mark-sent-btn',
-					popover: {
-						title: t.tourMarkSentTitle,
-						description: t.tourMarkSentDesc,
-						side: 'top',
-						onDoneClick: () => {
-							markSent();
-							d.destroy();
-						},
-						onPrevClick: () => {
-							d.movePrevious();
-						}
-					}
-				}
-			]
+				]
+			});
+			d.drive();
 		});
-		d.drive();
 	}
 
 	onMount(() => {
@@ -1865,10 +1874,10 @@ Heather Benjamin Jewelry`;
 										{t.continueToCustomerUpdate} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
 									</button>
 								{:else}
-									<button class="secondary-button flex items-center gap-1.5" type="button" onclick={copyCustomerUpdate}>
+									<button class="secondary-button flex items-center justify-center gap-1.5" type="button" onclick={copyCustomerUpdate}>
 										<i class="ri-file-copy-line" aria-hidden="true"></i> {t.copyUpdate}
 									</button>
-									<button id="mark-sent-btn" class="primary-button flex items-center gap-1.5 font-bold" type="button" onclick={markSent}>
+									<button id="mark-sent-btn" class="primary-button flex items-center justify-center gap-1.5 font-bold" type="button" onclick={markSent}>
 										<i class="ri-send-plane-line" aria-hidden="true"></i> {t.markSent}
 									</button>
 								{/if}
@@ -1911,18 +1920,18 @@ Heather Benjamin Jewelry`;
 				<!-- Modal Content -->
 				<div class="p-6 md:p-8 overflow-y-auto">
 					<!-- Version & Subtitle -->
-					<div class="flex items-center gap-2 mb-4">
-						<span class="px-2 py-0.5 rounded bg-[var(--brand)]/10 text-[var(--brand)] text-[10px] font-bold uppercase tracking-wider">
-							What's New
+					<div class="flex items-center gap-2 mb-4 text-[10px] text-[var(--muted)] font-semibold">
+						<span class="px-2 py-0.5 rounded bg-[var(--brand)]/10 text-[var(--brand)] font-semibold tracking-wide">
+							What's new
 						</span>
-						<span class="text-[10px] text-[var(--muted)] font-semibold">
+						<span>
 							{t.welcomeSubtitle}
 						</span>
 					</div>
 
 					<!-- Header Illustration / Icon -->
-					<div class="flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--surface-soft)] text-[var(--brand)] mb-6 shadow-sm border border-[var(--line)]">
-						<i class="ri-sparkling-2-line text-3xl"></i>
+					<div class="flex items-center justify-center w-14 h-14 rounded-xl bg-[var(--surface-soft)] text-[var(--brand)] mb-6 shadow-sm border border-[var(--line)]">
+						<i class="ri-sparkling-2-line text-2xl"></i>
 					</div>
 
 					<!-- Headings -->
@@ -1935,36 +1944,36 @@ Heather Benjamin Jewelry`;
 
 					<!-- Features list -->
 					<ul class="mt-6 space-y-4">
-						<li class="flex gap-3 items-start text-xs leading-relaxed text-[var(--ink)]">
-							<span class="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5 animate-pulse">
-								<i class="ri-checkbox-circle-line text-sm"></i>
+						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-[var(--ink)]">
+							<span class="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
+								<i class="ri-check-line text-xs font-bold"></i>
 							</span>
 							<div>
-								<strong class="font-bold text-[var(--brand-dark)]">Composer</strong>: {t.welcomeFeature1}
+								<strong class="font-semibold text-[var(--brand-dark)]">Composer</strong> · {t.welcomeFeature1}
 							</div>
 						</li>
-						<li class="flex gap-3 items-start text-xs leading-relaxed text-[var(--ink)]">
+						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-[var(--ink)]">
 							<span class="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
-								<i class="ri-checkbox-circle-line text-sm"></i>
+								<i class="ri-check-line text-xs font-bold"></i>
 							</span>
 							<div>
-								<strong class="font-bold text-[var(--brand-dark)]">SKU Match</strong>: {t.welcomeFeature2}
+								<strong class="font-semibold text-[var(--brand-dark)]">SKU Match</strong> · {t.welcomeFeature2}
 							</div>
 						</li>
-						<li class="flex gap-3 items-start text-xs leading-relaxed text-[var(--ink)]">
+						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-[var(--ink)]">
 							<span class="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
-								<i class="ri-checkbox-circle-line text-sm"></i>
+								<i class="ri-check-line text-xs font-bold"></i>
 							</span>
 							<div>
-								<strong class="font-bold text-[var(--brand-dark)]">Guardrail</strong>: {t.welcomeFeature3}
+								<strong class="font-semibold text-[var(--brand-dark)]">Guardrail</strong> · {t.welcomeFeature3}
 							</div>
 						</li>
-						<li class="flex gap-3 items-start text-xs leading-relaxed text-[var(--ink)]">
+						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-[var(--ink)]">
 							<span class="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
-								<i class="ri-checkbox-circle-line text-sm"></i>
+								<i class="ri-check-line text-xs font-bold"></i>
 							</span>
 							<div>
-								<strong class="font-bold text-[var(--brand-dark)]">Automation</strong>: {t.welcomeFeature4}
+								<strong class="font-semibold text-[var(--brand-dark)]">Automation</strong> · {t.welcomeFeature4}
 							</div>
 						</li>
 					</ul>
@@ -1974,14 +1983,14 @@ Heather Benjamin Jewelry`;
 				<div class="border-t border-[var(--line)] bg-[var(--surface-soft)] p-4 flex items-center justify-between gap-3 shrink-0">
 					<button 
 						type="button" 
-						class="text-xs text-[var(--muted)] hover:text-[var(--ink)] font-semibold transition cursor-pointer px-3 py-2 rounded hover:bg-[var(--surface-muted)]"
+						class="text-xs text-[var(--muted)] hover:text-[var(--ink)] font-semibold transition cursor-pointer px-4 py-2.5 rounded hover:bg-[var(--surface-muted)] bg-transparent border-0"
 						onclick={closeWelcomeModal}
 					>
 						{t.skipGuide}
 					</button>
 					<button 
 						type="button" 
-						class="primary-button text-xs font-bold py-2 px-5 shadow-md flex items-center gap-1.5 cursor-pointer"
+						class="bg-[var(--brand)] hover:bg-[var(--brand-dark)] text-white text-xs font-bold py-2.5 px-6 rounded shadow transition duration-150 flex items-center gap-1.5 cursor-pointer border-0"
 						onclick={handleLetsGo}
 					>
 						{t.letsGo} <i class="ri-arrow-right-line"></i>
