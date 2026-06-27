@@ -1170,16 +1170,20 @@ Heather Benjamin Jewelry`;
 									{:else}
 										<!-- Upload Mode Panel -->
 										<div 
-											class={`border-2 border-dashed rounded-lg p-10 text-center transition-all duration-300 relative ${isDragging ? 'border-[var(--brand)] bg-[var(--surface-soft)] scale-[1.01] ring-4 ring-[var(--brand)]/10' : 'border-[var(--line)] bg-[var(--surface-soft)] hover:border-[var(--brand)] hover:bg-[var(--surface-soft)]'}`}
+											class={`border-2 rounded-lg p-10 text-center transition-all duration-300 relative ${isDragging ? 'border-[var(--brand)] bg-[var(--brand)]/10 scale-[1.02] ring-4 ring-[var(--brand)]/20 border-solid' : 'border-dashed border-[var(--line)] bg-[var(--surface-soft)] hover:border-[var(--brand)] hover:bg-[var(--surface-soft)]'}`}
 											role="region"
 											aria-label="File upload dropzone"
-											ondragenter={(e) => { e.preventDefault(); isDragging = true; }}
-											ondragover={(e) => { e.preventDefault(); isDragging = true; }}
-											ondragleave={() => { isDragging = false; }}
-											ondrop={handleFileDrop}
 										>
-											<input class="absolute inset-0 w-full h-full opacity-0 cursor-pointer animate-none" type="file" onchange={handleFileUpload} />
-											<i class={`ri-upload-cloud-2-line text-4xl block mb-3 transition-transform duration-300 ${isDragging ? 'text-[var(--brand)] scale-110 animate-pulse' : 'text-[var(--brand)]'}`}></i>
+											<input 
+												class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+												type="file" 
+												onchange={handleFileUpload}
+												ondragenter={(e) => { e.preventDefault(); isDragging = true; }}
+												ondragover={(e) => { e.preventDefault(); isDragging = true; }}
+												ondragleave={() => { isDragging = false; }}
+												ondrop={handleFileDrop}
+											/>
+											<i class={`ri-upload-cloud-2-line text-4xl block mb-3 transition-transform duration-300 ${isDragging ? 'text-[var(--brand)] scale-110' : 'text-[var(--brand)]'}`}></i>
 											<strong class="block text-base text-[var(--ink)] mb-1">
 												{currentLocale === 'id' ? 'Tarik & lepas file di sini' : 'Drag & drop file here'}
 											</strong>
