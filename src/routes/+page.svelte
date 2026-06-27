@@ -356,6 +356,7 @@ Heather Benjamin Jewelry`;
 	let activeIngestTab = $state<'paste' | 'upload'>('paste');
 	let sampleUsed = $state(false);
 	let processClicked = $state(false);
+	let isDragging = $state(false);
 
 	const step1_item1 = $derived(intakeText.trim().length > 0 || uploadedFile.trim().length > 0);
 	const step1_item2 = $derived(sampleUsed);
@@ -370,8 +371,8 @@ Heather Benjamin Jewelry`;
 		addOrder: currentLocale === 'id' ? 'Input Pesanan' : 'Add Order',
 		addWholesaleOrder: currentLocale === 'id' ? 'Input Pesanan Grosir' : 'Add wholesale order',
 		intakeDesc: currentLocale === 'id' 
-			? 'Tempel detail PO, email, chat DM, baris spreadsheet, atau teks PDF di bawah. Artisan akan mengelompokkan item secara otomatis dan menandai hal yang perlu dikonfirmasi.'
-			: 'Paste a purchase order, email, DM, copied spreadsheet rows, or PDF text. Artisan finds line items and flags unclear production details.',
+			? 'Tempel PO, email, atau chat di bawah. Artisan akan mengekstrak item dan menandai hal yang butuh konfirmasi.'
+			: 'Paste your PO, email, or chat below. Artisan will extract items and highlight details needing confirmation.',
 		uploadInstead: currentLocale === 'id' ? 'Unggah File' : 'Upload file instead',
 		trySample: currentLocale === 'id' ? 'Gunakan Contoh Pesanan' : 'Try sample order',
 		processOrder: currentLocale === 'id' ? 'Mulai Proses' : 'Process order',
@@ -412,7 +413,7 @@ Heather Benjamin Jewelry`;
 		replayTour: currentLocale === 'id' ? 'Ulangi Panduan' : 'Replay Tour',
 		nextTitle: currentLocale === 'id' ? 'Cara Kerja Artisan' : 'What happens next',
 		extractTitle: currentLocale === 'id' ? '1. Ekstrak Data Otomatis' : 'Extract line items',
-		extractDesc: currentLocale === 'id' ? 'Detail produk, jumlah, material, dan catatan akan terbaca otomatis dari dokumen.' : 'Products, quantities, finishes, and notes are pulled from unstructured input.',
+		extractDesc: currentLocale === 'id' ? 'Ekstrak otomatis item, jumlah, dan bahan.' : 'Auto-extract products, quantities, and finishes.',
 		answerTitle: currentLocale === 'id' ? '2. Konfirmasi Detail' : 'Answer unclear details',
 		answerDesc: currentLocale === 'id' ? 'Artisan akan memunculkan pertanyaan jika ada spesifikasi produk yang kurang jelas.' : 'Questions appear only when production details are unclear.',
 		createTitle: currentLocale === 'id' ? '3. Lembar Kerja Siap' : 'Create sheets',
@@ -599,7 +600,17 @@ Heather Benjamin Jewelry`;
 			showToast(`Uploaded ${file.name}. Click Process to begin.`);
 		}
 	}
-
+	function handleFileDrop(event: DragEvent) {
+		event.preventDefault();
+		isDragging = false;
+		if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
+			const file = event.dataTransfer.files[0];
+			uploadedFile = file.name;
+			intakeText = `[File Source: ${file.name}]\n\n` + sampleOrder;
+			resetDemoState();
+			showToast(currentLocale === 'id' ? `File ${file.name} berhasil diunggah` : `File ${file.name} uploaded successfully.`);
+		}
+	}
 	function processOrder() {
 		if (!intakeText.trim()) {
 			intakeText = sampleOrder;
@@ -1158,9 +1169,17 @@ Heather Benjamin Jewelry`;
 										</div>
 									{:else}
 										<!-- Upload Mode Panel -->
-										<div class="border-2 border-dashed border-[var(--line)] rounded-lg p-10 text-center hover:border-[var(--brand)] transition bg-[var(--surface-soft)] relative">
-											<input class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" type="file" onchange={handleFileUpload} />
-											<i class="ri-upload-cloud-2-line text-4xl text-[var(--brand)] block mb-3"></i>
+										<div 
+											class={`border-2 border-dashed rounded-lg p-10 text-center transition-all duration-300 relative ${isDragging ? 'border-[var(--brand)] bg-[var(--surface-soft)] scale-[1.01] ring-4 ring-[var(--brand)]/10' : 'border-[var(--line)] bg-[var(--surface-soft)] hover:border-[var(--brand)] hover:bg-[var(--surface-soft)]'}`}
+											role="region"
+											aria-label="File upload dropzone"
+											ondragenter={(e) => { e.preventDefault(); isDragging = true; }}
+											ondragover={(e) => { e.preventDefault(); isDragging = true; }}
+											ondragleave={() => { isDragging = false; }}
+											ondrop={handleFileDrop}
+										>
+											<input class="absolute inset-0 w-full h-full opacity-0 cursor-pointer animate-none" type="file" onchange={handleFileUpload} />
+											<i class={`ri-upload-cloud-2-line text-4xl block mb-3 transition-transform duration-300 ${isDragging ? 'text-[var(--brand)] scale-110 animate-pulse' : 'text-[var(--brand)]'}`}></i>
 											<strong class="block text-base text-[var(--ink)] mb-1">
 												{currentLocale === 'id' ? 'Tarik & lepas file di sini' : 'Drag & drop file here'}
 											</strong>
@@ -1312,7 +1331,11 @@ Heather Benjamin Jewelry`;
 										<div class="flex items-start gap-2.5">
 											<i class="ri-error-warning-line text-lg text-[var(--warning)] shrink-0 mt-0.5" aria-hidden="true"></i>
 											<div>
-												<strong>Outdated Pricing Flagged:</strong> {pricingWarnings.length} {pricingWarnings.length === 1 ? 'item is' : 'items are'} attempting to order at outdated historical rates. Live calculations based on current spot rate of <strong>${silverSpotRate.toFixed(2)}/g</strong> exceed the PO prices. Bali team might reject or lose margin.
+												{#if currentLocale === 'id'}
+													<strong>Selisih Harga:</strong> Harga PO di bawah kalkulasi spot rate (<strong>${silverSpotRate.toFixed(2)}/g</strong>). Tim Bali berpotensi menolak.
+												{:else}
+													<strong>Price Discrepancy:</strong> PO prices are below spot calculations (<strong>${silverSpotRate.toFixed(2)}/g</strong>). Bali team may reject due to low margins.
+												{/if}
 											</div>
 										</div>
 										<button
@@ -1321,7 +1344,7 @@ Heather Benjamin Jewelry`;
 											onclick={applySafeSpotRate}
 										>
 											<i class="ri-refresh-line"></i>
-											{currentLocale === 'id' ? 'Sesuaikan Harga Spot' : 'Adjust Spot Price'}
+											{currentLocale === 'id' ? 'Sesuaikan' : 'Resolve'}
 										</button>
 									</div>
 								{/if}
@@ -1350,7 +1373,7 @@ Heather Benjamin Jewelry`;
 													</div>
 													<h3 class="mt-3 text-lg font-semibold">{blocker.question}</h3>
 													<p class="mt-1 text-sm text-[var(--muted)]">
-														Source evidence: “{blocker.evidence}” · {blocker.source}
+														{currentLocale === 'id' ? 'Ditemukan:' : 'Found:'} “{blocker.evidence}” ({blocker.source})
 													</p>
 												</div>
 												<div class="flex flex-wrap gap-3 w-full md:w-auto">
