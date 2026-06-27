@@ -353,6 +353,13 @@ Heather Benjamin Jewelry`;
 	let packedItems = $state<Record<string, boolean>>({}); // Checkbox state for Packing checklist
 	let completedSteps = $state<number>(1);
 	let rightSidebarCollapsed = $state(false);
+	let activeIngestTab = $state<'paste' | 'upload'>('paste');
+	let sampleUsed = $state(false);
+	let processClicked = $state(false);
+
+	const step1_item1 = $derived(intakeText.trim().length > 0 || uploadedFile.trim().length > 0);
+	const step1_item2 = $derived(sampleUsed);
+	const step1_item3 = $derived(processClicked);
 
 	// i18n Detection from Path
 	const isIndonesian = $derived(page.url.pathname.startsWith('/id'));
@@ -428,9 +435,32 @@ Heather Benjamin Jewelry`;
 		})
 	);
 
+	function applySafeSpotRate() {
+		let minRate = 1.05;
+		let found = false;
+		pricingWarnings.forEach(item => {
+			if (!item.styleCode) return;
+			const cat = catalog.find(x => x.styleCode === item.styleCode);
+			if (!cat || cat.silverWeight <= 0) return;
+			const rate = (item.unitPrice / markupMargin - cat.baseLabor - cat.stoneCost) / cat.silverWeight;
+			if (rate < minRate) {
+				minRate = rate;
+				found = true;
+			}
+		});
+		if (found) {
+			silverSpotRate = Number(Math.max(0, minRate).toFixed(2));
+			showToast(currentLocale === 'id' ? `Harga spot disesuaikan ke: $${silverSpotRate.toFixed(2)}/g` : `Spot rate adjusted to: $${silverSpotRate.toFixed(2)}/g`);
+		}
+	}
+
 	// Dynamic Blocker & Ready Tracking
 	const remainingAnswers = $derived(blockers.filter((blocker) => !blocker.answer).length);
 	const allAnswered = $derived(remainingAnswers === 0);
+
+	const prodProgress = $derived((blockers.filter(b => b.answer).length / blockers.length) * 100);
+	const packingProgress = $derived(allAnswered ? 100 : 0);
+	const customerProgress = $derived(allAnswered ? 100 : 0);
 
 	const readyItems = $derived(
 		lineItems.filter(item => {
@@ -480,6 +510,9 @@ Heather Benjamin Jewelry`;
 				packedItems = parsed.packedItems ?? {};
 				completedSteps = parsed.completedSteps ?? 1;
 				rightSidebarCollapsed = parsed.rightSidebarCollapsed ?? false;
+				activeIngestTab = parsed.activeIngestTab ?? 'paste';
+				sampleUsed = parsed.sampleUsed ?? false;
+				processClicked = parsed.processClicked ?? false;
 			} catch {
 				sessionStorage.removeItem(storageKey);
 			}
@@ -506,10 +539,27 @@ Heather Benjamin Jewelry`;
 				productionGrouping,
 				packedItems,
 				completedSteps,
-				rightSidebarCollapsed
+				rightSidebarCollapsed,
+				activeIngestTab,
+				sampleUsed,
+				processClicked
 			})
 		);
 	});
+
+	function getOptionDetail(blockerId: string, option: string): string {
+		if (blockerId === 'starburst-size') {
+			if (option === 'Mini') return currentLocale === 'id' ? 'Diameter 8mm (Anting stud mini)' : '8mm diameter (Mini stud earring)';
+			if (option === 'Small') return currentLocale === 'id' ? 'Diameter 12mm (Ukuran standar)' : '12mm diameter (Standard size)';
+			if (option === 'Large') return currentLocale === 'id' ? 'Diameter 18mm (Ukuran pernyataan)' : '18mm diameter (Statement size)';
+		}
+		if (blockerId === 'horse-size') {
+			if (option === 'Small') return currentLocale === 'id' ? 'Lebar 15mm (Cetakan S)' : '15mm width (Mold S)';
+			if (option === 'Medium') return currentLocale === 'id' ? 'Lebar 22mm (Cetakan M)' : '22mm width (Mold M)';
+			if (option === 'Large') return currentLocale === 'id' ? 'Lebar 30mm (Cetakan L)' : '30mm width (Mold L)';
+		}
+		return '';
+	}
 
 	function showToast(message: string) {
 		toast = message;
@@ -534,6 +584,7 @@ Heather Benjamin Jewelry`;
 		intakeText = sampleOrder;
 		selectedSource = 'Email';
 		uploadedFile = '';
+		sampleUsed = true;
 		resetDemoState();
 		showToast('Sample order loaded.');
 	}
@@ -553,6 +604,7 @@ Heather Benjamin Jewelry`;
 		if (!intakeText.trim()) {
 			intakeText = sampleOrder;
 		}
+		processClicked = true;
 		resetDemoState();
 		setStep(2);
 	}
@@ -1054,42 +1106,49 @@ Heather Benjamin Jewelry`;
 								<h1 class="font-display text-4xl leading-tight md:text-5xl">{t.addWholesaleOrder}</h1>
 								<p class="mt-4 max-w-3xl text-lg leading-8">{t.intakeDesc}</p>
 
-								<div class="mt-8 rounded-lg border border-[var(--line)] bg-white p-4 shadow-sm">
-									<div class="flex flex-wrap gap-2">
-										{#each sourceTypes as source (source)}
-											<button
-												class={`chip ${selectedSource === source ? 'chip-active' : ''}`}
-												type="button"
-												onclick={() => (selectedSource = source)}
-											>
-												{source}
-											</button>
-										{/each}
+								<div class="mt-8 rounded-lg border border-[var(--line)] bg-white p-6 shadow-sm">
+									<!-- Ingestion Mode Tabs -->
+									<div class="flex border-b border-[var(--line)] mb-6">
+										<button
+											class={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${activeIngestTab === 'paste' ? 'border-[var(--brand)] text-[var(--brand-dark)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--ink)]'}`}
+											type="button"
+											onclick={() => (activeIngestTab = 'paste')}
+										>
+											<i class="ri-keyboard-line text-base"></i> {currentLocale === 'id' ? 'Tempel Teks' : 'Paste Text'}
+										</button>
+										<button
+											class={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${activeIngestTab === 'upload' ? 'border-[var(--brand)] text-[var(--brand-dark)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--ink)]'}`}
+											type="button"
+											onclick={() => (activeIngestTab = 'upload')}
+										>
+											<i class="ri-upload-cloud-2-line text-base"></i> {currentLocale === 'id' ? 'Unggah File' : 'Upload File'}
+										</button>
 									</div>
 
-									<label class="mt-4 block">
-										<span class="sr-only">{t.addWholesaleOrder}</span>
-										<textarea
-											id="intake-scratchpad"
-											class="h-[260px] w-full resize-none rounded-md border border-[var(--line)] bg-[var(--surface-soft)] p-4 font-mono text-sm leading-6 outline-none transition focus:border-[var(--brand)] focus:bg-white"
-											bind:value={intakeText}
-										></textarea>
-									</label>
+									{#if activeIngestTab === 'paste'}
+										<!-- Paste Mode Panel -->
+										<div class="flex flex-wrap gap-2 mb-4">
+											{#each sourceTypes as source (source)}
+												<button
+													class={`chip ${selectedSource === source ? 'chip-active' : ''}`}
+													type="button"
+													onclick={() => (selectedSource = source)}
+												>
+													{source}
+												</button>
+											{/each}
+										</div>
 
-									<div class="mt-4 flex flex-wrap items-center justify-between gap-4">
-										<label
-											class="flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-[var(--line)] px-5 py-3 text-sm text-[var(--muted)] hover:border-[var(--brand)] transition"
-										>
-											<input class="sr-only" type="file" onchange={handleFileUpload} />
-											<i class="ri-upload-2-line text-xl" aria-hidden="true"></i>
-											<span>
-												<strong class="block text-[var(--ink)]">{t.uploadInstead}</strong>
-												PDF, CSV, XLSX, PNG, JPG, TXT
-											</span>
+										<label class="block">
+											<span class="sr-only">{t.addWholesaleOrder}</span>
+											<textarea
+												id="intake-scratchpad"
+												class="h-[260px] w-full resize-none rounded-md border border-[var(--line)] bg-[var(--surface-soft)] p-4 font-mono text-sm leading-6 outline-none transition focus:border-[var(--brand)] focus:bg-white"
+												bind:value={intakeText}
+											></textarea>
 										</label>
 
-										<!-- Primary action buttons placed inside the intake card for a familiar, intuitive UX -->
-										<div class="flex items-center gap-3">
+										<div class="mt-5 flex items-center justify-end gap-3">
 											<button id="try-sample-btn" class="secondary-button" type="button" onclick={useSampleOrder}>
 												{t.trySample}
 											</button>
@@ -1097,7 +1156,44 @@ Heather Benjamin Jewelry`;
 												{t.processOrder} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
 											</button>
 										</div>
-									</div>
+									{:else}
+										<!-- Upload Mode Panel -->
+										<div class="border-2 border-dashed border-[var(--line)] rounded-lg p-10 text-center hover:border-[var(--brand)] transition bg-[var(--surface-soft)] relative">
+											<input class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" type="file" onchange={handleFileUpload} />
+											<i class="ri-upload-cloud-2-line text-4xl text-[var(--brand)] block mb-3"></i>
+											<strong class="block text-base text-[var(--ink)] mb-1">
+												{currentLocale === 'id' ? 'Tarik & lepas file di sini' : 'Drag & drop file here'}
+											</strong>
+											<span class="text-xs text-[var(--muted)]">
+												{currentLocale === 'id' ? 'atau klik untuk memilih dari komputer Anda' : 'or click to browse from your computer'}
+											</span>
+											<div class="mt-4 text-[var(--muted)] text-[10px] uppercase font-bold tracking-wider">
+												PDF, CSV, XLSX, PNG, JPG, TXT
+											</div>
+										</div>
+
+										{#if uploadedFile}
+											<div class="mt-4 p-3 border border-emerald-100 bg-emerald-50/30 rounded flex items-center justify-between text-xs text-emerald-800">
+												<span class="flex items-center gap-2">
+													<i class="ri-checkbox-circle-line text-emerald-600 text-base"></i>
+													<strong>{uploadedFile}</strong> ({currentLocale === 'id' ? 'File berhasil diunggah' : 'File uploaded successfully'})
+												</span>
+												<button
+													class="text-red-600 hover:text-red-800 transition font-bold cursor-pointer"
+													type="button"
+													onclick={() => (uploadedFile = '')}
+												>
+													{currentLocale === 'id' ? 'Hapus' : 'Remove'}
+												</button>
+											</div>
+										{/if}
+
+										<div class="mt-6 flex justify-end gap-3">
+											<button id="process-file-btn" class="primary-button flex items-center justify-center" type="button" disabled={!uploadedFile} onclick={processOrder}>
+												{t.processOrder} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
+											</button>
+										</div>
+									{/if}
 								</div>
 
 								<p class="mt-4 flex items-center gap-2 text-sm text-[var(--muted)]">
@@ -1121,25 +1217,56 @@ Heather Benjamin Jewelry`;
 									</button>
 								</div>
 								<div class="mt-7 space-y-5">
-									<div class="next-card">
-										<span>1</span>
+									<!-- Checklist Item 1 -->
+									<div class={`next-card transition-all duration-300 ${step1_item1 ? 'border-emerald-200 bg-emerald-50/20' : ''}`}>
+										<span class={`flex items-center justify-center font-bold text-sm rounded-full w-8 h-8 border ${step1_item1 ? 'bg-emerald-600 text-white border-transparent' : 'border-[var(--line)] bg-[var(--surface-soft)] text-[var(--muted)]'}`}>
+											{#if step1_item1}
+												<i class="ri-check-line text-sm font-bold"></i>
+											{:else}
+												1
+											{/if}
+										</span>
 										<div>
-											<h3>{t.extractTitle}</h3>
-											<p>{t.extractDesc}</p>
+											<h3 class={step1_item1 ? 'text-[var(--ink)] font-semibold' : 'text-sm font-semibold'}>{t.extractTitle}</h3>
+											<p class="text-xs text-[var(--muted)] mt-1">{t.extractDesc}</p>
 										</div>
 									</div>
-									<div class="next-card">
-										<span>2</span>
+
+									<!-- Checklist Item 2 -->
+									<div class={`next-card transition-all duration-300 ${step1_item2 ? 'border-emerald-200 bg-emerald-50/20' : ''}`}>
+										<span class={`flex items-center justify-center font-bold text-sm rounded-full w-8 h-8 border ${step1_item2 ? 'bg-emerald-600 text-white border-transparent' : 'border-[var(--line)] bg-[var(--surface-soft)] text-[var(--muted)]'}`}>
+											{#if step1_item2}
+												<i class="ri-check-line text-sm font-bold"></i>
+											{:else}
+												2
+											{/if}
+										</span>
 										<div>
-											<h3>{t.answerTitle}</h3>
-											<p>{t.answerDesc}</p>
+											<h3 class={step1_item2 ? 'text-[var(--ink)] font-semibold' : 'text-sm font-semibold'}>
+												{currentLocale === 'id' ? 'Gunakan Contoh Data' : 'Review Sample Data'}
+											</h3>
+											<p class="text-xs text-[var(--muted)] mt-1">
+												{currentLocale === 'id' ? 'Gunakan contoh data PO untuk mempelajari ekstraksi otomatis Artisan.' : 'Click "Gunakan Contoh Pesanan" to load PO sample data.'}
+											</p>
 										</div>
 									</div>
-									<div class="next-card">
-										<span>3</span>
+
+									<!-- Checklist Item 3 -->
+									<div class={`next-card transition-all duration-300 ${step1_item3 ? 'border-emerald-200 bg-emerald-50/20' : ''}`}>
+										<span class={`flex items-center justify-center font-bold text-sm rounded-full w-8 h-8 border ${step1_item3 ? 'bg-emerald-600 text-white border-transparent' : 'border-[var(--line)] bg-[var(--surface-soft)] text-[var(--muted)]'}`}>
+											{#if step1_item3}
+												<i class="ri-check-line text-sm font-bold"></i>
+											{:else}
+												3
+											{/if}
+										</span>
 										<div>
-											<h3>{t.createTitle}</h3>
-											<p>{t.createDesc}</p>
+											<h3 class={step1_item3 ? 'text-[var(--ink)] font-semibold' : 'text-sm font-semibold'}>
+												{currentLocale === 'id' ? 'Mulai Proses Pesanan' : 'Start Order Processing'}
+											</h3>
+											<p class="text-xs text-[var(--muted)] mt-1">
+												{currentLocale === 'id' ? 'Kirim pesanan yang dimasukkan untuk masuk ke tahap audit.' : 'Process the entered order text to proceed to step 2.'}
+											</p>
 										</div>
 									</div>
 								</div>
@@ -1181,11 +1308,21 @@ Heather Benjamin Jewelry`;
 
 								<!-- Outdated spot auditor alert banner -->
 								{#if pricingWarnings.length > 0}
-									<div class="mt-6 rounded-md border border-[var(--warning)] bg-[var(--warning-bg)] p-4 text-sm text-[var(--warning-ink)] leading-relaxed shadow-sm flex items-start gap-2.5">
-										<i class="ri-error-warning-line text-lg text-[var(--warning)] shrink-0 mt-0.5" aria-hidden="true"></i>
-										<div>
-											<strong>Outdated Pricing Flagged:</strong> {pricingWarnings.length} {pricingWarnings.length === 1 ? 'item is' : 'items are'} attempting to order at outdated historical rates. Live calculations based on current spot rate of <strong>${silverSpotRate.toFixed(2)}/g</strong> exceed the PO prices. Bali team might reject or lose margin.
+									<div class="mt-6 rounded-md border border-[var(--warning)] bg-[var(--warning-bg)] p-4 text-sm text-[var(--warning-ink)] leading-relaxed shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+										<div class="flex items-start gap-2.5">
+											<i class="ri-error-warning-line text-lg text-[var(--warning)] shrink-0 mt-0.5" aria-hidden="true"></i>
+											<div>
+												<strong>Outdated Pricing Flagged:</strong> {pricingWarnings.length} {pricingWarnings.length === 1 ? 'item is' : 'items are'} attempting to order at outdated historical rates. Live calculations based on current spot rate of <strong>${silverSpotRate.toFixed(2)}/g</strong> exceed the PO prices. Bali team might reject or lose margin.
+											</div>
 										</div>
+										<button
+											class="secondary-button whitespace-nowrap text-xs font-semibold px-3 py-1.5 bg-white border border-[var(--warning)] hover:bg-[var(--warning-bg)] text-[var(--warning-ink)] transition flex items-center gap-1 cursor-pointer shrink-0"
+											type="button"
+											onclick={applySafeSpotRate}
+										>
+											<i class="ri-refresh-line"></i>
+											{currentLocale === 'id' ? 'Sesuaikan Harga Spot' : 'Adjust Spot Price'}
+										</button>
 									</div>
 								{/if}
 
@@ -1216,22 +1353,28 @@ Heather Benjamin Jewelry`;
 														Source evidence: “{blocker.evidence}” · {blocker.source}
 													</p>
 												</div>
-												<div class="flex flex-wrap gap-3">
+												<div class="flex flex-wrap gap-3 w-full md:w-auto">
 													{#each blocker.options as option (option)}
 														<button
-															class={`choice-button transition ${blocker.answer === option ? 'choice-button-active' : ''}`}
+															class={`choice-card flex flex-col items-start p-3 rounded-lg border text-left transition-all duration-200 cursor-pointer min-w-[130px] flex-1 md:flex-none ${blocker.answer === option ? 'border-[var(--brand)] bg-[var(--surface-soft)] ring-2 ring-[var(--brand)]/10' : 'border-[var(--line)] bg-white hover:border-[var(--brand)] hover:bg-[var(--surface-soft)]'}`}
 															type="button"
 															onclick={() => chooseAnswer(blocker.id, option)}
 														>
-															{option}
+															<span class="font-bold text-sm text-[var(--ink)]">{option}</span>
+															<span class="text-[10px] text-[var(--muted)] mt-1 leading-tight">{getOptionDetail(blocker.id, option)}</span>
 														</button>
 													{/each}
 												</div>
 											</div>
-											<details class="border-t border-[var(--line)] px-4 py-3 text-sm">
-												<summary class="cursor-pointer font-medium">Production risk</summary>
-												<p class="mt-2 text-[var(--muted)]">{blocker.risk}</p>
-											</details>
+											<div class="border-t border-[var(--line)] bg-[var(--warning-bg)]/20 px-4 py-3 text-xs text-[var(--warning-ink)] flex items-start gap-2 leading-relaxed">
+												<i class="ri-error-warning-line text-sm text-[var(--warning)] shrink-0 mt-0.5" aria-hidden="true"></i>
+												<div>
+													<strong class="font-semibold uppercase tracking-wider text-[10px] text-[var(--brand-dark)] block mb-0.5">
+														{currentLocale === 'id' ? 'Risiko Produksi:' : 'Production Risk:'}
+													</strong>
+													{blocker.risk}
+												</div>
+											</div>
 										</article>
 									{/each}
 								</div>
@@ -1299,10 +1442,15 @@ Heather Benjamin Jewelry`;
 								</p>
 								<div class="mt-6 space-y-4">
 									{#each [t.productionSheet, t.packingChecklist, t.customerUpdate] as doc (doc)}
-										<div class="document-card document-card-compact shadow-sm">
+										{@const progress = doc === t.productionSheet ? prodProgress : (doc === t.packingChecklist ? packingProgress : customerProgress)}
+										{@const isUnlocked = progress === 100}
+										<div class={`document-card document-card-compact shadow-sm relative overflow-hidden transition-all duration-300 ${isUnlocked ? 'border-emerald-200 bg-emerald-50/10' : ''}`}>
+											<!-- Progress Bar -->
+											<div class="absolute bottom-0 left-0 h-1 bg-emerald-500 transition-all duration-500 ease-out" style="width: {progress}%"></div>
+											
 											<div>
-												<h3>{doc}</h3>
-												<p>
+												<h3 class={isUnlocked ? 'text-[var(--ink)] font-semibold' : ''}>{doc}</h3>
+												<p class="text-xs text-[var(--muted)] mt-1">
 													{allAnswered
 														? doc === t.customerUpdate
 															? 'Draft includes notes'
@@ -1312,14 +1460,11 @@ Heather Benjamin Jewelry`;
 															: 'Blocked by production sheet'}
 												</p>
 											</div>
-											<span aria-hidden="true" class="text-lg text-[var(--brand)]">
-												{#if allAnswered}
-													<i class="ri-checkbox-circle-line" aria-hidden="true"></i>
+											<span aria-hidden="true" class={`text-lg transition-all duration-300 ${isUnlocked ? 'text-emerald-600 scale-110' : 'text-[var(--muted)]'}`}>
+												{#if isUnlocked}
+													<i class="ri-checkbox-circle-fill animate-scale-in block" aria-hidden="true"></i>
 												{:else}
 													<i class="ri-lock-line" aria-hidden="true"></i>
-												{#if rightSidebarCollapsed}
-													<!-- nested collapsed check for Svelte compilation -->
-												{/if}
 												{/if}
 											</span>
 										</div>
