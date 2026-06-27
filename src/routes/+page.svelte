@@ -1356,7 +1356,7 @@ Heather Benjamin Jewelry`;
 										<!-- Textarea -->
 										<textarea
 											id="intake-scratchpad"
-											class="flex-1 w-full min-h-[220px] resize-none p-4 font-mono text-sm leading-6 outline-none bg-transparent border-0"
+											class="flex-1 w-full min-h-[320px] resize-none p-4 font-mono text-sm leading-6 outline-none bg-transparent border-0"
 											placeholder="Paste purchase order details, email text, DM conversations, spreadsheet rows... or attach files below."
 											bind:value={intakeText}
 										></textarea>
