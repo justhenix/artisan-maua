@@ -189,6 +189,10 @@ button:disabled {
 	white-space: nowrap;
 }
 
+.step-button:disabled {
+	opacity: 0.42;
+}
+
 .step-button-active {
 	border-color: var(--brand);
 	font-weight: 700;
@@ -208,6 +212,25 @@ button:disabled {
 	background: var(--brand);
 	border-color: var(--brand);
 	color: white;
+}
+
+.step-button:disabled .step-index {
+	background: white;
+	color: var(--muted);
+}
+
+.page-actions {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	justify-content: flex-end;
+}
+
+.side-panel {
+	background: white;
+	border-left: 1px solid var(--line);
+	padding: 40px 28px;
 }
 
 .chip {
@@ -311,6 +334,14 @@ button:disabled {
 	display: flex;
 	justify-content: space-between;
 	padding: 18px;
+}
+
+.document-card-compact {
+	padding: 16px 18px;
+}
+
+.document-card-compact h3 {
+	font-size: 1.15rem;
 }
 
 .tab-button {
@@ -485,6 +516,16 @@ button:disabled {
 	.step-button {
 		gap: 8px;
 		padding: 0 8px;
+	}
+
+	.page-actions {
+		justify-content: flex-start;
+	}
+
+	.side-panel {
+		border-left: 0;
+		border-top: 1px solid var(--line);
+		padding: 24px 16px;
 	}
 
 	.step-index {

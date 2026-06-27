@@ -492,7 +492,7 @@ Heather Benjamin Jewelry`;
 							}}
 						>
 							<span class="step-index">{step.id}</span>
-							<span class="step-label">{step.label}</span>
+							<span class="step-label">{step.id > maxStep ? '' : step.label}</span>
 						</button>
 						{#if index < steps.length - 1}
 							<div class="hidden h-px flex-1 bg-[var(--line)] md:block"></div>
@@ -607,7 +607,12 @@ Heather Benjamin Jewelry`;
 										<p class="mt-4 text-sm text-[var(--muted)]">Source: pasted DM / copied PO text</p>
 									</div>
 
-									<button class="secondary-button" type="button">View original order</button>
+									<div class="page-actions">
+										<button class="ghost-button" type="button" onclick={() => showToast('Progress saved.')}>
+											Save progress
+										</button>
+										<button class="secondary-button" type="button">View original order</button>
+									</div>
 								</div>
 
 								<h2 class="mt-8 text-sm font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
@@ -684,14 +689,14 @@ Heather Benjamin Jewelry`;
 							</div>
 						</div>
 
-						<aside class="border-l border-[var(--line)] bg-white px-7 py-10">
+						<aside class="side-panel">
 							<h2 class="font-display text-2xl">Your documents</h2>
 							<p class="mt-2 text-[var(--muted)]">
 								{allAnswered ? 'Ready for review.' : 'Locked until the questions are answered.'}
 							</p>
 							<div class="mt-6 space-y-4">
 								{#each ['Production Sheet', 'Packing Checklist', 'Customer Update'] as doc (doc)}
-									<div class="document-card">
+									<div class="document-card document-card-compact">
 										<div>
 											<h3>{doc}</h3>
 											<p>
@@ -734,7 +739,7 @@ Heather Benjamin Jewelry`;
 									</p>
 								</div>
 
-								<div class="flex items-start gap-3">
+								<div class="page-actions">
 									<button class="secondary-button" type="button" disabled={!sheetDirty} onclick={saveChanges}>
 										Save changes
 									</button>
@@ -893,7 +898,10 @@ Heather Benjamin Jewelry`;
 										<h1 class="font-display text-4xl leading-tight md:text-5xl">Update customer</h1>
 										<p class="mt-3 text-lg">Edit the customer update before copying or marking sent.</p>
 									</div>
-									<button class="secondary-button" type="button">Preview</button>
+									<div class="page-actions">
+										<button class="ghost-button" type="button" onclick={saveDraft}>Save draft</button>
+										<button class="secondary-button" type="button">Preview</button>
+									</div>
 								</div>
 
 								<div class="mt-8 rounded-md border border-[var(--line)] bg-white p-4 text-sm">
@@ -915,7 +923,7 @@ Heather Benjamin Jewelry`;
 							</div>
 						</div>
 
-						<aside class="border-l border-[var(--line)] bg-white px-7 py-10">
+						<aside class="side-panel">
 							<h2 class="font-display text-2xl">Included in this update</h2>
 							<div class="mt-7 space-y-6">
 								<div>
@@ -977,9 +985,6 @@ Heather Benjamin Jewelry`;
 							<button class="secondary-button" type="button" onclick={previousStep}>Previous</button>
 						{/if}
 						{#if currentStep === 2}
-							<button class="ghost-button" type="button" onclick={() => showToast('Progress saved.')}>
-								Save progress
-							</button>
 							<button class="primary-button" type="button" disabled={!allAnswered} onclick={continueToSheets}>
 								Continue to sheets →
 							</button>
@@ -990,7 +995,6 @@ Heather Benjamin Jewelry`;
 								Continue to customer update →
 							</button>
 						{:else}
-							<button class="secondary-button" type="button" onclick={saveDraft}>Save draft</button>
 							<button class="secondary-button" type="button" onclick={copyCustomerUpdate}>Copy update</button>
 							<button class="primary-button" type="button" onclick={markSent}>Mark as sent</button>
 						{/if}
