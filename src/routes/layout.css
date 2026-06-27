@@ -523,6 +523,14 @@ button:disabled {
 	min-height: 100%;
 }
 
+.output-grid-collapsed {
+	grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.customer-grid-collapsed {
+	grid-template-columns: minmax(0, 1fr) !important;
+}
+
 .customer-textarea {
 	background: white;
 	border: 1px solid var(--line);

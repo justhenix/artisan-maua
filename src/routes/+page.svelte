@@ -352,6 +352,7 @@ Heather Benjamin Jewelry`;
 	let productionGrouping = $state<'material' | 'category'>('material'); // Production group toggle
 	let packedItems = $state<Record<string, boolean>>({}); // Checkbox state for Packing checklist
 	let completedSteps = $state<number>(1);
+	let rightSidebarCollapsed = $state(false);
 
 	// i18n Detection from Path
 	const isIndonesian = $derived(page.url.pathname.startsWith('/id'));
@@ -478,6 +479,7 @@ Heather Benjamin Jewelry`;
 				productionGrouping = parsed.productionGrouping ?? 'material';
 				packedItems = parsed.packedItems ?? {};
 				completedSteps = parsed.completedSteps ?? 1;
+				rightSidebarCollapsed = parsed.rightSidebarCollapsed ?? false;
 			} catch {
 				sessionStorage.removeItem(storageKey);
 			}
@@ -503,7 +505,8 @@ Heather Benjamin Jewelry`;
 				silverSpotRate,
 				productionGrouping,
 				packedItems,
-				completedSteps
+				completedSteps,
+				rightSidebarCollapsed
 			})
 		);
 	});
@@ -973,21 +976,44 @@ Heather Benjamin Jewelry`;
 					</button>
 					<span class="text-xs text-[var(--muted)]">Last saved {lastSaved}</span>
 				</div>
-				<!-- i18n Language Segment Control -->
-				<div class="flex items-center gap-1 border border-[var(--line)] rounded bg-[var(--surface-soft)] p-0.5 text-xs shadow-sm">
-					<i class="ri-translate-2 text-[var(--muted)] px-1 text-sm"></i>
-					<a
-						href={resolve(localizeHref(page.url.pathname, { locale: 'en' }) as Pathname)}
-						class={`px-2 py-1 rounded font-semibold text-xs transition-all ${currentLocale === 'en' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
-					>
-						English
-					</a>
-					<a
-						href={resolve(localizeHref(page.url.pathname, { locale: 'id' }) as Pathname)}
-						class={`px-2 py-1 rounded font-semibold text-xs transition-all ${currentLocale === 'id' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
-					>
-						Indonesia
-					</a>
+				<div class="flex items-center gap-4">
+					<!-- i18n Language Segment Control -->
+					<div class="flex items-center gap-1 border border-[var(--line)] rounded bg-[var(--surface-soft)] p-0.5 text-xs shadow-sm">
+						<i class="ri-translate-2 text-[var(--muted)] px-1 text-sm"></i>
+						<a
+							href={resolve(localizeHref(page.url.pathname, { locale: 'en' }) as Pathname)}
+							class={`px-2 py-1 rounded font-semibold text-xs transition-all ${currentLocale === 'en' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
+						>
+							English
+						</a>
+						<a
+							href={resolve(localizeHref(page.url.pathname, { locale: 'id' }) as Pathname)}
+							class={`px-2 py-1 rounded font-semibold text-xs transition-all ${currentLocale === 'id' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
+						>
+							Indonesia
+						</a>
+					</div>
+
+					<!-- Right Sidebar Toggle Button -->
+					<div class="relative group">
+						<button
+							class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
+							type="button"
+							aria-label={rightSidebarCollapsed ? 'Open right panel' : 'Close right panel'}
+							onclick={() => (rightSidebarCollapsed = !rightSidebarCollapsed)}
+						>
+							{#if rightSidebarCollapsed}
+								<i class="ri-layout-right-line text-lg"></i>
+							{:else}
+								<i class="ri-layout-right-fill text-lg text-[var(--brand)]"></i>
+							{/if}
+						</button>
+						<div class="absolute right-0 top-10 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
+							{rightSidebarCollapsed 
+								? (currentLocale === 'id' ? 'Buka panel kanan' : 'Open right panel') 
+								: (currentLocale === 'id' ? 'Tutup panel kanan' : 'Close right panel')}
+						</div>
+					</div>
 				</div>
 			</header>
 
@@ -1022,7 +1048,7 @@ Heather Benjamin Jewelry`;
 
 			<div class="min-h-0 overflow-auto" bind:this={contentPanel}>
 				{#if currentStep === 1}
-					<section class="grid min-h-full xl:grid-cols-[1fr_368px]">
+					<section class={`grid min-h-full transition-all duration-300 ${rightSidebarCollapsed ? 'xl:grid-cols-1' : 'xl:grid-cols-[1fr_368px]'}`}>
 						<div class="px-4 py-6 md:px-10 md:py-10">
 							<div class="mx-auto max-w-4xl">
 								<h1 class="font-display text-4xl leading-tight md:text-5xl">{t.addWholesaleOrder}</h1>
@@ -1081,35 +1107,47 @@ Heather Benjamin Jewelry`;
 							</div>
 						</div>
 
-						<aside class="border-l border-[var(--line)] bg-white px-8 py-10">
-							<h2 class="font-display text-2xl">{t.nextTitle}</h2>
-							<div class="mt-7 space-y-5">
-								<div class="next-card">
-									<span>1</span>
-									<div>
-										<h3>{t.extractTitle}</h3>
-										<p>{t.extractDesc}</p>
+						{#if !rightSidebarCollapsed}
+							<aside class="border-l border-[var(--line)] bg-white px-8 py-10">
+								<div class="flex items-center justify-between gap-4 mb-7">
+									<h2 class="font-display text-2xl">{t.nextTitle}</h2>
+									<button
+										class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
+										type="button"
+										aria-label="Close right panel"
+										onclick={() => (rightSidebarCollapsed = true)}
+									>
+										<i class="ri-close-line text-lg"></i>
+									</button>
+								</div>
+								<div class="mt-7 space-y-5">
+									<div class="next-card">
+										<span>1</span>
+										<div>
+											<h3>{t.extractTitle}</h3>
+											<p>{t.extractDesc}</p>
+										</div>
+									</div>
+									<div class="next-card">
+										<span>2</span>
+										<div>
+											<h3>{t.answerTitle}</h3>
+											<p>{t.answerDesc}</p>
+										</div>
+									</div>
+									<div class="next-card">
+										<span>3</span>
+										<div>
+											<h3>{t.createTitle}</h3>
+											<p>{t.createDesc}</p>
+										</div>
 									</div>
 								</div>
-								<div class="next-card">
-									<span>2</span>
-									<div>
-										<h3>{t.answerTitle}</h3>
-										<p>{t.answerDesc}</p>
-									</div>
-								</div>
-								<div class="next-card">
-									<span>3</span>
-									<div>
-										<h3>{t.createTitle}</h3>
-										<p>{t.createDesc}</p>
-									</div>
-								</div>
-							</div>
-						</aside>
+							</aside>
+						{/if}
 					</section>
 				{:else if currentStep === 2}
-					<section class="grid min-h-full xl:grid-cols-[1fr_352px]">
+					<section class={`grid min-h-full transition-all duration-300 ${rightSidebarCollapsed ? 'xl:grid-cols-1' : 'xl:grid-cols-[1fr_352px]'}`}>
 						<div class="px-4 py-6 md:px-10 md:py-8">
 							<div class="mx-auto max-w-5xl">
 								<div class="flex flex-wrap items-start justify-between gap-4">
@@ -1243,41 +1281,56 @@ Heather Benjamin Jewelry`;
 							</div>
 						</div>
 
-						<aside class="side-panel">
-							<h2 class="font-display text-2xl">{t.yourDocs}</h2>
-							<p class="mt-2 text-sm text-[var(--muted)]">
-								{allAnswered ? t.readyDocs : t.lockedDocs}
-							</p>
-							<div class="mt-6 space-y-4">
-								{#each [t.productionSheet, t.packingChecklist, t.customerUpdate] as doc (doc)}
-									<div class="document-card document-card-compact shadow-sm">
-										<div>
-											<h3>{doc}</h3>
-											<p>
-												{allAnswered
-													? doc === t.customerUpdate
-														? 'Draft includes notes'
-														: 'Ready after review'
-													: doc === t.productionSheet
-														? `Blocked by ${remainingAnswers} answers`
-														: 'Blocked by production sheet'}
-											</p>
+						{#if !rightSidebarCollapsed}
+							<aside class="side-panel">
+								<div class="flex items-center justify-between gap-4 mb-2">
+									<h2 class="font-display text-2xl">{t.yourDocs}</h2>
+									<button
+										class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
+										type="button"
+										aria-label="Close right panel"
+										onclick={() => (rightSidebarCollapsed = true)}
+									>
+										<i class="ri-close-line text-lg"></i>
+									</button>
+								</div>
+								<p class="text-sm text-[var(--muted)]">
+									{allAnswered ? t.readyDocs : t.lockedDocs}
+								</p>
+								<div class="mt-6 space-y-4">
+									{#each [t.productionSheet, t.packingChecklist, t.customerUpdate] as doc (doc)}
+										<div class="document-card document-card-compact shadow-sm">
+											<div>
+												<h3>{doc}</h3>
+												<p>
+													{allAnswered
+														? doc === t.customerUpdate
+															? 'Draft includes notes'
+															: 'Ready after review'
+														: doc === t.productionSheet
+															? `Blocked by ${remainingAnswers} answers`
+															: 'Blocked by production sheet'}
+												</p>
+											</div>
+											<span aria-hidden="true" class="text-lg text-[var(--brand)]">
+												{#if allAnswered}
+													<i class="ri-checkbox-circle-line" aria-hidden="true"></i>
+												{:else}
+													<i class="ri-lock-line" aria-hidden="true"></i>
+												{#if rightSidebarCollapsed}
+													<!-- nested collapsed check for Svelte compilation -->
+												{/if}
+												{/if}
+											</span>
 										</div>
-										<span aria-hidden="true" class="text-lg text-[var(--brand)]">
-											{#if allAnswered}
-												<i class="ri-checkbox-circle-line" aria-hidden="true"></i>
-											{:else}
-												<i class="ri-lock-line" aria-hidden="true"></i>
-											{/if}
-										</span>
-									</div>
-								{/each}
-							</div>
-							<div class="mt-6 rounded-md border border-[var(--info-line)] bg-[var(--info)] p-4 text-sm leading-relaxed text-blue-900 flex gap-2">
-								<i class="ri-information-line text-lg text-blue-600 shrink-0" aria-hidden="true"></i>
-								<span>{t.infoNote}</span>
-							</div>
-						</aside>
+									{/each}
+								</div>
+								<div class="mt-6 rounded-md border border-[var(--info-line)] bg-[var(--info)] p-4 text-sm leading-relaxed text-blue-900 flex gap-2">
+									<i class="ri-information-line text-lg text-blue-600 shrink-0" aria-hidden="true"></i>
+									<span>{t.infoNote}</span>
+								</div>
+							</aside>
+						{/if}
 					</section>
 				{:else if currentStep === 3}
 					<section class="px-4 py-6 md:px-8 md:py-8">
@@ -1357,7 +1410,7 @@ Heather Benjamin Jewelry`;
 								{/each}
 							</div>
 
-							<div class="output-grid">
+							<div class={`output-grid ${rightSidebarCollapsed ? 'output-grid-collapsed' : ''}`}>
 								<div class="output-card shadow-sm">
 									{#if activeTab === 'production'}
 										<div class="mb-5 flex flex-wrap items-center justify-between gap-4">
@@ -1573,40 +1626,52 @@ Heather Benjamin Jewelry`;
 									{/if}
 								</div>
 
-								<aside class="output-side shadow-sm">
-									<h2 class="font-display text-2xl">{t.readyNext}</h2>
-									<p class="mt-2 text-sm text-[var(--muted)]">
-										{currentLocale === 'id' ? 'Dokumen menggunakan perubahan dalam aplikasi.' : 'Documents use current in-app edits.'}
-									</p>
-									<div class="mt-5 space-y-4">
-										<button class="side-action transition flex items-center justify-between gap-3" type="button" onclick={() => downloadCsv('production')}>
-											<div>
-												<strong>{currentLocale === 'id' ? 'Unduh lembar produksi' : 'Download production sheet'}</strong>
-												<span class="block text-xs text-[var(--muted)] mt-1">CSV format</span>
-											</div>
-											<i class="ri-download-2-line text-xl text-[var(--brand)]" aria-hidden="true"></i>
-										</button>
-										<button class="side-action transition flex items-center justify-between gap-3" type="button" onclick={() => downloadCsv('packing')}>
-											<div>
-												<strong>{currentLocale === 'id' ? 'Unduh daftar pengepakan' : 'Download packing checklist'}</strong>
-												<span class="block text-xs text-[var(--muted)] mt-1">CSV format</span>
-											</div>
-											<i class="ri-download-2-line text-xl text-[var(--brand)]" aria-hidden="true"></i>
-										</button>
-										<button class="side-action transition flex items-center justify-between gap-3" type="button" onclick={copyCustomerUpdate}>
-											<div>
-												<strong>{t.copyUpdate}</strong>
-												<span class="block text-xs text-[var(--muted)] mt-1">Plain text</span>
-											</div>
-											<i class="ri-file-copy-2-line text-xl text-[var(--brand)]" aria-hidden="true"></i>
-										</button>
-									</div>
-								</aside>
+								{#if !rightSidebarCollapsed}
+									<aside class="output-side shadow-sm">
+										<div class="flex items-center justify-between gap-4 mb-2">
+											<h2 class="font-display text-2xl">{t.readyNext}</h2>
+											<button
+												class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
+												type="button"
+												aria-label="Close right panel"
+												onclick={() => (rightSidebarCollapsed = true)}
+											>
+												<i class="ri-close-line text-lg"></i>
+											</button>
+										</div>
+										<p class="text-sm text-[var(--muted)]">
+											{currentLocale === 'id' ? 'Dokumen menggunakan perubahan dalam aplikasi.' : 'Documents use current in-app edits.'}
+										</p>
+										<div class="mt-5 space-y-4">
+											<button class="side-action transition flex items-center justify-between gap-3" type="button" onclick={() => downloadCsv('production')}>
+												<div>
+													<strong>{currentLocale === 'id' ? 'Unduh lembar produksi' : 'Download production sheet'}</strong>
+													<span class="block text-xs text-[var(--muted)] mt-1">CSV format</span>
+												</div>
+												<i class="ri-download-2-line text-xl text-[var(--brand)]" aria-hidden="true"></i>
+											</button>
+											<button class="side-action transition flex items-center justify-between gap-3" type="button" onclick={() => downloadCsv('packing')}>
+												<div>
+													<strong>{currentLocale === 'id' ? 'Unduh daftar pengepakan' : 'Download packing checklist'}</strong>
+													<span class="block text-xs text-[var(--muted)] mt-1">CSV format</span>
+												</div>
+												<i class="ri-download-2-line text-xl text-[var(--brand)]" aria-hidden="true"></i>
+											</button>
+											<button class="side-action transition flex items-center justify-between gap-3" type="button" onclick={copyCustomerUpdate}>
+												<div>
+													<strong>{t.copyUpdate}</strong>
+													<span class="block text-xs text-[var(--muted)] mt-1">Plain text</span>
+												</div>
+												<i class="ri-file-copy-2-line text-xl text-[var(--brand)]" aria-hidden="true"></i>
+											</button>
+										</div>
+									</aside>
+								{/if}
 							</div>
 						</div>
 					</section>
 				{:else}
-					<section class="customer-grid">
+					<section class={`customer-grid ${rightSidebarCollapsed ? 'customer-grid-collapsed' : ''}`}>
 						<div class="px-4 py-6 md:px-10 md:py-9">
 							<div class="mx-auto max-w-5xl">
 								<p class="text-sm uppercase tracking-wide text-[var(--muted)]">
@@ -1644,34 +1709,46 @@ Heather Benjamin Jewelry`;
 							</div>
 						</div>
 
-						<aside class="side-panel customer-side">
-							<h2 class="font-display text-2xl">{t.whatsIncluded}</h2>
-							<div class="mt-7 space-y-6">
-								<div>
-									<h3 class="font-semibold">{currentLocale === 'id' ? 'Ringkasan pesanan' : 'Order summary'}</h3>
-									<p class="mt-1 text-sm text-[var(--muted)]">8 items, {totalQty} total quantity</p>
+						{#if !rightSidebarCollapsed}
+							<aside class="side-panel customer-side">
+								<div class="flex items-center justify-between gap-4 mb-2">
+									<h2 class="font-display text-2xl">{t.whatsIncluded}</h2>
+									<button
+										class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
+										type="button"
+										aria-label="Close right panel"
+										onclick={() => (rightSidebarCollapsed = true)}
+									>
+										<i class="ri-close-line text-lg"></i>
+									</button>
 								</div>
-								<div>
-									<h3 class="font-semibold">{currentLocale === 'id' ? 'Lini masa' : 'Timeline'}</h3>
-									<p class="mt-1 text-sm text-[var(--muted)]">Production start and ETA</p>
+								<div class="mt-7 space-y-6">
+									<div>
+										<h3 class="font-semibold">{currentLocale === 'id' ? 'Ringkasan pesanan' : 'Order summary'}</h3>
+										<p class="mt-1 text-sm text-[var(--muted)]">8 items, {totalQty} total quantity</p>
+									</div>
+									<div>
+										<h3 class="font-semibold">{currentLocale === 'id' ? 'Lini masa' : 'Timeline'}</h3>
+										<p class="mt-1 text-sm text-[var(--muted)]">Production start and ETA</p>
+									</div>
+									<div>
+										<h3 class="font-semibold">{currentLocale === 'id' ? 'Catatan' : 'Notes'}</h3>
+										<p class="mt-1 text-sm text-[var(--muted)]">Special requests or next steps</p>
+									</div>
 								</div>
-								<div>
-									<h3 class="font-semibold">{currentLocale === 'id' ? 'Catatan' : 'Notes'}</h3>
-									<p class="mt-1 text-sm text-[var(--muted)]">Special requests or next steps</p>
-								</div>
-							</div>
 
-							<div class="mt-9 rounded-md border border-[var(--line)] bg-[var(--surface-soft)] p-4 shadow-sm">
-								<h3 class="font-display text-xl">{t.preview}</h3>
-								<p class="mt-4 text-sm font-medium">{t.emailTo}: Mia Chen &lt;mia@driftwoodcollective.com&gt;</p>
-								<p class="mt-1 text-sm">{t.emailSubject}: Update on your order #{orderId}</p>
-								
-								<!-- Real-time email preview text rendering instead of dummy bars -->
-								<div class="mt-4 rounded border border-[var(--line)] bg-white p-3 text-xs font-sans whitespace-pre-wrap leading-relaxed shadow-inner max-h-[220px] overflow-auto">
-									{customerUpdate}
+								<div class="mt-9 rounded-md border border-[var(--line)] bg-[var(--surface-soft)] p-4 shadow-sm">
+									<h3 class="font-display text-xl">{t.preview}</h3>
+									<p class="mt-4 text-sm font-medium">{t.emailTo}: Mia Chen &lt;mia@driftwoodcollective.com&gt;</p>
+									<p class="mt-1 text-sm">{t.emailSubject}: Update on your order #{orderId}</p>
+									
+									<!-- Real-time email preview text rendering instead of dummy bars -->
+									<div class="mt-4 rounded border border-[var(--line)] bg-white p-3 text-xs font-sans whitespace-pre-wrap leading-relaxed shadow-inner max-h-[220px] overflow-auto">
+										{customerUpdate}
+									</div>
 								</div>
-							</div>
-						</aside>
+							</aside>
+						{/if}
 					</section>
 				{/if}
 			</div>
