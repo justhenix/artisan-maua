@@ -842,40 +842,105 @@ Heather Benjamin Jewelry`;
 			class={`sidebar ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileSidebarOpen ? 'sidebar-open' : ''} flex flex-col h-screen`}
 		>
 			<div class="sidebar-heading" id="sidebar-logo">
-				<div class="sidebar-title">
-					<p class="font-display text-2xl leading-tight">Artisan</p>
-					<p class="text-sm text-[var(--muted)]">Order-to-Production Assistant</p>
-				</div>
+				{#if !sidebarCollapsed}
+					<!-- Open State Header -->
+					<div class="flex w-full items-center justify-between">
+						<div class="sidebar-title flex items-center gap-2">
+							<div class="w-8 h-8 rounded-full bg-[var(--surface-muted)] flex items-center justify-center text-[var(--brand)]">
+								<i class="ri-sparkling-fill text-lg"></i>
+							</div>
+							<div>
+								<p class="font-display text-xl leading-tight">Artisan</p>
+								<p class="text-[10px] text-[var(--muted)]">Order-to-Production</p>
+							</div>
+						</div>
+						<div class="relative group">
+							<button
+								class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-muted)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
+								type="button"
+								aria-label={currentLocale === 'id' ? 'Tutup bilah samping' : 'Close sidebar'}
+								onclick={toggleSidebar}
+							>
+								<i class="ri-sidebar-fold-line text-lg"></i>
+							</button>
+							<div class="absolute right-10 top-1/2 -translate-y-1/2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
+								{currentLocale === 'id' ? 'Tutup bilah samping' : 'Close sidebar'}
+							</div>
+						</div>
+					</div>
+				{:else}
+					<!-- Collapsed State Header: shows logo, on hover replaces with toggle button -->
+					<div class="relative w-10 h-10 flex items-center justify-center mx-auto group">
+						<!-- Logo: visible by default, hidden on hover -->
+						<div class="w-8 h-8 rounded-full bg-[var(--surface-muted)] flex items-center justify-center text-[var(--brand)] transition-opacity duration-150 group-hover:opacity-0">
+							<i class="ri-sparkling-fill text-lg"></i>
+						</div>
+						<!-- Toggle button: hidden by default, visible on hover -->
+						<button
+							class="absolute inset-0 w-10 h-10 flex items-center justify-center rounded-full hover:bg-[var(--surface-muted)] text-[var(--muted)] hover:text-[var(--ink)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-transparent border-0 p-0 cursor-pointer"
+							type="button"
+							aria-label={currentLocale === 'id' ? 'Buka bilah samping' : 'Open sidebar'}
+							onclick={toggleSidebar}
+						>
+							<i class="ri-sidebar-unfold-line text-lg"></i>
+						</button>
+						<div class="absolute left-12 top-1/2 -translate-y-1/2 ml-2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
+							{currentLocale === 'id' ? 'Buka bilah samping' : 'Open sidebar'}
+						</div>
+					</div>
+				{/if}
 			</div>
 
 			<nav class="mt-10 space-y-2 flex-1">
-				<button
-					class="flex w-full items-center gap-3 rounded-md bg-[var(--nav-active)] px-4 py-3 text-left font-semibold"
-					type="button"
-				>
-					<i class="ri-file-list-3-line text-lg" aria-hidden="true"></i>
-					<span class="sidebar-label">{t.orders}</span>
-				</button>
-				<button
-					class="flex w-full items-center justify-between rounded-md px-4 py-3 text-left text-[var(--ink)]"
-					type="button"
-				>
-					<span class="flex items-center gap-3">
-						<i class="ri-book-open-line text-lg" aria-hidden="true"></i>
-						<span class="sidebar-label">{t.replayTour === 'Ulangi Tur' ? 'Katalog' : 'Catalog'}</span>
-					</span>
-					<span class="sidebar-label rounded bg-[var(--surface-muted)] px-2 py-1 text-xs text-[var(--muted)]">Later</span>
-				</button>
+				<div class="relative group">
+					<button
+						class="flex w-full items-center gap-3 rounded-md bg-[var(--nav-active)] px-4 py-3 text-left font-semibold"
+						type="button"
+					>
+						<i class="ri-file-list-3-line text-lg" aria-hidden="true"></i>
+						<span class="sidebar-label">{t.orders}</span>
+					</button>
+					{#if sidebarCollapsed}
+						<div class="absolute left-14 top-1/2 -translate-y-1/2 ml-2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
+							{t.orders}
+						</div>
+					{/if}
+				</div>
 
-				<button
-					id="replay-tour-btn"
-					class="flex w-full items-center gap-3 rounded-md px-4 py-3 text-left text-[var(--ink)] hover:bg-[var(--surface-soft)] transition"
-					type="button"
-					onclick={startTour}
-				>
-					<i class="ri-question-line text-lg" aria-hidden="true"></i>
-					<span class="sidebar-label">{t.replayTour}</span>
-				</button>
+				<div class="relative group">
+					<button
+						class="flex w-full items-center justify-between rounded-md px-4 py-3 text-left text-[var(--ink)]"
+						type="button"
+					>
+						<span class="flex items-center gap-3">
+							<i class="ri-book-open-line text-lg" aria-hidden="true"></i>
+							<span class="sidebar-label">{t.replayTour === 'Ulangi Tur' ? 'Katalog' : 'Catalog'}</span>
+						</span>
+						<span class="sidebar-label rounded bg-[var(--surface-muted)] px-2 py-1 text-xs text-[var(--muted)]">Later</span>
+					</button>
+					{#if sidebarCollapsed}
+						<div class="absolute left-14 top-1/2 -translate-y-1/2 ml-2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
+							{t.replayTour === 'Ulangi Tur' ? 'Katalog' : 'Catalog'}
+						</div>
+					{/if}
+				</div>
+
+				<div class="relative group">
+					<button
+						id="replay-tour-btn"
+						class="flex w-full items-center gap-3 rounded-md px-4 py-3 text-left text-[var(--ink)] hover:bg-[var(--surface-soft)] transition"
+						type="button"
+						onclick={startTour}
+					>
+						<i class="ri-question-line text-lg" aria-hidden="true"></i>
+						<span class="sidebar-label">{t.replayTour}</span>
+					</button>
+					{#if sidebarCollapsed}
+						<div class="absolute left-14 top-1/2 -translate-y-1/2 ml-2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
+							{t.replayTour}
+						</div>
+					{/if}
+				</div>
 			</nav>
 
 			{#if !sidebarCollapsed}
@@ -903,7 +968,7 @@ Heather Benjamin Jewelry`;
 		<section class="app-main">
 			<header class="app-header flex items-center justify-between px-6 py-3 border-b border-[var(--line)] bg-white">
 				<div class="flex items-center gap-4">
-					<button class="icon-button" type="button" aria-label="Toggle sidebar" onclick={toggleSidebar}>
+					<button class="icon-button header-toggle" type="button" aria-label="Toggle sidebar" onclick={toggleSidebar}>
 						<i class="ri-menu-line text-lg" aria-hidden="true"></i>
 					</button>
 					<span class="text-xs text-[var(--muted)]">Last saved {lastSaved}</span>

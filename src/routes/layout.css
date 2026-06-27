@@ -89,11 +89,16 @@ button:disabled {
 .app-shell {
 	display: grid;
 	height: 100vh;
-	grid-template-columns: 252px minmax(0, 1fr);
+	grid-template-columns: 1fr;
 }
 
-.app-shell-collapsed {
-	grid-template-columns: 76px minmax(0, 1fr);
+@media (min-width: 1024px) {
+	.app-shell {
+		grid-template-columns: 252px minmax(0, 1fr);
+	}
+	.app-shell-collapsed {
+		grid-template-columns: 76px minmax(0, 1fr);
+	}
 }
 
 .app-main {
@@ -137,6 +142,17 @@ button:disabled {
 .sidebar-collapsed {
 	padding-left: 12px;
 	padding-right: 12px;
+	overflow: visible;
+}
+
+.icon-button.header-toggle {
+	display: none;
+}
+
+@media (max-width: 1023px) {
+	.icon-button.header-toggle {
+		display: inline-flex;
+	}
 }
 
 .sidebar-collapsed .sidebar-title,
