@@ -452,9 +452,6 @@ Heather Benjamin Jewelry`;
 					<p class="font-display text-2xl leading-tight">Artisan</p>
 					<p class="text-sm text-[var(--muted)]">Order-to-Production Assistant</p>
 				</div>
-				<button class="icon-button lg:hidden" type="button" aria-label="Close sidebar" onclick={() => (mobileSidebarOpen = false)}>
-					×
-				</button>
 			</div>
 
 			<nav class="mt-10 space-y-2">
@@ -476,9 +473,7 @@ Heather Benjamin Jewelry`;
 		</aside>
 
 		<section class="app-main">
-			<header
-				class="flex items-center justify-between gap-4 border-b border-[var(--line)] bg-white px-4 text-sm text-[var(--muted)] md:px-7"
-			>
+			<header class="app-header">
 				<button class="icon-button" type="button" aria-label="Toggle sidebar" onclick={toggleSidebar}>
 					☰
 				</button>
@@ -953,9 +948,9 @@ Heather Benjamin Jewelry`;
 				{/if}
 			</div>
 
-			<footer class="border-t border-[var(--line)] bg-white px-4 md:px-8">
-				<div class="flex h-full flex-col items-stretch justify-center gap-3 md:flex-row md:items-center md:justify-between md:gap-5">
-					<div class="flex items-center gap-4">
+			<footer class="action-footer">
+				<div class="action-footer-inner">
+					<div class="footer-status">
 						<span class={`status-dot ${remainingAnswers && currentStep === 2 ? 'status-warn' : ''}`}>
 							{currentStep === 2 && remainingAnswers ? '?' : '✓'}
 						</span>
@@ -977,7 +972,7 @@ Heather Benjamin Jewelry`;
 						</div>
 					</div>
 
-					<div class="flex flex-wrap items-center justify-end gap-3 md:gap-4">
+					<div class="footer-actions">
 						{#if currentStep > 1}
 							<button class="secondary-button" type="button" onclick={previousStep}>Previous</button>
 						{/if}

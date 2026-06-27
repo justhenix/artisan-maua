@@ -63,6 +63,18 @@ button:disabled {
 	grid-template-rows: 56px 68px minmax(0, 1fr) auto;
 }
 
+.app-header {
+	align-items: center;
+	background: white;
+	border-bottom: 1px solid var(--line);
+	color: var(--muted);
+	display: flex;
+	font-size: 0.875rem;
+	gap: 16px;
+	justify-content: space-between;
+	padding: 0 28px;
+}
+
 .sidebar {
 	background: white;
 	border-right: 1px solid var(--line);
@@ -375,6 +387,37 @@ button:disabled {
 	color: var(--warning);
 }
 
+.action-footer {
+	background: white;
+	border-top: 1px solid var(--line);
+	padding: 16px 28px;
+}
+
+.action-footer-inner {
+	align-items: center;
+	display: flex;
+	gap: 24px;
+	height: 100%;
+	justify-content: space-between;
+}
+
+.footer-status {
+	align-items: center;
+	display: flex;
+	gap: 16px;
+	min-width: 0;
+}
+
+.footer-actions {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	justify-content: flex-end;
+	margin-left: auto;
+	max-width: 100%;
+}
+
 @media (max-width: 1023px) {
 	.app-shell,
 	.app-shell-collapsed {
@@ -410,6 +453,33 @@ button:disabled {
 	.ghost-button {
 		min-width: auto;
 		padding: 11px 14px;
+	}
+
+	.app-header {
+		padding: 0 16px;
+	}
+
+	.action-footer {
+		padding: 14px 16px 16px;
+	}
+
+	.action-footer-inner {
+		align-items: stretch;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.footer-actions {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+		margin-left: 0;
+		width: 100%;
+	}
+
+	.footer-actions .primary-button,
+	.footer-actions .secondary-button,
+	.footer-actions .ghost-button {
+		width: 100%;
 	}
 
 	.step-button {
