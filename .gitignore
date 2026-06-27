@@ -49,3 +49,7 @@ vite.config.ts.timestamp-*
 personal_docs/
 local_docs/
 scratch/
+
+# Database
+local.db
+local.db-journal

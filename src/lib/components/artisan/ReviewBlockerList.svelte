@@ -2,10 +2,13 @@
 	type Blocker = {
 		id: string;
 		impact: 'High impact' | 'Medium impact';
+		impactKey: 'highImpact' | 'mediumImpact';
 		question: string;
+		questionKey: 'starburstQuestion' | 'horseQuestion';
 		evidence: string;
 		source: string;
 		risk: string;
+		riskKey: 'starburstRisk' | 'horseRisk';
 		options: string[];
 		answer: string;
 	};
@@ -38,10 +41,10 @@
 				<div>
 					<div class="flex flex-wrap items-center gap-3">
 						<span
-							class={`impact flex items-center gap-1.5 ${blocker.impact === 'High impact' ? 'impact-high text-[var(--warning-ink)]' : 'text-[var(--warning-ink)]'}`}
+							class={`impact flex items-center gap-1.5 ${blocker.impactKey === 'highImpact' ? 'impact-high' : ''}`}
 						>
 							<i class="ri-alert-line" aria-hidden="true"></i>
-							{blocker.impact}
+							{t[blocker.impactKey] || blocker.impact}
 						</span>
 						{#if blocker.answer}
 							<span class="answered-pill flex items-center gap-1">
@@ -50,7 +53,7 @@
 							</span>
 						{/if}
 					</div>
-					<h3 class="mt-3 text-lg font-semibold">{blocker.question}</h3>
+					<h3 class="mt-3 text-lg font-semibold">{t[blocker.questionKey] || blocker.question}</h3>
 					<p class="mt-1 text-sm text-[var(--muted)]">
 						{t.found}: "{blocker.evidence}" ({blocker.source})
 					</p>
@@ -76,7 +79,7 @@
 					<strong class="mb-0.5 block text-[10px] font-semibold text-[var(--brand-dark)]">
 						{t.productionRisk}:
 					</strong>
-					{blocker.risk}
+					{t[blocker.riskKey] || blocker.risk}
 				</div>
 			</div>
 		</article>

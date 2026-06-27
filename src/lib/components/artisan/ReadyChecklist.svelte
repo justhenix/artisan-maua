@@ -2,6 +2,7 @@
 	type LineItem = {
 		id: string;
 		item: string;
+		styleCode?: string;
 		qty: number;
 		finish: string;
 		notes: string;
@@ -43,15 +44,29 @@
 	</div>
 
 	{#if expanded}
-		<ul class="mt-3 space-y-2">
-			{#each items as item (item.id)}
-				<li class="rounded-md bg-[var(--surface-soft)] px-3 py-2">
-					<p class="text-sm font-medium text-[var(--ink)]">{item.item}</p>
-					<p class="mt-0.5 text-sm text-[var(--muted)]">
-						{t.qty} {item.qty} · {item.finish}{item.notes ? ` · ${item.notes}` : ''}
-					</p>
-				</li>
-			{/each}
-		</ul>
+		<div class="mt-3 overflow-hidden rounded-md border border-[var(--line)] bg-white shadow-sm">
+			<table class="w-full text-left text-sm">
+				<thead class="border-b border-[var(--line)] bg-[var(--surface-soft)]">
+					<tr>
+						<th class="w-28 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.styleCode}</th>
+						<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.itemDescription}</th>
+						<th class="w-16 px-3 py-2 text-xs font-bold text-[var(--muted)] text-center">{t.qty}</th>
+						<th class="w-32 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.materialFinish || 'Material/Finish'}</th>
+						<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.orderNotes}</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each items as item (item.id)}
+						<tr class="border-t border-[var(--line)] hover:bg-[var(--surface-soft)]/50 transition-colors">
+							<td class="px-3 py-2 font-mono text-xs text-[var(--ink)]">{item.styleCode || '—'}</td>
+							<td class="px-3 py-2 font-medium text-[var(--ink)]">{item.item}</td>
+							<td class="px-3 py-2 text-center font-bold text-[var(--ink)]">{item.qty}</td>
+							<td class="px-3 py-2 text-xs text-[var(--muted)]">{item.finish}</td>
+							<td class="px-3 py-2 text-xs text-[var(--muted)] italic">{item.notes || '—'}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 	{/if}
 </section>

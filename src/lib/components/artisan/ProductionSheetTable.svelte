@@ -8,6 +8,8 @@
 		qty: number;
 		finish: string;
 		notes: string;
+		unitPrice?: number;
+		imageUrl?: string;
 	};
 
 	type CatalogItem = {
@@ -42,7 +44,7 @@
 		categoryGroups: ProductionGroup[];
 		catalog: CatalogItem[];
 		onGroupingChange: (grouping: ProductionGrouping) => void;
-		onUpdateItem: (id: string, field: 'styleCode' | 'qty' | 'notes', value: string | number) => void;
+		onUpdateItem: (id: string, field: 'styleCode' | 'qty' | 'notes' | 'unitPrice', value: string | number) => void;
 	} = $props();
 
 	const groups = $derived(grouping === 'material' ? materialGroups : categoryGroups);
@@ -88,9 +90,11 @@
 				<table class="w-full text-left text-sm">
 					<thead class="border-b border-[var(--line)] bg-[var(--surface-soft)]">
 						<tr>
-							<th class="w-24 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.styleCode}</th>
+							<th class="w-36 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.styleCode}</th>
+							<th class="w-16 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.preview || 'Preview'}</th>
 							<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.itemDescription}</th>
-							<th class="w-16 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.qty}</th>
+							<th class="w-20 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.qty}</th>
+							<th class="w-24 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.unitPrice || 'Price'}</th>
 							<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.technicalInstructions}</th>
 							<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.orderNotes}</th>
 						</tr>
@@ -100,17 +104,26 @@
 							<tr class="border-t border-[var(--line)]">
 								<td class="px-2 py-2">
 									<input
-										class="cell-input font-mono text-xs"
+										class="cell-input font-mono text-xs w-full"
 										aria-label={`${t.styleCode}: ${item.item}`}
 										autocomplete="off"
 										value={item.styleCode}
 										oninput={(event) => onUpdateItem(item.id, 'styleCode', inputValue(event))}
 									/>
 								</td>
+								<td class="px-3 py-2">
+									{#if item.imageUrl}
+										<img src={item.imageUrl} alt={item.item} class="w-8 h-8 rounded border object-cover shadow-sm bg-white" />
+									{:else}
+										<div class="w-8 h-8 rounded border border-dashed flex items-center justify-center text-[var(--muted)] bg-[var(--surface-soft)] shadow-sm">
+											<i class="ri-image-line text-xs"></i>
+										</div>
+									{/if}
+								</td>
 								<td class="px-3 py-2 font-medium">{item.item}</td>
 								<td class="px-2 py-2">
 									<input
-										class="cell-input w-16"
+										class="cell-input w-20"
 										type="number"
 										min="0"
 										aria-label={`${t.qty}: ${item.item}`}
@@ -119,12 +132,27 @@
 										oninput={(event) => onUpdateItem(item.id, 'qty', Number(inputValue(event)))}
 									/>
 								</td>
+								<td class="px-2 py-2">
+									<div class="flex items-center gap-1">
+										<span class="text-xs text-[var(--muted)]">$</span>
+										<input
+											class="cell-input w-16 text-xs text-right"
+											type="number"
+											step="0.01"
+											min="0"
+											aria-label={`${t.unitPrice || 'Price'}: ${item.item}`}
+											autocomplete="off"
+											value={item.unitPrice || 0}
+											oninput={(event) => onUpdateItem(item.id, 'unitPrice', Number(inputValue(event)))}
+										/>
+									</div>
+								</td>
 								<td class="px-3 py-2 text-xs leading-relaxed">
 									{#if item.styleCode}
 										{@const cat = catalog.find((entry) => entry.styleCode === item.styleCode)}
 										{#if cat}
-											<div class="font-medium text-[var(--ink)]">GB {cat.notes_en}</div>
-											<div class="mt-1 text-[var(--muted)] italic">ID {cat.notes_id}</div>
+											<div class="font-medium text-[var(--ink)]">{cat.notes_en}</div>
+											<div class="mt-1 text-[var(--muted)] italic">{cat.notes_id}</div>
 										{:else}
 											<span class="text-[var(--muted)]">{t.noInstructionsMapped}</span>
 										{/if}

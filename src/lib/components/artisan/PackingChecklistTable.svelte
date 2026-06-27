@@ -5,6 +5,7 @@
 		styleCode: string;
 		qty: number;
 		notes: string;
+		imageUrl?: string;
 	};
 
 	type Messages = Record<string, string>;
@@ -63,9 +64,18 @@
 						/>
 					</td>
 					<td class="px-3 py-3 font-medium">
-						<span class={packedItems[item.id] ? 'text-[var(--muted)] line-through' : ''}>
-							{item.item}
-						</span>
+						<div class="flex items-center gap-3">
+							{#if item.imageUrl}
+								<img src={item.imageUrl} alt={item.item} class="w-8 h-8 rounded border object-cover shadow-sm bg-white shrink-0" />
+							{:else}
+								<div class="w-8 h-8 rounded border border-dashed flex items-center justify-center text-[var(--muted)] bg-[var(--surface-soft)] shadow-sm shrink-0">
+									<i class="ri-image-line text-xs"></i>
+								</div>
+							{/if}
+							<span class={packedItems[item.id] ? 'text-[var(--muted)] line-through' : ''}>
+								{item.item}
+							</span>
+						</div>
 					</td>
 					<td class="px-3 py-3 text-center font-bold">{item.qty}</td>
 					<td class="px-3 py-3 text-xs text-[var(--muted)]">{getPackagingSpecifics(item.styleCode)}</td>

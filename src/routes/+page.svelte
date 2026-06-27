@@ -17,16 +17,21 @@
 	import enMessages from '../../messages/en.json';
 	import idMessages from '../../messages/id.json';
 
+	let { data }: { data: any } = $props();
+
 	type Step = 1 | 2 | 3 | 4;
 	type Tab = 'production' | 'packing' | 'customer';
 
 	type Blocker = {
 		id: string;
 		impact: 'High impact' | 'Medium impact';
+		impactKey: 'highImpact' | 'mediumImpact';
 		question: string;
+		questionKey: 'starburstQuestion' | 'horseQuestion';
 		evidence: string;
 		source: string;
 		risk: string;
+		riskKey: 'starburstRisk' | 'horseRisk';
 		options: string[];
 		answer: string;
 	};
@@ -40,6 +45,7 @@
 		notes: string;
 		source: string;
 		unitPrice: number; // Client PO price
+		imageUrl?: string;
 	};
 
 	type CatalogItem = {
@@ -52,6 +58,7 @@
 		material: 'Silver' | 'Gold' | 'Brass' | 'Others';
 		notes_en: string;
 		notes_id: string;
+		imageUrl?: string;
 	};
 
 	type Locale = 'en' | 'id';
@@ -160,12 +167,253 @@ Line  Item Code      Description                  Qty  Unit Price
 		return 'sourcePoText';
 	}
 
+	function parseMessyInput(text: string): LineItem[] {
+		const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+		if (lines.length === 0) return [];
+
+		const parsedItems: LineItem[] = [];
+		const cleanField = (f: string) => f.replace(/^["']|["']$/g, '').trim();
+
+		const firstLine = lines[0];
+		const isCsv = firstLine.includes(',') && lines.some(l => l.includes(','));
+		const isTsv = firstLine.includes('\t') && lines.some(l => l.includes('\t'));
+
+		if (isCsv || isTsv) {
+			const sep = isTsv ? '\t' : ',';
+			const parseRow = (rowText: string): string[] => {
+				const result: string[] = [];
+				let current = '';
+				let inQuotes = false;
+				for (let i = 0; i < rowText.length; i++) {
+					const char = rowText[i];
+					if (char === '"') {
+						inQuotes = !inQuotes;
+					} else if (char === sep && !inQuotes) {
+						result.push(current);
+						current = '';
+					} else {
+						current += char;
+					}
+				}
+				result.push(current);
+				return result.map(cleanField);
+			};
+
+			const headerRow = parseRow(lines[0]);
+			let itemIdx = -1;
+			let qtyIdx = -1;
+			let finishIdx = -1;
+			let priceIdx = -1;
+			let notesIdx = -1;
+			let imageIdx = -1;
+
+			headerRow.forEach((col, idx) => {
+				const c = col.toLowerCase();
+				if (c.includes('item') || c.includes('description') || c.includes('style') || c.includes('code') || c.includes('product') || c === 'name') {
+					if (itemIdx === -1) itemIdx = idx;
+				} else if (c.includes('qty') || c.includes('quantity') || c.includes('count') || c === 'q') {
+					if (qtyIdx === -1) qtyIdx = idx;
+				} else if (c.includes('finish') || c.includes('material') || c.includes('metal')) {
+					if (finishIdx === -1) finishIdx = idx;
+				} else if (c.includes('price') || c.includes('rate') || c.includes('cost')) {
+					if (priceIdx === -1) priceIdx = idx;
+				} else if (c.includes('note') || c.includes('instruction') || c.includes('comment')) {
+					if (notesIdx === -1) notesIdx = idx;
+				} else if (c.includes('image') || c.includes('pic') || c.includes('photo') || c.includes('url') || c.includes('file')) {
+					if (imageIdx === -1) imageIdx = idx;
+				}
+			});
+
+			const startRowIdx = (itemIdx !== -1 || qtyIdx !== -1) ? 1 : 0;
+			let finalItemIdx = itemIdx !== -1 ? itemIdx : 0;
+			let finalQtyIdx = qtyIdx !== -1 ? qtyIdx : 1;
+			let finalFinishIdx = finishIdx !== -1 ? finishIdx : 2;
+			let finalNotesIdx = notesIdx !== -1 ? notesIdx : 3;
+			let finalPriceIdx = priceIdx;
+			let finalImageIdx = imageIdx;
+
+			for (let i = startRowIdx; i < lines.length; i++) {
+				if (lines[i].startsWith('---') || lines[i].startsWith('===')) continue;
+				const cols = parseRow(lines[i]);
+				if (cols.length < 2) continue;
+
+				const itemText = cols[finalItemIdx] || '';
+				if (!itemText) continue;
+
+				const qtyText = cols[finalQtyIdx] || '1';
+				const qty = parseInt(qtyText.replace(/[^\d]/g, ''), 10) || 1;
+
+				const finish = cols[finalFinishIdx] || 'Silver';
+				const notes = cols[finalNotesIdx] || '';
+				
+				let unitPrice = 0;
+				if (finalPriceIdx !== undefined && finalPriceIdx !== -1 && cols[finalPriceIdx]) {
+					unitPrice = parseFloat(cols[finalPriceIdx].replace(/[^\d.]/g, '')) || 0;
+				}
+
+				let imageUrl = '';
+				if (finalImageIdx !== undefined && finalImageIdx !== -1 && cols[finalImageIdx]) {
+					imageUrl = cols[finalImageIdx];
+				}
+
+				const id = `item-${Math.random().toString(36).substr(2, 9)}`;
+
+				parsedItems.push({
+					id,
+					item: itemText,
+					styleCode: '',
+					qty,
+					finish,
+					notes,
+					source: isCsv ? 'CSV row' : 'TSV row',
+					unitPrice,
+					imageUrl
+				});
+			}
+		}
+
+		if (parsedItems.length === 0) {
+			lines.forEach((line) => {
+				if (
+					line.startsWith('From:') || 
+					line.startsWith('Subject:') || 
+					line.startsWith('PO#') || 
+					line.startsWith('Ship to:') || 
+					line.startsWith('Item ') || 
+					line.startsWith('---') || 
+					line.startsWith('===') ||
+					line.toLowerCase().includes('csv pasted below')
+				) return;
+
+				let matchedCatalog: CatalogItem | undefined;
+				for (const cat of catalog) {
+					if (
+						line.toLowerCase().includes(cat.styleCode.toLowerCase()) ||
+						line.toLowerCase().includes(cat.creativeTitle.toLowerCase()) ||
+						(cat.creativeTitle === 'Horse Pin Medium' && line.toLowerCase().includes('horse pin')) ||
+						(cat.creativeTitle === 'Bali Starburst Large' && line.toLowerCase().includes('starburst'))
+					) {
+						matchedCatalog = cat;
+						break;
+					}
+				}
+
+				if (matchedCatalog) {
+					const qtyMatch = line.match(/\b(\d+)\b/);
+					const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+
+					let finish = 'Silver';
+					const finishes = ['Silver', 'Gold', 'Vermeil', 'Brass', 'Mother of Pearl'];
+					for (const f of finishes) {
+						if (line.toLowerCase().includes(f.toLowerCase())) {
+							finish = f === 'Vermeil' ? 'Gold Vermeil' : f;
+							break;
+						}
+					}
+
+					const priceMatch = line.match(/\$(\d+(\.\d{2})?)/);
+					const unitPrice = priceMatch ? parseFloat(priceMatch[1]) : 0;
+
+					let notes = '';
+					const noteQuotes = line.match(/["']([^"']+)["']/);
+					if (noteQuotes) {
+						notes = noteQuotes[1];
+					} else {
+						const parts = line.split(/\s{2,}/);
+						if (parts.length > 2) {
+							notes = parts[parts.length - 1];
+						}
+					}
+
+					let imageUrl = '';
+					const imgMatch = line.match(/\b\S+\.(png|jpg|jpeg)\b/i);
+					if (imgMatch) {
+						imageUrl = imgMatch[0];
+					}
+
+					parsedItems.push({
+						id: `item-${Math.random().toString(36).substr(2, 9)}`,
+						item: matchedCatalog.creativeTitle,
+						styleCode: matchedCatalog.styleCode,
+						qty,
+						finish,
+						notes,
+						source: 'Pasted text',
+						unitPrice,
+						imageUrl
+					});
+				}
+			});
+		}
+
+		parsedItems.forEach((item) => {
+			if (!item.styleCode) {
+				const name = item.item.toLowerCase();
+				const exactMatch = catalog.find(
+					c => c.creativeTitle.toLowerCase() === name || c.styleCode.toLowerCase() === name
+				);
+				if (exactMatch) {
+					item.styleCode = exactMatch.styleCode;
+					item.item = exactMatch.creativeTitle;
+				} else {
+					if (name.includes('horse') && name.includes('pin')) {
+						if (name.includes('medium')) {
+							item.styleCode = 'HB-HORSE-M';
+							item.item = 'Horse Pin Medium';
+						} else if (name.includes('small')) {
+							item.styleCode = 'HB-HORSE-S';
+							item.item = 'Horse Pin Small';
+						} else if (name.includes('large')) {
+							item.styleCode = 'HB-HORSE-L';
+							item.item = 'Horse Pin Large';
+						} else {
+							item.styleCode = '';
+							item.item = 'Horse Pin (Size Unresolved)';
+						}
+					} else if (name.includes('starburst')) {
+						if (name.includes('mini')) {
+							item.styleCode = 'HB-SB-MINI';
+							item.item = 'Bali Starburst Mini';
+						} else if (name.includes('small')) {
+							item.styleCode = 'HB-SB-SMALL';
+							item.item = 'Bali Starburst Small';
+						} else if (name.includes('large')) {
+							item.styleCode = 'HB-SB-LARGE';
+							item.item = 'Bali Starburst Large';
+						} else if (name.includes('stud')) {
+							item.styleCode = 'HB-SB-STUD';
+							item.item = 'Starburst Studs';
+						} else {
+							item.styleCode = '';
+							item.item = 'Bali Starburst (Size Unresolved)';
+						}
+					} else if (name.includes('mountain')) {
+						item.styleCode = 'HB-MTN-P';
+						item.item = 'Mountain Pendant';
+					} else if (name.includes('wave') && name.includes('cuff')) {
+						item.styleCode = 'HB-WAVE-C';
+						item.item = 'Wave Cuff';
+					} else if (name.includes('stacking') && name.includes('ring')) {
+						item.styleCode = 'HB-TSR-2';
+						item.item = 'Thin Stacking Ring';
+					} else if (name.includes('cable') && name.includes('chain')) {
+						item.styleCode = 'HB-CC-18';
+						item.item = 'Cable Chain 18"';
+					}
+				}
+			}
+		});
+
+		return parsedItems;
+	}
+
 	function loadSampleType(source: (typeof sourceTypes)[number]) {
 		selectedSource = source;
 		intakeText = samples[source];
 		uploadedFiles = [];
 		sampleUsed = true;
 		resetDemoState();
+		markAutoSaved();
 		showToast(t.sampleOrderLoaded);
 	}
 
@@ -177,9 +425,10 @@ Line  Item Code      Description                  Qty  Unit Price
 			intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + samples[selectedSource];
 		}
 		resetDemoState();
+		markAutoSaved();
 	}
 
-	const catalog: CatalogItem[] = [
+	const catalog = $derived<CatalogItem[]>(data.catalogItems && data.catalogItems.length > 0 ? data.catalogItems : [
 		{ 
 			styleCode: 'HB-HORSE-M', 
 			creativeTitle: 'Horse Pin Medium', 
@@ -189,7 +438,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			category: 'Pins',
 			material: 'Silver',
 			notes_en: 'Cast in sterling silver. Match master horse mold size M.',
-			notes_id: 'Cor dalam perak murni. Sesuaikan dengan cetakan induk kuda ukuran M.'
+			notes_id: 'Cor dalam perak murni. Sesuaikan dengan cetakan induk kuda ukuran M.',
+			imageUrl: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=120&h=120&fit=crop'
 		},
 		{ 
 			styleCode: 'HB-HORSE-S', 
@@ -200,7 +450,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			category: 'Pins',
 			material: 'Silver',
 			notes_en: 'Cast in sterling silver. Match master horse mold size S.',
-			notes_id: 'Cor dalam perak murni. Sesuaikan dengan cetakan induk kuda ukuran S.'
+			notes_id: 'Cor dalam perak murni. Sesuaikan dengan cetakan induk kuda ukuran S.',
+			imageUrl: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=120&h=120&fit=crop'
 		},
 		{ 
 			styleCode: 'HB-HORSE-L', 
@@ -211,7 +462,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			category: 'Pins',
 			material: 'Silver',
 			notes_en: 'Cast in sterling silver. Match master horse mold size L.',
-			notes_id: 'Cor dalam perak murni. Sesuaikan dengan cetakan induk kuda ukuran L.'
+			notes_id: 'Cor dalam perak murni. Sesuaikan dengan cetakan induk kuda ukuran L.',
+			imageUrl: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=120&h=120&fit=crop'
 		},
 		{ 
 			styleCode: 'HB-MTN-P', 
@@ -222,7 +474,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			category: 'Traditional Jewelry',
 			material: 'Silver',
 			notes_en: 'Hand-carved snow structures and mother-of-pearl accent. Long chain.',
-			notes_id: 'Struktur salju diukir tangan dengan hiasan kerang mutiara. Rantai panjang.'
+			notes_id: 'Struktur salju diukir tangan dengan hiasan kerang mutiara. Rantai panjang.',
+			imageUrl: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=120&h=120&fit=crop'
 		},
 		{ 
 			styleCode: 'HB-WAVE-C', 
@@ -233,7 +486,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			category: 'Traditional Jewelry',
 			material: 'Silver',
 			notes_en: 'Wave textured cuff. Hand-finish silver. 6.5 inch circumference.',
-			notes_id: 'Gelang bertekstur ombak. Perak polesan tangan. Lingkar 6.5 inci.'
+			notes_id: 'Gelang bertekstur ombak. Perak polesan tangan. Lingkar 6.5 inci.',
+			imageUrl: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=120&h=120&fit=crop'
 		},
 		{ 
 			styleCode: 'HB-SB-STUD', 
@@ -244,7 +498,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			category: 'Traditional Jewelry',
 			material: 'Gold',
 			notes_en: 'Starburst design with gold vermeil finish. Match gold thickness rules.',
-			notes_id: 'Desain starburst dengan lapisan emas vermeil. Sesuaikan ketebalan emas.'
+			notes_id: 'Desain starburst dengan lapisan emas vermeil. Sesuaikan ketebalan emas.',
+			imageUrl: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=120&h=120&fit=crop'
 		},
 		{ 
 			styleCode: 'HB-TSR-2', 
@@ -255,7 +510,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			category: 'Traditional Jewelry',
 			material: 'Silver',
 			notes_en: 'Thin stacking ring. Mix sizes 7 and 8.',
-			notes_id: 'Cincin tumpuk tipis. Campuran ukuran 7 dan 8.'
+			notes_id: 'Cincin tumpuk tipis. Campuran ukuran 7 dan 8.',
+			imageUrl: 'https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=120&h=120&fit=crop'
 		},
 		{ 
 			styleCode: 'HB-CC-18', 
@@ -266,7 +522,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			category: 'Others',
 			material: 'Silver',
 			notes_en: 'Cable chain 18 inches. Check links and clasp durability.',
-			notes_id: 'Rantai kabel 18 inci. Periksa ketahanan sambungan dan pengait.'
+			notes_id: 'Rantai kabel 18 inci. Periksa ketahanan sambungan dan pengait.',
+			imageUrl: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=120&h=120&fit=crop'
 		},
 		{ 
 			styleCode: 'HB-SB-MINI', 
@@ -277,7 +534,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			category: 'Traditional Jewelry',
 			material: 'Silver',
 			notes_en: 'Mini starburst studs in sterling silver.',
-			notes_id: 'Anting giwang starburst mini dalam perak murni.'
+			notes_id: 'Anting giwang starburst mini dalam perak murni.',
+			imageUrl: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=120&h=120&fit=crop'
 		},
 		{ 
 			styleCode: 'HB-SB-SMALL', 
@@ -288,7 +546,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			category: 'Traditional Jewelry',
 			material: 'Silver',
 			notes_en: 'Small starburst studs in sterling silver.',
-			notes_id: 'Anting giwang starburst kecil dalam perak murni.'
+			notes_id: 'Anting giwang starburst kecil dalam perak murni.',
+			imageUrl: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=120&h=120&fit=crop'
 		},
 		{ 
 			styleCode: 'HB-SB-LARGE', 
@@ -299,28 +558,35 @@ Line  Item Code      Description                  Qty  Unit Price
 			category: 'Traditional Jewelry',
 			material: 'Silver',
 			notes_en: 'Large starburst studs in sterling silver.',
-			notes_id: 'Anting giwang starburst besar dalam perak murni.'
+			notes_id: 'Anting giwang starburst besar dalam perak murni.',
+			imageUrl: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=120&h=120&fit=crop'
 		}
-	];
+	]);
 
 	const initialBlockers = (): Blocker[] => [
 		{
 			id: 'starburst-size',
 			impact: 'High impact',
+			impactKey: 'highImpact',
 			question: 'Which Starburst size should Bali make?',
+			questionKey: 'starburstQuestion',
 			evidence: 'mini star',
 			source: 'Pasted DM',
 			risk: 'Size changes casting, stone layout, packing count, and production time.',
+			riskKey: 'starburstRisk',
 			options: ['Mini', 'Small', 'Large'],
 			answer: ''
 		},
 		{
 			id: 'horse-pin-size',
 			impact: 'Medium impact',
+			impactKey: 'mediumImpact',
 			question: 'Which Horse Pin size is this?',
+			questionKey: 'horseQuestion',
 			evidence: 'new smaller horse pin',
 			source: 'Copied PO text',
 			risk: 'Horse Pin sizes map to different style codes and wholesale packing labels.',
+			riskKey: 'horseRisk',
 			options: ['Small', 'Medium', 'Large'],
 			answer: ''
 		}
@@ -446,6 +712,18 @@ Heather Benjamin Jewelry`;
 	let mobileSidebarOpen = $state(false);
 	let showWelcomeModal = $state(false);
 
+	let dbLoaded = false;
+	$effect(() => {
+		if (!dbLoaded && data.savedOrder) {
+			intakeText = data.savedOrder.sourceText;
+			blockers = data.savedOrder.blockers;
+			lineItems = data.savedOrder.lineItems;
+			customerUpdate = data.savedOrder.customerUpdate;
+			uploadedFiles = data.savedOrder.uploadedFiles;
+			dbLoaded = true;
+		}
+	});
+
 	// New States
 	let uploadedFiles = $state<string[]>([]);
 	let showOriginalDrawer = $state(false);
@@ -489,6 +767,10 @@ Heather Benjamin Jewelry`;
 		return t[source];
 	}
 
+	function extractEmail(text: string) {
+		return text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? '';
+	}
+
 	// Dynamic Blocker & Ready Tracking
 	const remainingAnswers = $derived(blockers.filter((blocker) => !blocker.answer).length);
 	const allAnswered = $derived(remainingAnswers === 0);
@@ -515,6 +797,8 @@ Heather Benjamin Jewelry`;
 	const finishSummary = $derived(
 		Array.from(new Set(lineItems.map((item) => item.finish))).join(', ')
 	);
+	const packedCount = $derived(Object.values(packedItems).filter(Boolean).length);
+	const customerEmail = $derived(extractEmail(intakeText));
 
 	const maxStep = $derived(allAnswered ? Math.max(completedSteps, 3) as Step : completedSteps as Step);
 
@@ -619,6 +903,7 @@ Heather Benjamin Jewelry`;
 		uploadedFiles = [];
 		sampleUsed = true;
 		resetDemoState();
+		markAutoSaved();
 		showToast(t.sampleOrderLoaded);
 	}
 
@@ -629,9 +914,29 @@ Heather Benjamin Jewelry`;
 			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
 			intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + samples[selectedSource];
 			resetDemoState();
+			markAutoSaved();
 			showToast(`${files.length} ${t.fileUploaded}`);
 		}
 	}
+
+	function handleComposerPaste(event: ClipboardEvent) {
+		const files = Array.from(event.clipboardData?.files ?? []).filter((file) =>
+			file.type.startsWith('image/')
+		);
+		if (files.length === 0) return;
+
+		event.preventDefault();
+		const imageNames = files.map((file, index) => {
+			const extension = file.type.split('/')[1] || 'png';
+			return file.name || `Clipboard image ${uploadedFiles.length + index + 1}.${extension}`;
+		});
+		uploadedFiles = [...uploadedFiles, ...imageNames];
+		intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n${intakeText.trim() || samples[selectedSource]}`;
+		resetDemoState();
+		markAutoSaved();
+		showToast(`${files.length} ${t.clipboardImageAttached}`);
+	}
+
 	function handleFileDrop(event: DragEvent) {
 		event.preventDefault();
 		isDragging = false;
@@ -640,6 +945,7 @@ Heather Benjamin Jewelry`;
 			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
 			intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + samples[selectedSource];
 			resetDemoState();
+			markAutoSaved();
 			showToast(`${files.length} ${t.fileUploaded}`);
 		}
 	}
@@ -649,6 +955,90 @@ Heather Benjamin Jewelry`;
 		}
 		processClicked = true;
 		resetDemoState();
+
+		const isDefaultSample = Object.values(samples).some(s => s.trim() === intakeText.trim()) && !uploadedFiles.length;
+
+		if (!isDefaultSample) {
+			const parsed = parseMessyInput(intakeText);
+			if (parsed.length > 0) {
+				parsed.forEach((item) => {
+					if (item.styleCode) {
+						const cat = catalog.find(c => c.styleCode === item.styleCode);
+						if (cat && cat.imageUrl && !item.imageUrl) {
+							item.imageUrl = cat.imageUrl;
+						}
+					}
+				});
+				lineItems = parsed;
+
+				const activeBlockers: Blocker[] = [];
+				const hasStarburstUnresolved = parsed.some(item => !item.styleCode && item.item.toLowerCase().includes('starburst'));
+				const hasHorseUnresolved = parsed.some(item => !item.styleCode && item.item.toLowerCase().includes('horse'));
+
+				if (hasStarburstUnresolved) {
+					activeBlockers.push({
+						id: 'starburst-size',
+						impact: 'High impact',
+						impactKey: 'highImpact',
+						question: 'Which Starburst size should Bali make?',
+						questionKey: 'starburstQuestion',
+						evidence: parsed.find(item => item.item.toLowerCase().includes('starburst'))?.notes || 'Bali Starburst',
+						source: parsed.find(item => item.item.toLowerCase().includes('starburst'))?.source || 'Source',
+						risk: 'Size changes casting, stone layout, packing count, and production time.',
+						riskKey: 'starburstRisk',
+						options: ['Mini', 'Small', 'Large'],
+						answer: ''
+					});
+				}
+
+				if (hasHorseUnresolved) {
+					activeBlockers.push({
+						id: 'horse-pin-size',
+						impact: 'Medium impact',
+						impactKey: 'mediumImpact',
+						question: 'Which Horse Pin size is this?',
+						questionKey: 'horseQuestion',
+						evidence: parsed.find(item => item.item.toLowerCase().includes('horse'))?.notes || 'Horse Pin',
+						source: parsed.find(item => item.item.toLowerCase().includes('horse'))?.source || 'Source',
+						risk: 'Horse Pin sizes map to different style codes and wholesale packing labels.',
+						riskKey: 'horseRisk',
+						options: ['Small', 'Medium', 'Large'],
+						answer: ''
+					});
+				}
+
+				blockers = activeBlockers;
+
+				customerUpdate = `Hi Mia,
+
+Thank you for your order. We reviewed the details and everything needed for production is now ready.
+
+Order summary
+- ${parsed.length} items
+- Total quantity: ${parsed.reduce((sum, item) => sum + item.qty, 0)}
+- Finishes: ${Array.from(new Set(parsed.map(item => item.finish))).join(', ')}
+
+Timeline
+- Production start: June 3, 2026
+- Estimated completion: June 20, 2026
+- Need by: July 10, 2026
+
+We will send another update once production begins. Please reach out if anything needs to change.
+
+Thank you,
+Heather Benjamin Jewelry`;
+			}
+		} else {
+			lineItems.forEach((item) => {
+				if (item.styleCode) {
+					const cat = catalog.find(c => c.styleCode === item.styleCode);
+					if (cat && cat.imageUrl) {
+						item.imageUrl = cat.imageUrl;
+					}
+				}
+			});
+		}
+
 		setStep(2);
 	}
 
@@ -697,6 +1087,7 @@ Heather Benjamin Jewelry`;
 				horse.notes = `${t.resolvedSize}: ${answer}`;
 			}
 		}
+		markAutoSaved();
 	}
 
 	function continueToSheets() {
@@ -744,34 +1135,70 @@ Heather Benjamin Jewelry`;
 		{ name: t.otherAccessories, items: otherCatProduction }
 	]);
 
+	async function syncToDatabase() {
+		if (!browser) return;
+		try {
+			await fetch('/api/order-sync', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					orderId,
+					client,
+					blockers,
+					lineItems,
+					customerUpdate,
+					uploadedFiles,
+					sourceText: intakeText
+				})
+			});
+		} catch (err) {
+			console.error('Failed to sync to database:', err);
+		}
+	}
+
 	function markDirty() {
 		sheetDirty = true;
 	}
 
-	function updateLineItem(id: string, field: 'styleCode' | 'qty' | 'notes', value: string | number) {
+	function markAutoSaved() {
+		lastSaved = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+		sheetDirty = false;
+		syncToDatabase();
+	}
+
+	function updateLineItem(id: string, field: 'styleCode' | 'qty' | 'notes' | 'unitPrice', value: string | number) {
 		const item = lineItems.find((entry) => entry.id === id);
 		if (!item) return;
 		if (field === 'qty') {
 			item.qty = Number(value) || 0;
+		} else if (field === 'unitPrice') {
+			item.unitPrice = Number(value) || 0;
 		} else {
 			item[field] = String(value);
 		}
 		markDirty();
+		markAutoSaved();
 	}
 
 	function setPackedItem(id: string, checked: boolean) {
 		packedItems = { ...packedItems, [id]: checked };
 		markDirty();
+		markAutoSaved();
+	}
+
+	function updateIntakeText(value: string) {
+		intakeText = value;
+		markAutoSaved();
+	}
+
+	function setProductionGrouping(grouping: 'material' | 'category') {
+		productionGrouping = grouping;
+		markAutoSaved();
 	}
 
 	function updateCustomerUpdate(value: string) {
 		customerUpdate = value;
-	}
-
-	function saveChanges() {
-		lastSaved = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-		sheetDirty = false;
-		showToast(t.changesSaved);
+		markAutoSaved();
 	}
 
 	function sanitizeExportCell(value: string | number) {
@@ -794,18 +1221,20 @@ Heather Benjamin Jewelry`;
 						'',
 						'',
 						'',
+						'',
 						''
 					]
 				]
 			: [];
 
 		return [
-			[t.item, t.styleCode, t.qty, t.materialFinish, t.technicalInstructions, t.sourceEvidence],
+			[t.item, t.styleCode, t.qty, t.unitPrice || 'Price', t.materialFinish, t.technicalInstructions, t.orderNotes || 'Notes'],
 			...warningRows,
 			...lineItems.map((item) => [
 				item.item,
 				item.styleCode,
 				item.qty,
+				item.unitPrice || 0,
 				item.finish,
 				item.notes,
 				item.source
@@ -868,9 +1297,12 @@ Heather Benjamin Jewelry`;
 		showToast(t.customerUpdateCopied);
 	}
 
-	function saveDraft() {
-		lastSaved = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-		showToast(t.draftSaved);
+	function openEmailDraft() {
+		if (!browser) return;
+		const subject = `${t.customerUpdate}: ${orderId}`;
+		const mailto = `mailto:${customerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(customerUpdate)}`;
+		window.location.href = mailto;
+		showToast(t.emailDraftOpened);
 	}
 
 	function markSent() {
@@ -1259,18 +1691,21 @@ Heather Benjamin Jewelry`;
 				<div class="flex items-center gap-4">
 					<!-- i18n Language Segment Control -->
 					<div class="flex items-center gap-1 border border-[var(--line)] rounded bg-[var(--surface-soft)] p-0.5 text-xs shadow-sm">
-						<i class="ri-translate-2 text-[var(--muted)] px-1 text-sm"></i>
 						<a
 							href={resolve(localizeHref(page.url.pathname, { locale: 'en' }) as Pathname)}
-							class={`px-2 py-1 rounded font-semibold text-xs transition-all ${currentLocale === 'en' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
+							class={`px-2.5 py-1 rounded font-semibold text-xs leading-none transition-all ${currentLocale === 'en' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
+							aria-label="English US"
+							title="English US"
 						>
-							{t.english}
+							US
 						</a>
 						<a
 							href={resolve(localizeHref(page.url.pathname, { locale: 'id' }) as Pathname)}
-							class={`px-2 py-1 rounded font-semibold text-xs transition-all ${currentLocale === 'id' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
+							class={`px-2.5 py-1 rounded font-semibold text-xs leading-none transition-all ${currentLocale === 'id' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
+							aria-label="Indonesia ID"
+							title="Indonesia ID"
 						>
-							{t.indonesia}
+							ID
 						</a>
 					</div>
 
@@ -1330,9 +1765,9 @@ Heather Benjamin Jewelry`;
 				{#if currentStep === 1}
 					<section class={`grid min-h-full transition-all duration-300 ${rightSidebarCollapsed ? 'xl:grid-cols-1' : 'xl:grid-cols-[1fr_368px]'}`}>
 						<div class="px-4 py-6 md:px-10 md:py-10">
-							<div class="mx-auto max-w-4xl">
+							<div class="mx-auto max-w-5xl">
 								<h1 class="font-display text-4xl leading-tight md:text-5xl">{t.addWholesaleOrder}</h1>
-								<p class="mt-4 max-w-3xl text-lg leading-8">{t.intakeDesc}</p>
+								<p class="mt-4 max-w-3xl whitespace-pre-line text-lg leading-8">{t.intakeDesc}</p>
 
 								<div class="mt-8 rounded-lg border border-[var(--line)] bg-white p-6 shadow-sm">
 									<!-- Unified Intake Composer -->
@@ -1344,6 +1779,7 @@ Heather Benjamin Jewelry`;
 										ondragover={(e) => { e.preventDefault(); isDragging = true; }}
 										ondragleave={() => { isDragging = false; }}
 										ondrop={handleFileDrop}
+										onpaste={handleComposerPaste}
 									>
 										<!-- Drop Overlay -->
 										{#if isDragging}
@@ -1358,7 +1794,8 @@ Heather Benjamin Jewelry`;
 											id="intake-scratchpad"
 											class="flex-1 w-full min-h-[320px] resize-none p-4 font-mono text-sm leading-6 outline-none bg-transparent border-0"
 											placeholder="Paste purchase order details, email text, DM conversations, spreadsheet rows... or attach files below."
-											bind:value={intakeText}
+											value={intakeText}
+											oninput={(event) => updateIntakeText((event.currentTarget as HTMLTextAreaElement).value)}
 										></textarea>
 
 										<!-- Bottom controls bar inside the box -->
@@ -1547,9 +1984,6 @@ Heather Benjamin Jewelry`;
 									</div>
 
 									<div class="page-actions">
-										<button class="ghost-button" type="button" onclick={() => showToast(t.progressSaved)}>
-											{t.saveProgress}
-										</button>
 										<button class="secondary-button" type="button" onclick={() => (showOriginalDrawer = true)}>{t.viewOriginal}</button>
 									</div>
 								</div>
@@ -1632,7 +2066,7 @@ Heather Benjamin Jewelry`;
 				{:else if currentStep === 3}
 					<section class="px-4 py-6 md:px-8 md:py-8">
 						<div class="mx-auto max-w-7xl">
-							<div class="flex flex-wrap items-start justify-between gap-5">
+							<div class="flex flex-wrap items-start justify-between gap-5 border-b border-[var(--line)] pb-6">
 								<div>
 									<p class="text-sm uppercase tracking-wide text-[var(--muted)]">
 										Order #{orderId}
@@ -1647,47 +2081,6 @@ Heather Benjamin Jewelry`;
 										<i class="ri-checkbox-circle-line text-base" aria-hidden="true"></i>
 										{t.answersComplete}
 									</p>
-								</div>
-
-								<div class="page-actions">
-									<button class="secondary-button" type="button" disabled={!sheetDirty} onclick={saveChanges}>
-										{t.saveChanges}
-									</button>
-									<div class="relative">
-										<button id="export-dropdown-btn" class="secondary-button flex items-center" type="button" onclick={() => (exportOpen = !exportOpen)}>
-											{t.exportBtn} <i class="ri-arrow-down-s-line ml-1" aria-hidden="true"></i>
-										</button>
-										{#if exportOpen}
-											<div class="absolute right-0 z-10 mt-2 w-56 rounded-md border border-[var(--line)] bg-white p-2 shadow-xl animate-fade-in">
-												<button class="menu-item font-sans text-sm" type="button" onclick={() => downloadCsv('production')}>
-													{t.downloadProductionCsv}
-												</button>
-												<button class="menu-item font-sans text-sm" type="button" onclick={() => downloadCsv('packing')}>
-													{t.downloadPackingCsv}
-												</button>
-												<button class="menu-item font-sans text-sm" type="button" onclick={copyTable}>{t.copyTable}</button>
-											</div>
-										{/if}
-									</div>
-								</div>
-							</div>
-
-							<div class="sheet-stats">
-								<div>
-									<span>{t.lineItems}</span>
-									<strong>{lineItems.length}</strong>
-								</div>
-								<div>
-									<span>{t.totalQuantity}</span>
-									<strong>{totalQty}</strong>
-								</div>
-								<div>
-									<span>{t.finishes}</span>
-									<strong>{finishSummary}</strong>
-								</div>
-								<div>
-									<span>{t.unresolved}</span>
-									<strong>{remainingAnswers}</strong>
 								</div>
 							</div>
 
@@ -1707,7 +2100,7 @@ Heather Benjamin Jewelry`;
 								{/each}
 							</div>
 
-							<div class={`output-grid ${rightSidebarCollapsed ? 'output-grid-collapsed' : ''}`}>
+							<div class={`output-grid mt-7 ${rightSidebarCollapsed ? 'output-grid-collapsed' : ''}`}>
 								<div class="output-card shadow-sm">
 									{#if activeTab === 'production'}
 										<ProductionSheetTable
@@ -1718,7 +2111,7 @@ Heather Benjamin Jewelry`;
 											materialGroups={materialProductionGroups}
 											categoryGroups={categoryProductionGroups}
 											{catalog}
-											onGroupingChange={(grouping) => (productionGrouping = grouping)}
+											onGroupingChange={setProductionGrouping}
 											onUpdateItem={updateLineItem}
 										/>
 									{:else if activeTab === 'packing'}
@@ -1746,42 +2139,73 @@ Heather Benjamin Jewelry`;
 
 								{#if !rightSidebarCollapsed}
 									<aside class="output-side shadow-sm">
-										<div class="flex items-center justify-between gap-4 mb-2">
-											<h2 class="font-display text-2xl">{t.readyNext}</h2>
-											<button
-												class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
-												type="button"
-												aria-label={t.closeRightPanel}
-												onclick={() => (rightSidebarCollapsed = true)}
-											>
-												<i class="ri-close-line text-lg"></i>
-											</button>
+										<div class="mb-5 border-b border-[var(--line)] pb-4">
+											<div class="flex items-center justify-between gap-4 mb-3">
+												<h2 class="font-display text-lg font-bold text-[var(--brand-dark)]">{t.orderSummary}</h2>
+												<button
+													class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
+													type="button"
+													style="margin-right: -6px;"
+													aria-label={t.closeRightPanel}
+													onclick={() => (rightSidebarCollapsed = true)}
+												>
+													<i class="ri-close-line text-lg"></i>
+												</button>
+											</div>
+											<div class="space-y-2.5 text-xs">
+												<div class="flex justify-between">
+													<span class="text-[var(--muted)]">{t.lineItems}</span>
+													<strong class="font-semibold">{lineItems.length}</strong>
+												</div>
+												<div class="flex justify-between">
+													<span class="text-[var(--muted)]">{t.totalQuantity}</span>
+													<strong class="font-semibold">{totalQty}</strong>
+												</div>
+												<div class="flex flex-col">
+													<span class="text-[var(--muted)] mb-0.5">{t.finishes}</span>
+													<strong class="font-semibold leading-normal">{finishSummary}</strong>
+												</div>
+												{#if activeTab === 'packing'}
+													<div class="mt-3 border-t border-[var(--line)] pt-3">
+														<div class="flex justify-between items-center mb-1">
+															<span class="text-[var(--muted)]">{t.packed}</span>
+															<strong class="font-bold text-emerald-700">{packedCount} / {lineItems.length}</strong>
+														</div>
+														<div class="h-1.5 w-full bg-[var(--surface-soft)] rounded-full overflow-hidden border border-[var(--line)]">
+															<div class="h-full bg-emerald-600 rounded-full transition-all duration-300" style="width: {(packedCount / lineItems.length) * 100}%"></div>
+														</div>
+													</div>
+												{/if}
+											</div>
 										</div>
-										<p class="text-sm text-[var(--muted)]">
-											{t.documentsUseEdits}
-										</p>
-										<div class="mt-5 space-y-4">
-											<button class="side-action transition flex items-center justify-between gap-3" type="button" onclick={() => downloadCsv('production')}>
-												<div>
-													<strong>{t.downloadProductionSheet}</strong>
-													<span class="block text-xs text-[var(--muted)] mt-1">{t.csvFormat}</span>
-												</div>
-												<i class="ri-download-2-line text-xl text-[var(--brand)]" aria-hidden="true"></i>
-											</button>
-											<button class="side-action transition flex items-center justify-between gap-3" type="button" onclick={() => downloadCsv('packing')}>
-												<div>
-													<strong>{t.downloadPackingChecklist}</strong>
-													<span class="block text-xs text-[var(--muted)] mt-1">{t.csvFormat}</span>
-												</div>
-												<i class="ri-download-2-line text-xl text-[var(--brand)]" aria-hidden="true"></i>
-											</button>
-											<button class="side-action transition flex items-center justify-between gap-3" type="button" onclick={copyCustomerUpdate}>
-												<div>
-													<strong>{t.copyUpdate}</strong>
-													<span class="block text-xs text-[var(--muted)] mt-1">{t.plainText}</span>
-												</div>
-												<i class="ri-file-copy-2-line text-xl text-[var(--brand)]" aria-hidden="true"></i>
-											</button>
+
+										<div>
+											<h2 class="font-display text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-3">{t.readyNext}</h2>
+											{#if activeTab === 'production'}
+												<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-[var(--brand)] text-left cursor-pointer border border-[var(--line)] rounded-lg p-4" type="button" onclick={() => downloadCsv('production')}>
+													<div>
+														<strong class="block font-bold text-sm text-[var(--ink)]">{t.downloadProductionSheet}</strong>
+														<span class="block text-[10px] text-[var(--muted)] mt-0.5">{t.csvFormat}</span>
+													</div>
+													<i class="ri-download-2-line text-lg text-[var(--brand)]" aria-hidden="true"></i>
+												</button>
+											{:else if activeTab === 'packing'}
+												<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-[var(--brand)] text-left cursor-pointer border border-[var(--line)] rounded-lg p-4" type="button" onclick={() => downloadCsv('packing')}>
+													<div>
+														<strong class="block font-bold text-sm text-[var(--ink)]">{t.downloadPackingChecklist}</strong>
+														<span class="block text-[10px] text-[var(--muted)] mt-0.5">{t.csvFormat}</span>
+													</div>
+													<i class="ri-download-2-line text-lg text-[var(--brand)]" aria-hidden="true"></i>
+												</button>
+											{:else}
+												<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-[var(--brand)] text-left cursor-pointer border border-[var(--line)] rounded-lg p-4" type="button" onclick={copyCustomerUpdate}>
+													<div>
+														<strong class="block font-bold text-sm text-[var(--ink)]">{t.copyUpdate}</strong>
+														<span class="block text-[10px] text-[var(--muted)] mt-0.5">{t.plainText}</span>
+													</div>
+													<i class="ri-file-copy-2-line text-lg text-[var(--brand)]" aria-hidden="true"></i>
+												</button>
+											{/if}
 										</div>
 									</aside>
 								{/if}
@@ -1799,13 +2223,18 @@ Heather Benjamin Jewelry`;
 									>
 									<span class="ml-3 normal-case tracking-normal font-sans">Client: {client}</span>
 								</p>
-								<div class="mt-5 flex flex-wrap items-start justify-between gap-4">
+								<div class="mt-5 flex flex-wrap items-center justify-between gap-4">
 									<div>
 										<h1 class="font-display text-4xl leading-tight md:text-5xl">{t.customerUpdate}</h1>
 										<p class="mt-3 text-lg">{t.updateDesc}</p>
 									</div>
-									<div class="page-actions">
-										<button class="ghost-button" type="button" onclick={saveDraft}>{t.saveDraft}</button>
+									<div class="flex items-center gap-3">
+										<button class="secondary-button flex items-center justify-center gap-1.5" type="button" onclick={copyCustomerUpdate}>
+											<i class="ri-file-copy-line" aria-hidden="true"></i> {t.copyUpdate}
+										</button>
+										<button class="secondary-button flex items-center justify-center gap-1.5" type="button" onclick={openEmailDraft}>
+											<i class="ri-mail-send-line" aria-hidden="true"></i> {t.openEmailDraft}
+										</button>
 									</div>
 								</div>
 
@@ -1858,13 +2287,20 @@ Heather Benjamin Jewelry`;
 								</button>
 							{/if}
 							{#if currentStep === 2}
-								<div class="flex items-center gap-3">
+								<div class="continue-action">
 									{#if remainingAnswers > 0}
-										<span class="text-xs text-[var(--warning-ink)] bg-[var(--warning-bg)] border border-[var(--warning)] px-2 py-1 rounded">
+										<span id="continue-warning" class="footer-warning-bubble" role="status">
 											{t.resolveToContinue}
 										</span>
 									{/if}
-									<button id="continue-to-sheets-btn" class="primary-button flex items-center justify-center font-bold" type="button" disabled={!allAnswered} onclick={continueToSheets}>
+									<button
+										id="continue-to-sheets-btn"
+										class="primary-button flex items-center justify-center font-bold"
+										type="button"
+										disabled={!allAnswered}
+										aria-describedby={remainingAnswers > 0 ? 'continue-warning' : undefined}
+										onclick={continueToSheets}
+									>
 										{t.continueToSheets} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
 									</button>
 								</div>
@@ -1874,9 +2310,6 @@ Heather Benjamin Jewelry`;
 										{t.continueToCustomerUpdate} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
 									</button>
 								{:else}
-									<button class="secondary-button flex items-center justify-center gap-1.5" type="button" onclick={copyCustomerUpdate}>
-										<i class="ri-file-copy-line" aria-hidden="true"></i> {t.copyUpdate}
-									</button>
 									<button id="mark-sent-btn" class="primary-button flex items-center justify-center gap-1.5 font-bold" type="button" onclick={markSent}>
 										<i class="ri-send-plane-line" aria-hidden="true"></i> {t.markSent}
 									</button>

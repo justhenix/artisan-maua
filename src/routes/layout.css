@@ -351,23 +351,29 @@ button:disabled {
 	border-color: var(--ready);
 }
 
-.impact,
-.answered-pill {
+.impact {
 	border-radius: 4px;
 	background: var(--warning-bg);
-	color: var(--warning);
+	color: var(--warning-ink);
+	border: 1px solid oklch(0.88 0.05 75);
 	font-size: 0.8rem;
 	font-weight: 700;
-	padding: 4px 8px;
+	padding: 3px 6px;
 }
 
 .impact-high {
-	color: #974b00;
+	background: oklch(0.95 0.03 55);
+	color: oklch(0.28 0.07 45);
+	border-color: oklch(0.82 0.09 55);
 }
 
 .answered-pill {
+	border-radius: 4px;
 	background: var(--ready-bg);
 	color: var(--ready-ink);
+	font-size: 0.8rem;
+	font-weight: 700;
+	padding: 4px 8px;
 }
 
 .choice-button {
@@ -416,8 +422,19 @@ button:disabled {
 	border-radius: 5px;
 	background: white;
 	min-height: 34px;
-	padding: 7px 9px;
+	padding: 6px 8px;
 	width: 100%;
+}
+
+/* Hide number input spinners for cleaner display in tables */
+.cell-input[type="number"]::-webkit-outer-spin-button,
+.cell-input[type="number"]::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+
+.cell-input[type="number"] {
+	-moz-appearance: textfield;
 }
 
 .cell-input-wide {
@@ -602,6 +619,44 @@ button:disabled {
 	max-width: 100%;
 }
 
+.continue-action {
+	position: relative;
+}
+
+.footer-warning-bubble {
+	background: var(--warning-bg);
+	border: 1px solid var(--warning);
+	border-radius: 8px;
+	bottom: calc(100% + 10px);
+	box-shadow: 0 10px 28px rgb(0 0 0 / 0.12);
+	color: var(--warning-ink);
+	font-size: 0.75rem;
+	font-weight: 650;
+	left: 50%;
+	line-height: 1.25;
+	max-width: min(360px, calc(100vw - 32px));
+	padding: 8px 12px;
+	position: absolute;
+	text-align: center;
+	transform: translateX(-50%);
+	white-space: normal;
+	width: max-content;
+	z-index: 2;
+}
+
+.footer-warning-bubble::after {
+	background: var(--warning-bg);
+	border-bottom: 1px solid var(--warning);
+	border-right: 1px solid var(--warning);
+	bottom: -5px;
+	content: "";
+	height: 9px;
+	left: 50%;
+	position: absolute;
+	transform: translateX(-50%) rotate(45deg);
+	width: 9px;
+}
+
 @media (max-width: 1023px) {
 	.app-shell,
 	.app-shell-collapsed {
@@ -664,6 +719,16 @@ button:disabled {
 	.footer-actions .secondary-button,
 	.footer-actions .ghost-button {
 		width: 100%;
+	}
+
+	.continue-action {
+		width: 100%;
+	}
+
+	.footer-warning-bubble {
+		bottom: calc(100% + 8px);
+		max-width: 100%;
+		white-space: normal;
 	}
 
 	.step-button {
