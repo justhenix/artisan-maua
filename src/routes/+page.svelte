@@ -196,6 +196,9 @@ Heather Benjamin Jewelry`;
 	const remainingAnswers = $derived(blockers.filter((blocker) => !blocker.answer).length);
 	const allAnswered = $derived(remainingAnswers === 0);
 	const totalQty = $derived(lineItems.reduce((sum, item) => sum + Number(item.qty || 0), 0));
+	const finishSummary = $derived(
+		Array.from(new Set(lineItems.map((item) => item.finish))).join(', ')
+	);
 	const maxStep = $derived(currentStep);
 
 	if (browser) {
@@ -762,6 +765,25 @@ Heather Benjamin Jewelry`;
 								</div>
 							</div>
 
+							<div class="sheet-stats">
+								<div>
+									<span>Line items</span>
+									<strong>{lineItems.length}</strong>
+								</div>
+								<div>
+									<span>Total quantity</span>
+									<strong>{totalQty}</strong>
+								</div>
+								<div>
+									<span>Finishes</span>
+									<strong>{finishSummary}</strong>
+								</div>
+								<div>
+									<span>Unresolved</span>
+									<strong>{remainingAnswers}</strong>
+								</div>
+							</div>
+
 							<div class="mt-9 flex gap-8 border-b border-[var(--line)]">
 								{#each [
 									['production', 'Production sheet'],
@@ -778,8 +800,8 @@ Heather Benjamin Jewelry`;
 								{/each}
 							</div>
 
-							<div class="mt-7 grid gap-5 2xl:grid-cols-[1fr_288px]">
-								<div class="rounded-lg border border-[var(--line)] bg-white p-5 shadow-sm">
+							<div class="output-grid">
+								<div class="output-card">
 									{#if activeTab === 'production'}
 										<div class="mb-5">
 											<h2 class="font-display text-2xl">Production sheet</h2>
@@ -788,7 +810,7 @@ Heather Benjamin Jewelry`;
 											</p>
 										</div>
 										<div class="overflow-auto">
-											<table class="min-w-[880px] w-full text-left text-sm">
+											<table class="min-w-[760px] w-full text-left text-sm">
 												<thead class="bg-[var(--surface-soft)]">
 													<tr>
 														<th class="w-9 px-3 py-3"></th>
@@ -821,7 +843,7 @@ Heather Benjamin Jewelry`;
 																<input class="cell-input" bind:value={item.finish} oninput={markDirty} />
 															</td>
 															<td class="px-2 py-2">
-																<input class="cell-input" bind:value={item.notes} oninput={markDirty} />
+																<input class="cell-input cell-input-wide" bind:value={item.notes} oninput={markDirty} />
 															</td>
 															<td class="px-3 py-3">{item.source}</td>
 														</tr>
@@ -862,8 +884,11 @@ Heather Benjamin Jewelry`;
 									{/if}
 								</div>
 
-								<aside class="rounded-lg border border-[var(--line)] bg-white p-5">
+								<aside class="output-side">
 									<h2 class="font-display text-2xl">Ready next</h2>
+									<p class="mt-2 text-sm text-[var(--muted)]">
+										Documents use current in-app edits.
+									</p>
 									<div class="mt-5 space-y-4">
 										<button class="side-action" type="button" onclick={() => downloadCsv('production')}>
 											<strong>Download production sheet</strong>
@@ -883,7 +908,7 @@ Heather Benjamin Jewelry`;
 						</div>
 					</section>
 				{:else}
-					<section class="grid min-h-full xl:grid-cols-[1fr_352px]">
+					<section class="customer-grid">
 						<div class="px-4 py-6 md:px-10 md:py-9">
 							<div class="mx-auto max-w-5xl">
 								<p class="text-sm uppercase tracking-wide text-[var(--muted)]">
@@ -916,14 +941,14 @@ Heather Benjamin Jewelry`;
 										Message
 									</span>
 									<textarea
-										class="mt-3 h-[520px] w-full resize-none rounded-md border border-[var(--line)] bg-white p-5 leading-7 outline-none focus:border-[var(--brand)]"
+										class="customer-textarea"
 										bind:value={customerUpdate}
 									></textarea>
 								</label>
 							</div>
 						</div>
 
-						<aside class="side-panel">
+						<aside class="side-panel customer-side">
 							<h2 class="font-display text-2xl">Included in this update</h2>
 							<div class="mt-7 space-y-6">
 								<div>

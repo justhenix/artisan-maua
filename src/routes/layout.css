@@ -364,6 +364,10 @@ button:disabled {
 	width: 100%;
 }
 
+.cell-input-wide {
+	min-width: 180px;
+}
+
 .cell-input:focus {
 	border-color: var(--brand);
 	outline: 2px solid color-mix(in srgb, var(--brand) 18%, transparent);
@@ -399,6 +403,91 @@ button:disabled {
 	display: block;
 	font-size: 0.9rem;
 	margin-top: 6px;
+}
+
+.sheet-stats {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	margin-top: 22px;
+}
+
+.sheet-stats div {
+	background: white;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	padding: 14px 16px;
+}
+
+.sheet-stats span {
+	color: var(--muted);
+	display: block;
+	font-size: 0.8rem;
+	margin-bottom: 6px;
+}
+
+.sheet-stats strong {
+	display: block;
+	font-size: 1rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.output-grid {
+	display: grid;
+	gap: 18px;
+	grid-template-columns: minmax(0, 1fr) 270px;
+	margin-top: 28px;
+}
+
+.output-card,
+.output-side {
+	background: white;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	box-shadow: 0 1px 1px rgb(0 0 0 / 0.02);
+}
+
+.output-card {
+	min-width: 0;
+	padding: 20px;
+}
+
+.output-side {
+	align-self: start;
+	padding: 20px;
+	position: sticky;
+	top: 16px;
+}
+
+.customer-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 352px;
+	min-height: 100%;
+}
+
+.customer-textarea {
+	background: white;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	line-height: 1.75;
+	margin-top: 12px;
+	min-height: 520px;
+	outline: none;
+	padding: 22px;
+	resize: none;
+	width: 100%;
+}
+
+.customer-textarea:focus {
+	border-color: var(--brand);
+	outline: 2px solid color-mix(in srgb, var(--brand) 16%, transparent);
+}
+
+.customer-side {
+	position: sticky;
+	top: 0;
 }
 
 .status-dot {
@@ -528,6 +617,20 @@ button:disabled {
 		padding: 24px 16px;
 	}
 
+	.sheet-stats {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.output-grid,
+	.customer-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.output-side,
+	.customer-side {
+		position: static;
+	}
+
 	.step-index {
 		height: 32px;
 		width: 32px;
@@ -550,5 +653,13 @@ button:disabled {
 	.status-dot {
 		height: 32px;
 		width: 32px;
+	}
+
+	.sheet-stats {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.customer-textarea {
+		min-height: 420px;
 	}
 }
