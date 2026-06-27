@@ -7,6 +7,8 @@
 	import { page } from '$app/state';
 	import { localizeHref } from '$lib/paraglide/runtime';
 	import type { Pathname } from '$app/types';
+	import enMessages from '../../messages/en.json';
+	import idMessages from '../../messages/id.json';
 
 	type Step = 1 | 2 | 3 | 4;
 	type Tab = 'production' | 'packing' | 'customer';
@@ -45,11 +47,18 @@
 		notes_id: string;
 	};
 
+	type Locale = 'en' | 'id';
+	type AppMessages = typeof enMessages;
+
 	const storageKey = 'artisan-demo-flow-v3';
 	const orderId = 'HB-250416';
 	const client = 'Driftwood Collective';
 
-	const sourceTypes = ['Email', 'DM', 'Spreadsheet rows', 'PO text'];
+	const messageCatalog: Record<Locale, AppMessages> = {
+		en: enMessages,
+		id: idMessages
+	};
+	const sourceTypes = ['sourceEmail', 'sourceDm', 'sourceSpreadsheet', 'sourcePoText'] as const;
 	const steps: { id: Step; label: string }[] = [
 		{ id: 1, label: 'Add order' },
 		{ id: 2, label: 'Review order' },
@@ -330,7 +339,7 @@ Thank you,
 Heather Benjamin Jewelry`;
 
 	let currentStep = $state<Step>(1);
-	let selectedSource = $state('Email');
+	let selectedSource = $state<(typeof sourceTypes)[number]>('sourceEmail');
 	let intakeText = $state(sampleOrder);
 	let blockers = $state<Blocker[]>(initialBlockers());
 	let lineItems = $state<LineItem[]>(initialLineItems());
@@ -340,6 +349,7 @@ Heather Benjamin Jewelry`;
 	let lastSaved = $state('10:42 AM');
 	let exportOpen = $state(false);
 	let toast = $state('');
+	let toastTimeout: number | undefined;
 	let sent = $state(false);
 	let contentPanel = $state<HTMLDivElement | undefined>();
 	let sidebarCollapsed = $state(false);
@@ -357,68 +367,37 @@ Heather Benjamin Jewelry`;
 	let sampleUsed = $state(false);
 	let processClicked = $state(false);
 	let isDragging = $state(false);
-
+	let readyItemsExpanded = $state(false);
 	const step1_item1 = $derived(intakeText.trim().length > 0 || uploadedFiles.length > 0);
 	const step1_item2 = $derived(sampleUsed);
 	const step1_item3 = $derived(processClicked);
 
-	// i18n Detection from Path
 	const isIndonesian = $derived(page.url.pathname.startsWith('/id'));
-	const currentLocale = $derived(isIndonesian ? 'id' : 'en');
+	const currentLocale = $derived<Locale>(isIndonesian ? 'id' : 'en');
+	const t = $derived(messageCatalog[currentLocale]);
 
-	// Translation Dictionary
-	const t = $derived({
-		addOrder: currentLocale === 'id' ? 'Input Pesanan' : 'Add Order',
-		addWholesaleOrder: currentLocale === 'id' ? 'Input Pesanan Grosir' : 'Add wholesale order',
-		intakeDesc: currentLocale === 'id' 
-			? 'Tempel PO, email, atau chat di bawah. Artisan akan mengekstrak item dan menandai hal yang butuh konfirmasi.'
-			: 'Paste your PO, email, or chat below. Artisan will extract items and highlight details needing confirmation.',
-		uploadInstead: currentLocale === 'id' ? 'Unggah File' : 'Upload file instead',
-		trySample: currentLocale === 'id' ? 'Gunakan Contoh Pesanan' : 'Try sample order',
-		processOrder: currentLocale === 'id' ? 'Mulai Proses' : 'Process order',
-		safetyNote: currentLocale === 'id' ? 'Keamanan data terjaga. Gunakan data sampel atau data samaran.' : 'Use fictional or redacted data only.',
-		reviewOrder: currentLocale === 'id' ? 'Cek Detail Pesanan' : 'Review order',
-		foundItems: currentLocale === 'id' ? 'Berhasil menemukan 8 item' : 'Artisan found 8 items',
-		unresolvedCount: (count: number) => currentLocale === 'id'
-			? `Ada ${count} detail produksi yang butuh konfirmasi sebelum masuk ke lembar kerja.`
-			: `${count} production ${count === 1 ? 'detail needs' : 'details need'} answers before sheets can be created.`,
-		allResolved: currentLocale === 'id' ? 'Semua detail selesai dikonfirmasi! Silakan lanjut ke lembar kerja.' : 'All production details have been resolved. You are ready to view sheets.',
-		viewOriginal: currentLocale === 'id' ? 'Lihat Dokumen Asli' : 'View original order',
-		saveProgress: currentLocale === 'id' ? 'Simpan Progres' : 'Save progress',
-		needsAnswer: currentLocale === 'id' ? 'Butuh Konfirmasi' : 'Needs your answer',
-		looksReady: currentLocale === 'id' ? 'Siap Produksi' : 'Looks ready',
-		yourDocs: currentLocale === 'id' ? 'Dokumen Pesanan' : 'Your documents',
-		lockedDocs: currentLocale === 'id' ? 'Belum siap. Selesaikan konfirmasi di sebelah kiri.' : 'Locked until the questions are answered.',
-		readyDocs: currentLocale === 'id' ? 'Siap ditinjau.' : 'Ready for review.',
-		infoNote: currentLocale === 'id' ? 'Butuh cek ulang? Kamu bisa lihat dokumen asli kapan saja.' : 'You can view the original order anytime while reviewing details.',
-		sheets: currentLocale === 'id' ? 'Lembar Kerja' : 'Sheets',
-		sheetsDesc: currentLocale === 'id' ? 'Dokumen produksi & packing siap pakai yang diekstrak otomatis dari pesanan pelanggan.' : 'Clean production and packing documents generated from order input.',
-		answersComplete: currentLocale === 'id' ? 'Semua konfirmasi sudah lengkap!' : 'All required answers complete.',
-		productionSheet: currentLocale === 'id' ? 'Lembar Produksi' : 'Production sheet',
-		packingChecklist: currentLocale === 'id' ? 'Checklist Packing' : 'Packing checklist',
-		customerUpdate: currentLocale === 'id' ? 'Update Pelanggan' : 'Customer update',
-		saveChanges: currentLocale === 'id' ? 'Simpan Perubahan' : 'Save changes',
-		exportBtn: currentLocale === 'id' ? 'Ekspor' : 'Export',
-		readyNext: currentLocale === 'id' ? 'Langkah Berikutnya' : 'Ready next',
-		copyUpdate: currentLocale === 'id' ? 'Salin Update' : 'Copy update',
-		markSent: currentLocale === 'id' ? 'Tandai Sudah Dikirim' : 'Mark as sent',
-		preview: currentLocale === 'id' ? 'Pratinjau' : 'Preview',
-		saveDraft: currentLocale === 'id' ? 'Simpan Draft' : 'Save draft',
-		emailTo: currentLocale === 'id' ? 'Kirim ke' : 'To',
-		emailSubject: currentLocale === 'id' ? 'Subjek Email' : 'Subject',
-		whatsIncluded: currentLocale === 'id' ? 'Rangkuman Update' : "What's included in this update",
-		includedDesc: currentLocale === 'id' ? 'Rangkuman pesanan, jadwal produksi, estimasi selesai, dan catatan khusus.' : 'Order summary, timeline, production status, and any notes or next steps.',
-		updateDesc: currentLocale === 'id' ? 'Sesuaikan pesan untuk pelanggan di bawah sebelum disalin atau dikirim.' : 'Edit the customer update before copying or marking sent.',
-		orders: currentLocale === 'id' ? 'Daftar Pesanan' : 'Orders',
-		replayTour: currentLocale === 'id' ? 'Ulangi Panduan' : 'Replay Tour',
-		nextTitle: currentLocale === 'id' ? 'Cara Kerja Artisan' : 'What happens next',
-		extractTitle: currentLocale === 'id' ? '1. Ekstrak Data Otomatis' : 'Extract line items',
-		extractDesc: currentLocale === 'id' ? 'Ekstrak otomatis item, jumlah, dan bahan.' : 'Auto-extract products, quantities, and finishes.',
-		answerTitle: currentLocale === 'id' ? '2. Konfirmasi Detail' : 'Answer unclear details',
-		answerDesc: currentLocale === 'id' ? 'Artisan akan memunculkan pertanyaan jika ada spesifikasi produk yang kurang jelas.' : 'Questions appear only when production details are unclear.',
-		createTitle: currentLocale === 'id' ? '3. Lembar Kerja Siap' : 'Create sheets',
-		createDesc: currentLocale === 'id' ? 'Lembar produksi, checklist packing, dan draft update pelanggan langsung siap pakai.' : 'Production sheet, packing checklist, and customer update become ready.'
-	});
+	function formatMessage(template: string, values: Record<string, string | number>) {
+		return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ''));
+	}
+
+	function answerCountLabel(count: number) {
+		return count === 1 ? t.oneAnswerRemaining : formatMessage(t.answersRemaining, { count });
+	}
+
+	function reviewCountLabel(count: number) {
+		return formatMessage(t.reviewUnresolvedCount, { count });
+	}
+
+	function stepLabel(step: Step) {
+		if (step === 1) return t.addOrder;
+		if (step === 2) return t.reviewOrder;
+		if (step === 3) return t.sheets;
+		return t.customerUpdate;
+	}
+
+	function sourceLabel(source: (typeof sourceTypes)[number]) {
+		return t[source];
+	}
 
 	// Formulaic Weight-Based Pricing Auditor
 	const markupMargin = 1.5;
@@ -451,7 +430,7 @@ Heather Benjamin Jewelry`;
 		});
 		if (found) {
 			silverSpotRate = Number(Math.max(0, minRate).toFixed(2));
-			showToast(currentLocale === 'id' ? `Harga spot disesuaikan ke: $${silverSpotRate.toFixed(2)}/g` : `Spot rate adjusted to: $${silverSpotRate.toFixed(2)}/g`);
+			showToast(t.changesSaved);
 		}
 	}
 
@@ -496,7 +475,9 @@ Heather Benjamin Jewelry`;
 			try {
 				const parsed = JSON.parse(saved) as any;
 				currentStep = parsed.currentStep ?? 1;
-				selectedSource = parsed.selectedSource ?? 'Email';
+				selectedSource = sourceTypes.includes(parsed.selectedSource)
+					? parsed.selectedSource
+					: 'sourceEmail';
 				intakeText = parsed.intakeText ?? sampleOrder;
 				blockers = parsed.blockers ?? initialBlockers();
 				lineItems = parsed.lineItems ?? initialLineItems();
@@ -550,14 +531,14 @@ Heather Benjamin Jewelry`;
 
 	function getOptionDetail(blockerId: string, option: string): string {
 		if (blockerId === 'starburst-size') {
-			if (option === 'Mini') return currentLocale === 'id' ? 'Diameter 8mm (Anting stud mini)' : '8mm diameter (Mini stud earring)';
-			if (option === 'Small') return currentLocale === 'id' ? 'Diameter 12mm (Ukuran standar)' : '12mm diameter (Standard size)';
-			if (option === 'Large') return currentLocale === 'id' ? 'Diameter 18mm (Ukuran pernyataan)' : '18mm diameter (Statement size)';
+			if (option === 'Mini') return t.starburstMiniDetail;
+			if (option === 'Small') return t.starburstSmallDetail;
+			if (option === 'Large') return t.starburstLargeDetail;
 		}
-		if (blockerId === 'horse-size') {
-			if (option === 'Small') return currentLocale === 'id' ? 'Lebar 15mm (Cetakan S)' : '15mm width (Mold S)';
-			if (option === 'Medium') return currentLocale === 'id' ? 'Lebar 22mm (Cetakan M)' : '22mm width (Mold M)';
-			if (option === 'Large') return currentLocale === 'id' ? 'Lebar 30mm (Cetakan L)' : '30mm width (Mold L)';
+		if (blockerId === 'horse-pin-size') {
+			if (option === 'Small') return t.horseSmallDetail;
+			if (option === 'Medium') return t.horseMediumDetail;
+			if (option === 'Large') return t.horseLargeDetail;
 		}
 		return '';
 	}
@@ -565,9 +546,12 @@ Heather Benjamin Jewelry`;
 	function showToast(message: string) {
 		toast = message;
 		if (!browser) return;
-		window.setTimeout(() => {
+		if (toastTimeout) {
+			window.clearTimeout(toastTimeout);
+		}
+		toastTimeout = window.setTimeout(() => {
 			if (toast === message) toast = '';
-		}, 2400);
+		}, 3600);
 	}
 
 	function resetDemoState() {
@@ -579,15 +563,16 @@ Heather Benjamin Jewelry`;
 		customerUpdate = initialCustomerUpdate;
 		showOriginalDrawer = false;
 		packedItems = {};
+		readyItemsExpanded = false;
 	}
 
 	function useSampleOrder() {
 		intakeText = sampleOrder;
-		selectedSource = 'Email';
+		selectedSource = 'sourceEmail';
 		uploadedFiles = [];
 		sampleUsed = true;
 		resetDemoState();
-		showToast('Sample order loaded.');
+		showToast(t.sampleOrderLoaded);
 	}
 
 	function handleFileUpload(event: Event) {
@@ -595,9 +580,9 @@ Heather Benjamin Jewelry`;
 		if (target.files && target.files.length > 0) {
 			const files = Array.from(target.files);
 			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
-			intakeText = `[Files Source: ${uploadedFiles.join(', ')}]\n\n` + sampleOrder;
+			intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + sampleOrder;
 			resetDemoState();
-			showToast(currentLocale === 'id' ? `${files.length} file berhasil diunggah.` : `${files.length} files uploaded successfully.`);
+			showToast(`${files.length} ${t.fileUploaded}`);
 		}
 	}
 	function handleFileDrop(event: DragEvent) {
@@ -606,9 +591,9 @@ Heather Benjamin Jewelry`;
 		if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
 			const files = Array.from(event.dataTransfer.files);
 			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
-			intakeText = `[Files Source: ${uploadedFiles.join(', ')}]\n\n` + sampleOrder;
+			intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + sampleOrder;
 			resetDemoState();
-			showToast(currentLocale === 'id' ? `${files.length} file berhasil diunggah.` : `${files.length} files uploaded successfully.`);
+			showToast(`${files.length} ${t.fileUploaded}`);
 		}
 	}
 	function processOrder() {
@@ -651,7 +636,7 @@ Heather Benjamin Jewelry`;
 			if (starburst) {
 				starburst.item = `Bali Starburst ${answer}`;
 				starburst.styleCode = `HB-SB-${answer.toUpperCase()}`;
-				starburst.notes = `Resolved size: ${answer}`;
+				starburst.notes = `${t.resolvedSize}: ${answer}`;
 			}
 		}
 		if (blockerId === 'horse-pin-size') {
@@ -659,7 +644,7 @@ Heather Benjamin Jewelry`;
 			if (horse) {
 				horse.item = `Horse Pin ${answer}`;
 				horse.styleCode = `HB-HORSE-${answer.charAt(0).toUpperCase()}`;
-				horse.notes = `Resolved size: ${answer}`;
+				horse.notes = `${t.resolvedSize}: ${answer}`;
 			}
 		}
 	}
@@ -704,7 +689,7 @@ Heather Benjamin Jewelry`;
 	function saveChanges() {
 		lastSaved = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 		sheetDirty = false;
-		showToast('Changes saved.');
+		showToast(t.changesSaved);
 	}
 
 	function sanitizeExportCell(value: string | number) {
@@ -722,8 +707,8 @@ Heather Benjamin Jewelry`;
 		const warningRows = remainingAnswers
 			? [
 					[
-						'UNRESOLVED WARNING',
-						`${remainingAnswers} required production answers remain before final use.`,
+						t.pendingResolution,
+						reviewCountLabel(remainingAnswers),
 						'',
 						'',
 						'',
@@ -733,7 +718,7 @@ Heather Benjamin Jewelry`;
 			: [];
 
 		return [
-			['Item', 'Style code', 'Qty', 'Material / finish', 'Production notes', 'Source evidence'],
+			[t.item, t.styleCode, t.qty, t.materialFinish, t.technicalInstructions, t.sourceEvidence],
 			...warningRows,
 			...lineItems.map((item) => [
 				item.item,
@@ -747,12 +732,24 @@ Heather Benjamin Jewelry`;
 	}
 
 	function packingRows() {
+		const warningRows = remainingAnswers
+			? [
+					[
+						t.pendingResolution,
+						reviewCountLabel(remainingAnswers),
+						'',
+						''
+					]
+				]
+			: [];
+
 		return [
-			['Item', 'Qty', 'Packing check', 'Notes'],
+			[t.item, t.qty, t.packed, t.notes],
+			...warningRows,
 			...lineItems.map((item) => [
 				item.item,
 				item.qty,
-				'Confirm count and finish label',
+				t.packagingSpecifics,
 				item.notes
 			])
 		];
@@ -772,7 +769,7 @@ Heather Benjamin Jewelry`;
 		link.click();
 		URL.revokeObjectURL(url);
 		exportOpen = false;
-		showToast(`${kind === 'production' ? 'Production sheet' : 'Packing checklist'} CSV downloaded.`);
+		showToast(kind === 'production' ? t.productionCsvDownloaded : t.packingCsvDownloaded);
 	}
 
 	async function copyTable() {
@@ -781,38 +778,38 @@ Heather Benjamin Jewelry`;
 			rows.map((row) => row.map((cell) => sanitizeExportCell(cell)).join('\t')).join('\n')
 		);
 		exportOpen = false;
-		showToast('Table copied.');
+		showToast(t.tableCopied);
 	}
 
 	async function copyCustomerUpdate() {
 		await navigator.clipboard.writeText(customerUpdate);
-		showToast('Customer update copied.');
+		showToast(t.customerUpdateCopied);
 	}
 
 	function saveDraft() {
 		lastSaved = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-		showToast('Draft saved.');
+		showToast(t.draftSaved);
 	}
 
 	function markSent() {
 		sent = true;
-		showToast('Marked as sent.');
+		showToast(t.markedAsSentToast);
 	}
 
 	// Onboarding Tour logic
 	function startTour() {
 		const d = driver({
 			showProgress: true,
-			nextBtnText: 'Next →',
-			prevBtnText: '← Back',
-			doneBtnText: 'Done',
+			nextBtnText: t.tourNext,
+			prevBtnText: t.tourBack,
+			doneBtnText: t.tourDone,
 			animate: true, // Animations enabled as viewport fits clean and scroll-free
 			steps: [
 				{ 
 					element: '#sidebar-logo', 
 					popover: { 
-						title: 'Welcome to Artisan', 
-						description: 'Your Quiet Workshop companion for processing Heather Benjamin Jewelry wholesale orders.', 
+						title: t.tourWelcomeTitle,
+						description: t.tourWelcomeDesc,
 						side: 'right', 
 						align: 'start' 
 					} 
@@ -820,33 +817,25 @@ Heather Benjamin Jewelry`;
 				{ 
 					element: '#intake-scratchpad', 
 					popover: { 
-						title: '1. Ingestion Area', 
-						description: 'Paste unstructured order text (emails, DMs, spreadsheet rows) here. No strict parsing forms required.', 
+						title: t.tourIntakeTitle,
+						description: t.tourIntakeDesc,
 						side: 'bottom' 
 					} 
 				},
 				{ 
 					element: '#try-sample-btn', 
 					popover: { 
-						title: '2. Try Sample Order', 
-						description: 'Load a realistic wholesale order containing item size ambiguities to test the verification pipeline.', 
+						title: t.tourSampleTitle,
+						description: t.tourSampleDesc,
 						side: 'top' 
 					} 
 				},
 				{ 
 					element: '#process-order-btn', 
 					popover: { 
-						title: '3. Process Order', 
-						description: 'Run the extraction engine to catalog items and instantly discover production blockers.', 
+						title: t.tourProcessTitle,
+						description: t.tourProcessDesc,
 						side: 'top' 
-					} 
-				},
-				{ 
-					element: '#silver-auditor', 
-					popover: { 
-						title: '4. Silver Spot Auditor', 
-						description: 'Drag this slider to simulate changes in silver spot price, which automatically flags outdated order rates.', 
-						side: 'right' 
 					} 
 				}
 			]
@@ -867,17 +856,17 @@ Heather Benjamin Jewelry`;
 
 	// Packing Helpers
 	function getPackagingSpecifics(styleCode: string): string {
-		if (!styleCode) return 'Standard pouch';
+		if (!styleCode) return t.standardPouch;
 		if (styleCode.includes('STUD') || styleCode.includes('MINI') || styleCode.includes('SMALL') || styleCode.includes('LARGE')) {
-			return 'Earring card + small linen pouch';
+			return t.earringCardPouch;
 		}
 		if (styleCode.includes('HORSE') || styleCode.includes('MTN')) {
-			return 'Premium gift box + custom wrapping';
+			return t.premiumGiftBox;
 		}
 		if (styleCode.includes('WAVE')) {
-			return 'Velvet pouch + gift box';
+			return t.velvetPouchGiftBox;
 		}
-		return 'Standard jewelry pouch';
+		return t.standardJewelryPouch;
 	}
 
 	function isBackordered(styleCode: string): boolean {
@@ -899,7 +888,7 @@ Heather Benjamin Jewelry`;
 			<button
 				class="sidebar-backdrop"
 				type="button"
-				aria-label="Close sidebar"
+				aria-label={t.closeSidebar}
 				onclick={() => (mobileSidebarOpen = false)}
 			></button>
 		{/if}
@@ -924,13 +913,13 @@ Heather Benjamin Jewelry`;
 							<button
 								class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-muted)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
 								type="button"
-								aria-label={currentLocale === 'id' ? 'Tutup bilah samping' : 'Close sidebar'}
+								aria-label={t.closeSidebar}
 								onclick={toggleSidebar}
 							>
 								<i class="ri-sidebar-fold-line text-lg"></i>
 							</button>
 							<div class="absolute right-10 top-1/2 -translate-y-1/2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
-								{currentLocale === 'id' ? 'Tutup bilah samping' : 'Close sidebar'}
+								{t.closeSidebar}
 							</div>
 						</div>
 					</div>
@@ -945,13 +934,13 @@ Heather Benjamin Jewelry`;
 						<button
 							class="absolute inset-0 w-10 h-10 flex items-center justify-center rounded-full hover:bg-[var(--surface-muted)] text-[var(--muted)] hover:text-[var(--ink)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-transparent border-0 p-0 cursor-pointer"
 							type="button"
-							aria-label={currentLocale === 'id' ? 'Buka bilah samping' : 'Open sidebar'}
+							aria-label={t.openSidebar}
 							onclick={toggleSidebar}
 						>
 							<i class="ri-sidebar-unfold-line text-lg"></i>
 						</button>
-						<div class="absolute left-12 top-1/2 -translate-y-1/2 ml-2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
-							{currentLocale === 'id' ? 'Buka bilah samping' : 'Open sidebar'}
+							<div class="absolute left-12 top-1/2 -translate-y-1/2 ml-2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
+								{t.openSidebar}
 						</div>
 					</div>
 				{/if}
@@ -980,13 +969,13 @@ Heather Benjamin Jewelry`;
 					>
 						<span class="flex items-center gap-3">
 							<i class="ri-book-open-line text-lg" aria-hidden="true"></i>
-							<span class="sidebar-label">{t.replayTour === 'Ulangi Tur' ? 'Katalog' : 'Catalog'}</span>
+							<span class="sidebar-label">{t.catalog}</span>
 						</span>
-						<span class="sidebar-label rounded bg-[var(--surface-muted)] px-2 py-1 text-xs text-[var(--muted)]">Later</span>
+						<span class="sidebar-label rounded bg-[var(--surface-muted)] px-2 py-1 text-xs text-[var(--muted)]">{t.later}</span>
 					</button>
 					{#if sidebarCollapsed}
 						<div class="absolute left-14 top-1/2 -translate-y-1/2 ml-2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
-							{t.replayTour === 'Ulangi Tur' ? 'Katalog' : 'Catalog'}
+							{t.catalog}
 						</div>
 					{/if}
 				</div>
@@ -1009,35 +998,15 @@ Heather Benjamin Jewelry`;
 				</div>
 			</nav>
 
-			{#if !sidebarCollapsed}
-				<div class="mt-auto border-t border-[var(--line)] pt-6 space-y-4" id="silver-auditor">
-					<div class="rounded-md bg-[var(--surface-soft)] p-4 border border-[var(--line)] shadow-sm">
-						<h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Silver Spot Auditor</h3>
-						<div class="mt-3 flex items-center justify-between">
-							<span class="text-sm text-[var(--ink)] font-medium">Silver Spot:</span>
-							<strong class="text-sm text-[var(--brand)]">${silverSpotRate.toFixed(2)}/g</strong>
-						</div>
-						<input
-							type="range"
-							min="0.5"
-							max="2.5"
-							step="0.05"
-							bind:value={silverSpotRate}
-							class="mt-2 w-full accent-[var(--brand)] cursor-ew-resize"
-						/>
-						<p class="mt-1 text-[10px] text-[var(--muted)]">Recalculates margins and flags outdated client pricing.</p>
-					</div>
-				</div>
-			{/if}
 		</aside>
 
 		<section class="app-main">
 			<header class="app-header flex items-center justify-between px-6 py-3 border-b border-[var(--line)] bg-white">
 				<div class="flex items-center gap-4">
-					<button class="icon-button header-toggle" type="button" aria-label="Toggle sidebar" onclick={toggleSidebar}>
+					<button class="icon-button header-toggle" type="button" aria-label={t.toggleSidebar} onclick={toggleSidebar}>
 						<i class="ri-menu-line text-lg" aria-hidden="true"></i>
 					</button>
-					<span class="text-xs text-[var(--muted)]">Last saved {lastSaved}</span>
+					<span class="text-xs text-[var(--muted)]">{t.lastSaved} {lastSaved}</span>
 				</div>
 				<div class="flex items-center gap-4">
 					<!-- i18n Language Segment Control -->
@@ -1047,13 +1016,13 @@ Heather Benjamin Jewelry`;
 							href={resolve(localizeHref(page.url.pathname, { locale: 'en' }) as Pathname)}
 							class={`px-2 py-1 rounded font-semibold text-xs transition-all ${currentLocale === 'en' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
 						>
-							English
+							{t.english}
 						</a>
 						<a
 							href={resolve(localizeHref(page.url.pathname, { locale: 'id' }) as Pathname)}
 							class={`px-2 py-1 rounded font-semibold text-xs transition-all ${currentLocale === 'id' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
 						>
-							Indonesia
+							{t.indonesia}
 						</a>
 					</div>
 
@@ -1062,7 +1031,7 @@ Heather Benjamin Jewelry`;
 						<button
 							class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
 							type="button"
-							aria-label={rightSidebarCollapsed ? 'Open right panel' : 'Close right panel'}
+							aria-label={rightSidebarCollapsed ? t.openRightPanel : t.closeRightPanel}
 							onclick={() => (rightSidebarCollapsed = !rightSidebarCollapsed)}
 						>
 							{#if rightSidebarCollapsed}
@@ -1073,8 +1042,8 @@ Heather Benjamin Jewelry`;
 						</button>
 						<div class="absolute right-0 top-10 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
 							{rightSidebarCollapsed 
-								? (currentLocale === 'id' ? 'Buka panel kanan' : 'Open right panel') 
-								: (currentLocale === 'id' ? 'Tutup panel kanan' : 'Close right panel')}
+								? t.openRightPanel
+								: t.closeRightPanel}
 						</div>
 					</div>
 				</div>
@@ -1099,7 +1068,7 @@ Heather Benjamin Jewelry`;
 								{/if}
 							</span>
 							<span class={`step-label ${step.id > maxStep ? 'text-[var(--muted)] opacity-60' : 'font-semibold'}`}>
-								{t[step.id === 1 ? 'addOrder' : step.id === 2 ? 'reviewOrder' : step.id === 3 ? 'sheets' : 'customerUpdate']}
+								{stepLabel(step.id)}
 							</span>
 						</button>
 						{#if index < steps.length - 1}
@@ -1125,14 +1094,14 @@ Heather Benjamin Jewelry`;
 											type="button"
 											onclick={() => (activeIngestTab = 'paste')}
 										>
-											<i class="ri-keyboard-line text-base"></i> {currentLocale === 'id' ? 'Tempel Teks' : 'Paste Text'}
+											<i class="ri-keyboard-line text-base"></i> {t.pasteText}
 										</button>
 										<button
 											class={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${activeIngestTab === 'upload' ? 'border-[var(--brand)] text-[var(--brand-dark)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--ink)]'}`}
 											type="button"
 											onclick={() => (activeIngestTab = 'upload')}
 										>
-											<i class="ri-upload-cloud-2-line text-base"></i> {currentLocale === 'id' ? 'Unggah File' : 'Upload File'}
+											<i class="ri-upload-cloud-2-line text-base"></i> {t.uploadFile}
 										</button>
 									</div>
 
@@ -1145,7 +1114,7 @@ Heather Benjamin Jewelry`;
 													type="button"
 													onclick={() => (selectedSource = source)}
 												>
-													{source}
+													{sourceLabel(source)}
 												</button>
 											{/each}
 										</div>
@@ -1172,11 +1141,12 @@ Heather Benjamin Jewelry`;
 										<div 
 											class={`border-2 rounded-lg p-10 text-center transition-all duration-300 relative ${isDragging ? 'border-[var(--brand)] bg-[var(--brand)]/10 scale-[1.02] ring-4 ring-[var(--brand)]/20 border-solid' : 'border-dashed border-[var(--line)] bg-[var(--surface-soft)] hover:border-[var(--brand)] hover:bg-[var(--surface-soft)]'}`}
 											role="region"
-											aria-label="File upload dropzone"
+											aria-label={t.fileUploadDropzone}
 										>
 											<input 
 												class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
 												type="file" 
+												aria-label={t.uploadFile}
 												multiple
 												onchange={handleFileUpload}
 												ondragenter={(e) => { e.preventDefault(); isDragging = true; }}
@@ -1186,10 +1156,10 @@ Heather Benjamin Jewelry`;
 											/>
 											<i class={`ri-upload-cloud-2-line text-4xl block mb-3 transition-transform duration-300 ${isDragging ? 'text-[var(--brand)] scale-110' : 'text-[var(--brand)]'}`}></i>
 											<strong class="block text-base text-[var(--ink)] mb-1">
-												{currentLocale === 'id' ? 'Tarik & lepas file di sini' : 'Drag & drop file here'}
+												{t.uploadDropTitle}
 											</strong>
 											<span class="text-xs text-[var(--muted)]">
-												{currentLocale === 'id' ? 'atau klik untuk memilih dari komputer Anda' : 'or click to browse from your computer'}
+												{t.uploadBrowse}
 											</span>
 											<div class="mt-4 text-[var(--muted)] text-[10px] uppercase font-bold tracking-wider">
 												PDF, CSV, XLSX, PNG, JPG, TXT
@@ -1202,7 +1172,7 @@ Heather Benjamin Jewelry`;
 													<div class="p-3 border border-emerald-100 bg-emerald-50/30 rounded flex items-center justify-between text-xs text-emerald-800">
 														<span class="flex items-center gap-2">
 															<i class="ri-checkbox-circle-line text-emerald-600 text-base"></i>
-															<strong>{file}</strong> ({currentLocale === 'id' ? 'File berhasil diunggah' : 'File uploaded successfully'})
+															<strong>{file}</strong> ({t.fileUploaded})
 														</span>
 														<button
 															class="text-red-600 hover:text-red-800 transition font-bold cursor-pointer"
@@ -1210,13 +1180,13 @@ Heather Benjamin Jewelry`;
 															onclick={() => {
 																uploadedFiles = uploadedFiles.filter((_, i) => i !== index);
 																if (uploadedFiles.length > 0) {
-																	intakeText = `[Files Source: ${uploadedFiles.join(', ')}]\n\n` + sampleOrder;
+																	intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + sampleOrder;
 																} else {
 																	intakeText = '';
 																}
 															}}
 														>
-															{currentLocale === 'id' ? 'Hapus' : 'Remove'}
+															{t.remove}
 														</button>
 													</div>
 												{/each}
@@ -1241,11 +1211,11 @@ Heather Benjamin Jewelry`;
 						{#if !rightSidebarCollapsed}
 							<aside class="border-l border-[var(--line)] bg-white px-8 py-10">
 								<div class="flex items-center justify-between gap-4 mb-7">
-									<h2 class="font-display text-2xl">{t.nextTitle}</h2>
+									<h2 class="font-display text-2xl">{t.whatHappensNext}</h2>
 									<button
 										class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
 										type="button"
-										aria-label="Close right panel"
+										aria-label={t.closeRightPanel}
 										onclick={() => (rightSidebarCollapsed = true)}
 									>
 										<i class="ri-close-line text-lg"></i>
@@ -1277,11 +1247,9 @@ Heather Benjamin Jewelry`;
 											{/if}
 										</span>
 										<div>
-											<h3 class={step1_item2 ? 'text-[var(--ink)] font-semibold' : 'text-sm font-semibold'}>
-												{currentLocale === 'id' ? 'Gunakan Contoh Data' : 'Review Sample Data'}
-											</h3>
+											<h3 class={step1_item2 ? 'text-[var(--ink)] font-semibold' : 'text-sm font-semibold'}>{t.reviewSampleTitle}</h3>
 											<p class="text-xs text-[var(--muted)] mt-1">
-												{currentLocale === 'id' ? 'Gunakan contoh data PO untuk mempelajari ekstraksi otomatis Artisan.' : 'Click "Gunakan Contoh Pesanan" to load PO sample data.'}
+												{t.reviewSampleDesc}
 											</p>
 										</div>
 									</div>
@@ -1296,11 +1264,9 @@ Heather Benjamin Jewelry`;
 											{/if}
 										</span>
 										<div>
-											<h3 class={step1_item3 ? 'text-[var(--ink)] font-semibold' : 'text-sm font-semibold'}>
-												{currentLocale === 'id' ? 'Mulai Proses Pesanan' : 'Start Order Processing'}
-											</h3>
+											<h3 class={step1_item3 ? 'text-[var(--ink)] font-semibold' : 'text-sm font-semibold'}>{t.startProcessingTitle}</h3>
 											<p class="text-xs text-[var(--muted)] mt-1">
-												{currentLocale === 'id' ? 'Kirim pesanan yang dimasukkan untuk masuk ke tahap audit.' : 'Process the entered order text to proceed to step 2.'}
+												{t.startProcessingDesc}
 											</p>
 										</div>
 									</div>
@@ -1325,45 +1291,23 @@ Heather Benjamin Jewelry`;
 										<p class="mt-3 text-lg">{t.foundItems}</p>
 										<p class="mt-1 text-sm text-[var(--muted)]">
 											{#if remainingAnswers > 0}
-												{t.unresolvedCount(remainingAnswers)}
+												{reviewCountLabel(remainingAnswers)}
 											{:else}
 												{t.allResolved}
 											{/if}
 										</p>
-										<p class="mt-4 text-sm text-[var(--muted)]">Source: {uploadedFiles.length > 0 ? `Uploaded ${uploadedFiles.join(', ')}` : 'Pasted text'}</p>
+										<p class="mt-4 text-sm text-[var(--muted)]">
+											{t.sourceEvidence}: {uploadedFiles.length > 0 ? `${t.uploaded} ${uploadedFiles.join(', ')}` : t.pastedText}
+										</p>
 									</div>
 
 									<div class="page-actions">
-										<button class="ghost-button" type="button" onclick={() => showToast('Progress saved.')}>
+										<button class="ghost-button" type="button" onclick={() => showToast(t.progressSaved)}>
 											{t.saveProgress}
 										</button>
 										<button class="secondary-button" type="button" onclick={() => (showOriginalDrawer = true)}>{t.viewOriginal}</button>
 									</div>
 								</div>
-
-								<!-- Outdated spot auditor alert banner -->
-								{#if pricingWarnings.length > 0}
-									<div class="mt-6 rounded-md border border-[var(--warning)] bg-[var(--warning-bg)] p-4 text-sm text-[var(--warning-ink)] leading-relaxed shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-										<div class="flex items-start gap-2.5">
-											<i class="ri-error-warning-line text-lg text-[var(--warning)] shrink-0 mt-0.5" aria-hidden="true"></i>
-											<div>
-												{#if currentLocale === 'id'}
-													<strong>Selisih Harga:</strong> Harga PO di bawah kalkulasi spot rate (<strong>${silverSpotRate.toFixed(2)}/g</strong>). Tim Bali berpotensi menolak.
-												{:else}
-													<strong>Price Discrepancy:</strong> PO prices are below spot calculations (<strong>${silverSpotRate.toFixed(2)}/g</strong>). Bali team may reject due to low margins.
-												{/if}
-											</div>
-										</div>
-										<button
-											class="secondary-button whitespace-nowrap text-xs font-semibold px-3 py-1.5 bg-white border border-[var(--warning)] hover:bg-[var(--warning-bg)] text-[var(--warning-ink)] transition flex items-center gap-1 cursor-pointer shrink-0"
-											type="button"
-											onclick={applySafeSpotRate}
-										>
-											<i class="ri-refresh-line"></i>
-											{currentLocale === 'id' ? 'Sesuaikan' : 'Resolve'}
-										</button>
-									</div>
-								{/if}
 
 								<h2 class="mt-8 text-sm font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
 									{t.needsAnswer} ({remainingAnswers})
@@ -1383,13 +1327,13 @@ Heather Benjamin Jewelry`;
 														{#if blocker.answer}
 															<span class="answered-pill flex items-center gap-1">
 																<i class="ri-checkbox-circle-line" aria-hidden="true"></i>
-																Answered: {blocker.answer}
+																{t.answered}: {blocker.answer}
 															</span>
 														{/if}
 													</div>
 													<h3 class="mt-3 text-lg font-semibold">{blocker.question}</h3>
 													<p class="mt-1 text-sm text-[var(--muted)]">
-														{currentLocale === 'id' ? 'Ditemukan:' : 'Found:'} “{blocker.evidence}” ({blocker.source})
+														{t.found}: “{blocker.evidence}” ({blocker.source})
 													</p>
 												</div>
 												<div class="flex flex-wrap gap-3 w-full md:w-auto">
@@ -1405,11 +1349,11 @@ Heather Benjamin Jewelry`;
 													{/each}
 												</div>
 											</div>
-											<div class="border-t border-[var(--line)] bg-[var(--warning-bg)]/20 px-4 py-3 text-xs text-[var(--warning-ink)] flex items-start gap-2 leading-relaxed">
-												<i class="ri-error-warning-line text-sm text-[var(--warning)] shrink-0 mt-0.5" aria-hidden="true"></i>
+											<div class="border-t border-[var(--line)] bg-[var(--warning-bg)]/20 px-4 py-3 text-xs text-[var(--warning-ink)] flex items-center gap-2 leading-relaxed">
+												<i class="ri-error-warning-line text-sm text-[var(--warning)] shrink-0" aria-hidden="true"></i>
 												<div>
 													<strong class="font-semibold uppercase tracking-wider text-[10px] text-[var(--brand-dark)] block mb-0.5">
-														{currentLocale === 'id' ? 'Risiko Produksi:' : 'Production Risk:'}
+														{t.productionRisk}:
 													</strong>
 													{blocker.risk}
 												</div>
@@ -1418,48 +1362,39 @@ Heather Benjamin Jewelry`;
 									{/each}
 								</div>
 
-								<h2 class="mt-8 text-sm font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-									{t.looksReady} ({readyItems.length})
-								</h2>
-								<div class="mt-3 overflow-hidden rounded-md border border-[var(--line)] bg-white shadow-sm">
-									<table class="w-full text-left text-sm">
-										<thead class="bg-[var(--surface-soft)] border-b border-[var(--line)]">
-											<tr>
-												<th class="w-10 px-3 py-3"></th>
-												<th class="px-3 py-3">Item</th>
-												<th class="px-3 py-3">Style code</th>
-												<th class="px-3 py-3">Qty</th>
-												<th class="px-3 py-3">Finish</th>
-												<th class="px-3 py-3 text-right">PO Price</th>
-												<th class="px-3 py-3 text-right">Calc Cost</th>
-												<th class="px-3 py-3">Notes</th>
-											</tr>
-										</thead>
-										<tbody>
+								<section class="mt-8 rounded-md border border-[var(--line)] bg-white/70 px-4 py-3">
+									<div class="flex flex-wrap items-center justify-between gap-3">
+										<div>
+											<h2 class="text-sm font-semibold text-[var(--muted)]">
+												{t.looksReady} ({readyItems.length})
+											</h2>
+											<p class="mt-1 text-sm text-[var(--muted)]">
+												{formatMessage(t.readySummary, { count: readyItems.length })}
+											</p>
+										</div>
+										<button
+											class="ghost-button px-3 py-2 text-sm"
+											type="button"
+											aria-expanded={readyItemsExpanded}
+											onclick={() => (readyItemsExpanded = !readyItemsExpanded)}
+										>
+											{readyItemsExpanded ? t.hideReadyItems : t.showReadyItems}
+										</button>
+									</div>
+
+									{#if readyItemsExpanded}
+										<ul class="mt-3 space-y-2">
 											{#each readyItems as item (item.id)}
-												{@const calculatedCost = item.styleCode ? getCalculatedCost(item.styleCode, silverSpotRate) : 0}
-												{@const hasPriceWarning = item.styleCode && calculatedCost > item.unitPrice}
-												<tr class="border-t border-[var(--line)]">
-													<td class="px-3 py-3 text-[var(--ready-ink)] text-center">
-														<i class="ri-checkbox-circle-line text-base font-medium" aria-hidden="true"></i>
-													</td>
-													<td class="px-3 py-3 font-medium">{item.item}</td>
-													<td class="px-3 py-3 font-mono text-xs">{item.styleCode || 'PENDING'}</td>
-													<td class="px-3 py-3 font-medium">{item.qty}</td>
-													<td class="px-3 py-3">{item.finish}</td>
-													<td class="px-3 py-3 text-right">${item.unitPrice.toFixed(2)}</td>
-													<td class={`px-3 py-3 text-right font-medium flex items-center justify-end gap-1 ${hasPriceWarning ? 'text-[var(--warning)]' : 'text-[var(--ready-ink)]'}`}>
-														${calculatedCost > 0 ? calculatedCost.toFixed(2) : '-'}
-														{#if hasPriceWarning}
-															<i class="ri-error-warning-line text-sm text-[var(--warning)] cursor-help" title="Outdated pricing" aria-hidden="true"></i>
-														{/if}
-													</td>
-													<td class="px-3 py-3 text-[var(--muted)] text-xs">{item.notes}</td>
-												</tr>
+												<li class="rounded-md bg-[var(--surface-soft)] px-3 py-2">
+													<p class="text-sm font-medium text-[var(--ink)]">{item.item}</p>
+													<p class="mt-0.5 text-sm text-[var(--muted)]">
+														{t.qty} {item.qty} · {item.finish}{item.notes ? ` · ${item.notes}` : ''}
+													</p>
+												</li>
 											{/each}
-										</tbody>
-									</table>
-								</div>
+										</ul>
+									{/if}
+								</section>
 							</div>
 						</div>
 
@@ -1470,7 +1405,7 @@ Heather Benjamin Jewelry`;
 									<button
 										class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
 										type="button"
-										aria-label="Close right panel"
+										aria-label={t.closeRightPanel}
 										onclick={() => (rightSidebarCollapsed = true)}
 									>
 										<i class="ri-close-line text-lg"></i>
@@ -1492,11 +1427,11 @@ Heather Benjamin Jewelry`;
 												<p class="text-xs text-[var(--muted)] mt-1">
 													{allAnswered
 														? doc === t.customerUpdate
-															? 'Draft includes notes'
-															: 'Ready after review'
+															? t.draftIncludesNotes
+															: t.readyAfterReview
 														: doc === t.productionSheet
-															? `Blocked by ${remainingAnswers} answers`
-															: 'Blocked by production sheet'}
+															? formatMessage(t.blockedByAnswers, { count: remainingAnswers })
+															: t.blockedByProductionSheet}
 												</p>
 											</div>
 											<span aria-hidden="true" class={`text-lg transition-all duration-300 ${isUnlocked ? 'text-emerald-600 scale-110' : 'text-[var(--muted)]'}`}>
@@ -1547,12 +1482,12 @@ Heather Benjamin Jewelry`;
 										{#if exportOpen}
 											<div class="absolute right-0 z-10 mt-2 w-56 rounded-md border border-[var(--line)] bg-white p-2 shadow-xl animate-fade-in">
 												<button class="menu-item font-sans text-sm" type="button" onclick={() => downloadCsv('production')}>
-													Download production CSV
+													{t.downloadProductionCsv}
 												</button>
 												<button class="menu-item font-sans text-sm" type="button" onclick={() => downloadCsv('packing')}>
-													Download packing CSV
+													{t.downloadPackingCsv}
 												</button>
-												<button class="menu-item font-sans text-sm" type="button" onclick={copyTable}>Copy table</button>
+												<button class="menu-item font-sans text-sm" type="button" onclick={copyTable}>{t.copyTable}</button>
 											</div>
 										{/if}
 									</div>
@@ -1561,19 +1496,19 @@ Heather Benjamin Jewelry`;
 
 							<div class="sheet-stats">
 								<div>
-									<span>Line items</span>
+									<span>{t.lineItems}</span>
 									<strong>{lineItems.length}</strong>
 								</div>
 								<div>
-									<span>Total quantity</span>
+									<span>{t.totalQuantity}</span>
 									<strong>{totalQty}</strong>
 								</div>
 								<div>
-									<span>Finishes</span>
+									<span>{t.finishes}</span>
 									<strong>{finishSummary}</strong>
 								</div>
 								<div>
-									<span>Unresolved</span>
+									<span>{t.unresolved}</span>
 									<strong>{remainingAnswers}</strong>
 								</div>
 							</div>
@@ -1606,20 +1541,20 @@ Heather Benjamin Jewelry`;
 											</div>
 											<!-- Grouping Mode Selector -->
 											<div class="flex items-center gap-2 border border-[var(--line)] rounded bg-[var(--surface-soft)] p-1 text-xs">
-												<span class="px-2 text-[var(--muted)] font-medium">{currentLocale === 'id' ? 'Grup berdasarkan:' : 'Group by:'}</span>
+												<span class="px-2 text-[var(--muted)] font-medium">{t.groupBy}</span>
 												<button
 													class={`px-2 py-1 rounded transition font-semibold ${productionGrouping === 'material' ? 'bg-white shadow-sm border border-[var(--line)] text-[var(--brand-dark)]' : 'text-[var(--muted)]'}`}
 													type="button"
 													onclick={() => (productionGrouping = 'material')}
 												>
-													{currentLocale === 'id' ? 'Hasil Akhir Bahan' : 'Material Finish'}
+													{t.materialFinish}
 												</button>
 												<button
 													class={`px-2 py-1 rounded transition font-semibold ${productionGrouping === 'category' ? 'bg-white shadow-sm border border-[var(--line)] text-[var(--brand-dark)]' : 'text-[var(--muted)]'}`}
 													type="button"
 													onclick={() => (productionGrouping = 'category')}
 												>
-													{currentLocale === 'id' ? 'Kategori Gaya' : 'Style Category'}
+													{t.styleCategory}
 												</button>
 											</div>
 										</div>
@@ -1628,10 +1563,10 @@ Heather Benjamin Jewelry`;
 											{#if productionGrouping === 'material'}
 												<!-- GROUP BY MATERIAL -->
 												{#each [
-													{ name: currentLocale === 'id' ? 'Produksi Perak (Perak Murni)' : 'Silver Production (Perak Murni)', items: silverProduction },
-													{ name: currentLocale === 'id' ? 'Produksi Emas Vermeil (Lapisan Emas)' : 'Gold Vermeil Production (Lapisan Emas)', items: goldProduction },
-													{ name: currentLocale === 'id' ? 'Produksi Bahan Lainnya' : 'Other Materials Production', items: otherProduction }
-												] as group}
+													{ name: t.silverProduction, items: silverProduction },
+													{ name: t.goldProduction, items: goldProduction },
+													{ name: t.otherMaterials, items: otherProduction }
+												] as group (group.name)}
 													{#if group.items.length > 0}
 														<div class="border border-[var(--line)] rounded-md overflow-hidden bg-white shadow-sm">
 															<div class="bg-[var(--surface-muted)] px-4 py-2 border-b border-[var(--line)]">
@@ -1640,22 +1575,22 @@ Heather Benjamin Jewelry`;
 															<table class="w-full text-left text-sm">
 																<thead class="bg-[var(--surface-soft)] border-b border-[var(--line)]">
 																	<tr>
-																		<th class="w-24 px-3 py-2 text-xs font-bold text-[var(--muted)]">{currentLocale === 'id' ? 'Kode gaya' : 'Style code'}</th>
-																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{currentLocale === 'id' ? 'Deskripsi item' : 'Item description'}</th>
-																		<th class="w-16 px-3 py-2 text-xs font-bold text-[var(--muted)]">{currentLocale === 'id' ? 'Jumlah' : 'Qty'}</th>
-																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.exportBtn === 'Ekspor' ? 'Instruksi Teknis (EN/ID)' : 'Technical Instructions (EN/ID)'}</th>
-																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{currentLocale === 'id' ? 'Catatan Pesanan' : 'Order Notes'}</th>
+																		<th class="w-24 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.styleCode}</th>
+																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.itemDescription}</th>
+																		<th class="w-16 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.qty}</th>
+																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.technicalInstructions}</th>
+																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.orderNotes}</th>
 																	</tr>
 																</thead>
 																<tbody>
 																	{#each group.items as item (item.id)}
 																		<tr class="border-t border-[var(--line)]">
 																			<td class="px-2 py-2">
-																				<input class="cell-input font-mono text-xs" bind:value={item.styleCode} oninput={markDirty} />
+																				<input class="cell-input font-mono text-xs" aria-label={`${t.styleCode}: ${item.item}`} autocomplete="off" bind:value={item.styleCode} oninput={markDirty} />
 																			</td>
 																			<td class="px-3 py-2 font-medium">{item.item}</td>
 																			<td class="px-2 py-2">
-																				<input class="cell-input w-16" type="number" min="0" bind:value={item.qty} oninput={markDirty} />
+																				<input class="cell-input w-16" type="number" min="0" aria-label={`${t.qty}: ${item.item}`} autocomplete="off" bind:value={item.qty} oninput={markDirty} />
 																			</td>
 																			<td class="px-3 py-2 text-xs leading-relaxed">
 																				{#if item.styleCode}
@@ -1664,17 +1599,17 @@ Heather Benjamin Jewelry`;
 																						<div class="text-[var(--ink)] font-medium">🇬🇧 {cat.notes_en}</div>
 																						<div class="text-[var(--muted)] mt-1 italic">🇮🇩 {cat.notes_id}</div>
 																					{:else}
-																						<span class="text-[var(--muted)]">No instructions mapped</span>
+																						<span class="text-[var(--muted)]">{t.noInstructionsMapped}</span>
 																					{/if}
 																				{:else}
 																					<span class="text-[var(--warning)] font-semibold flex items-center gap-1">
 																						<i class="ri-error-warning-line" aria-hidden="true"></i>
-																						PENDING RESOLUTION
+																						{t.pendingResolution}
 																					</span>
 																				{/if}
 																			</td>
 																			<td class="px-2 py-2">
-																				<input class="cell-input cell-input-wide text-xs" bind:value={item.notes} oninput={markDirty} />
+																				<input class="cell-input cell-input-wide text-xs" aria-label={`${t.orderNotes}: ${item.item}`} autocomplete="off" bind:value={item.notes} oninput={markDirty} />
 																			</td>
 																		</tr>
 																	{/each}
@@ -1686,10 +1621,10 @@ Heather Benjamin Jewelry`;
 											{:else}
 												<!-- GROUP BY CATEGORY -->
 												{#each [
-													{ name: currentLocale === 'id' ? 'Pen & Jepitan Brim' : 'Pins & Brim Pinches', items: pinsProduction },
-													{ name: currentLocale === 'id' ? 'Perhiasan Tradisional' : 'Traditional Jewelry', items: traditionalProduction },
-													{ name: currentLocale === 'id' ? 'Aksesori Lainnya' : 'Other Accessories', items: otherCatProduction }
-												] as group}
+													{ name: t.pinsAndBrim, items: pinsProduction },
+													{ name: t.traditionalJewelry, items: traditionalProduction },
+													{ name: t.otherAccessories, items: otherCatProduction }
+												] as group (group.name)}
 													{#if group.items.length > 0}
 														<div class="border border-[var(--line)] rounded-md overflow-hidden bg-white shadow-sm">
 															<div class="bg-[var(--surface-muted)] px-4 py-2 border-b border-[var(--line)]">
@@ -1698,22 +1633,22 @@ Heather Benjamin Jewelry`;
 															<table class="w-full text-left text-sm">
 																<thead class="bg-[var(--surface-soft)] border-b border-[var(--line)]">
 																	<tr>
-																		<th class="w-24 px-3 py-2 text-xs font-bold text-[var(--muted)]">{currentLocale === 'id' ? 'Kode gaya' : 'Style code'}</th>
-																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{currentLocale === 'id' ? 'Deskripsi item' : 'Item description'}</th>
-																		<th class="w-16 px-3 py-2 text-xs font-bold text-[var(--muted)]">{currentLocale === 'id' ? 'Jumlah' : 'Qty'}</th>
-																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.exportBtn === 'Ekspor' ? 'Instruksi Teknis (EN/ID)' : 'Technical Instructions (EN/ID)'}</th>
-																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{currentLocale === 'id' ? 'Catatan Pesanan' : 'Order Notes'}</th>
+																		<th class="w-24 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.styleCode}</th>
+																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.itemDescription}</th>
+																		<th class="w-16 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.qty}</th>
+																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.technicalInstructions}</th>
+																		<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.orderNotes}</th>
 																	</tr>
 																</thead>
 																<tbody>
 																	{#each group.items as item (item.id)}
 																		<tr class="border-t border-[var(--line)]">
 																			<td class="px-2 py-2">
-																				<input class="cell-input font-mono text-xs" bind:value={item.styleCode} oninput={markDirty} />
+																				<input class="cell-input font-mono text-xs" aria-label={`${t.styleCode}: ${item.item}`} autocomplete="off" bind:value={item.styleCode} oninput={markDirty} />
 																			</td>
 																			<td class="px-3 py-2 font-medium">{item.item}</td>
 																			<td class="px-2 py-2">
-																				<input class="cell-input w-16" type="number" min="0" bind:value={item.qty} oninput={markDirty} />
+																				<input class="cell-input w-16" type="number" min="0" aria-label={`${t.qty}: ${item.item}`} autocomplete="off" bind:value={item.qty} oninput={markDirty} />
 																			</td>
 																			<td class="px-3 py-2 text-xs leading-relaxed">
 																				{#if item.styleCode}
@@ -1722,17 +1657,17 @@ Heather Benjamin Jewelry`;
 																						<div class="text-[var(--ink)] font-medium">🇬🇧 {cat.notes_en}</div>
 																						<div class="text-[var(--muted)] mt-1 italic">🇮🇩 {cat.notes_id}</div>
 																					{:else}
-																						<span class="text-[var(--muted)]">No instructions mapped</span>
+																						<span class="text-[var(--muted)]">{t.noInstructionsMapped}</span>
 																					{/if}
 																				{:else}
 																					<span class="text-[var(--warning)] font-semibold flex items-center gap-1">
 																						<i class="ri-error-warning-line" aria-hidden="true"></i>
-																						PENDING RESOLUTION
+																						{t.pendingResolution}
 																					</span>
 																				{/if}
 																			</td>
 																			<td class="px-2 py-2">
-																				<input class="cell-input cell-input-wide text-xs" bind:value={item.notes} oninput={markDirty} />
+																				<input class="cell-input cell-input-wide text-xs" aria-label={`${t.orderNotes}: ${item.item}`} autocomplete="off" bind:value={item.notes} oninput={markDirty} />
 																			</td>
 																		</tr>
 																	{/each}
@@ -1747,19 +1682,19 @@ Heather Benjamin Jewelry`;
 										<div class="mb-5">
 											<h2 class="font-display text-2xl">{t.packingChecklist}</h2>
 											<p class="mt-1 text-sm text-[var(--muted)]">
-												Bali Fulfillment & Packing Check · Order {orderId} · {client}
+												{t.baliPackingCheck} · Order {orderId} · {client}
 											</p>
 										</div>
 										<div class="mt-5 overflow-hidden rounded-md border border-[var(--line)] bg-white shadow-sm">
 											<table class="w-full text-left text-sm">
 												<thead class="bg-[var(--surface-soft)] border-b border-[var(--line)]">
 													<tr>
-														<th class="w-12 px-3 py-3 text-center text-xs font-bold text-[var(--muted)]">{currentLocale === 'id' ? 'Pengepakan' : 'Packed'}</th>
-														<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">Item</th>
-														<th class="w-20 px-3 py-3 text-center text-xs font-bold text-[var(--muted)]">{currentLocale === 'id' ? 'Jumlah' : 'Qty'}</th>
-														<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{currentLocale === 'id' ? 'Spesifikasi Kemasan' : 'Packaging Specifics'}</th>
-														<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{currentLocale === 'id' ? 'Tanda Pemenuhan' : 'Fulfillment Flags'}</th>
-														<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{currentLocale === 'id' ? 'Catatan Pesanan' : 'Order Notes'}</th>
+														<th class="w-12 px-3 py-3 text-center text-xs font-bold text-[var(--muted)]">{t.packed}</th>
+														<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.item}</th>
+														<th class="w-20 px-3 py-3 text-center text-xs font-bold text-[var(--muted)]">{t.qty}</th>
+														<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.packagingSpecifics}</th>
+														<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.fulfillmentFlags}</th>
+														<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.orderNotes}</th>
 													</tr>
 												</thead>
 												<tbody>
@@ -1769,6 +1704,7 @@ Heather Benjamin Jewelry`;
 															<td class="px-3 py-3 text-center">
 																<input
 																	type="checkbox"
+																	aria-label={`${t.packed}: ${item.item}`}
 																	bind:checked={packedItems[item.id]}
 																	class="w-4 h-4 rounded border-[var(--line)] accent-[var(--brand)] cursor-pointer"
 																/>
@@ -1784,13 +1720,13 @@ Heather Benjamin Jewelry`;
 																{#if isBack}
 																	<span class="inline-flex items-center gap-1 rounded bg-red-100 text-red-700 text-[10px] font-bold px-2 py-1 uppercase tracking-wide border border-red-200">
 																		<i class="ri-time-line" aria-hidden="true"></i>
-																		Backorder
+																		{t.backorder}
 																	</span>
-																	<span class="text-[10px] text-[var(--muted)] block mt-1">Split ship after Bali casting</span>
+																	<span class="text-[10px] text-[var(--muted)] block mt-1">{t.splitShipAfterCasting}</span>
 																{:else}
 																	<span class="inline-flex items-center gap-1 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-1 uppercase tracking-wide border border-emerald-200">
 																		<i class="ri-send-plane-line" aria-hidden="true"></i>
-																		Direct Ship
+																		{t.directShip}
 																	</span>
 																{/if}
 															</td>
@@ -1801,10 +1737,11 @@ Heather Benjamin Jewelry`;
 											</table>
 										</div>
 									{:else}
-										<h2 class="font-display text-2xl">Customer update draft</h2>
-										<p class="mt-1 text-sm text-[var(--muted)]">Edit the drafted message directly.</p>
+										<h2 class="font-display text-2xl">{t.customerUpdateDraft}</h2>
+										<p class="mt-1 text-sm text-[var(--muted)]">{t.editDraftDirectly}</p>
 										<textarea
 											class="mt-5 h-[420px] w-full resize-none rounded-md border border-[var(--line)] bg-[var(--surface-soft)] p-4 leading-7 outline-none focus:border-[var(--brand)] focus:bg-white"
+											aria-label={t.message}
 											bind:value={customerUpdate}
 										></textarea>
 									{/if}
@@ -1817,34 +1754,34 @@ Heather Benjamin Jewelry`;
 											<button
 												class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
 												type="button"
-												aria-label="Close right panel"
+												aria-label={t.closeRightPanel}
 												onclick={() => (rightSidebarCollapsed = true)}
 											>
 												<i class="ri-close-line text-lg"></i>
 											</button>
 										</div>
 										<p class="text-sm text-[var(--muted)]">
-											{currentLocale === 'id' ? 'Dokumen menggunakan perubahan dalam aplikasi.' : 'Documents use current in-app edits.'}
+											{t.documentsUseEdits}
 										</p>
 										<div class="mt-5 space-y-4">
 											<button class="side-action transition flex items-center justify-between gap-3" type="button" onclick={() => downloadCsv('production')}>
 												<div>
-													<strong>{currentLocale === 'id' ? 'Unduh lembar produksi' : 'Download production sheet'}</strong>
-													<span class="block text-xs text-[var(--muted)] mt-1">CSV format</span>
+													<strong>{t.downloadProductionSheet}</strong>
+													<span class="block text-xs text-[var(--muted)] mt-1">{t.csvFormat}</span>
 												</div>
 												<i class="ri-download-2-line text-xl text-[var(--brand)]" aria-hidden="true"></i>
 											</button>
 											<button class="side-action transition flex items-center justify-between gap-3" type="button" onclick={() => downloadCsv('packing')}>
 												<div>
-													<strong>{currentLocale === 'id' ? 'Unduh daftar pengepakan' : 'Download packing checklist'}</strong>
-													<span class="block text-xs text-[var(--muted)] mt-1">CSV format</span>
+													<strong>{t.downloadPackingChecklist}</strong>
+													<span class="block text-xs text-[var(--muted)] mt-1">{t.csvFormat}</span>
 												</div>
 												<i class="ri-download-2-line text-xl text-[var(--brand)]" aria-hidden="true"></i>
 											</button>
 											<button class="side-action transition flex items-center justify-between gap-3" type="button" onclick={copyCustomerUpdate}>
 												<div>
 													<strong>{t.copyUpdate}</strong>
-													<span class="block text-xs text-[var(--muted)] mt-1">Plain text</span>
+													<span class="block text-xs text-[var(--muted)] mt-1">{t.plainText}</span>
 												</div>
 												<i class="ri-file-copy-2-line text-xl text-[var(--brand)]" aria-hidden="true"></i>
 											</button>
@@ -1855,8 +1792,8 @@ Heather Benjamin Jewelry`;
 						</div>
 					</section>
 				{:else}
-					<section class={`customer-grid ${rightSidebarCollapsed ? 'customer-grid-collapsed' : ''}`}>
-						<div class="px-4 py-6 md:px-10 md:py-9">
+					<section class="px-4 py-6 md:px-10 md:py-9">
+						<div>
 							<div class="mx-auto max-w-5xl">
 								<p class="text-sm uppercase tracking-wide text-[var(--muted)]">
 									Order #{orderId}
@@ -1872,67 +1809,21 @@ Heather Benjamin Jewelry`;
 									</div>
 									<div class="page-actions">
 										<button class="ghost-button" type="button" onclick={saveDraft}>{t.saveDraft}</button>
-										<button class="secondary-button" type="button">{t.preview}</button>
 									</div>
-								</div>
-
-								<div class="mt-8 rounded-md border border-[var(--line)] bg-white p-4 text-sm leading-relaxed shadow-sm">
-									<strong>{t.whatsIncluded}</strong>
-									<p class="mt-1 text-[var(--muted)]">{t.includedDesc}</p>
 								</div>
 
 								<label class="mt-8 block">
 									<span class="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-										{currentLocale === 'id' ? 'Pesan' : 'Message'}
+										{t.message}
 									</span>
 									<textarea
 										class="customer-textarea shadow-inner"
+										aria-label={t.message}
 										bind:value={customerUpdate}
 									></textarea>
 								</label>
 							</div>
 						</div>
-
-						{#if !rightSidebarCollapsed}
-							<aside class="side-panel customer-side">
-								<div class="flex items-center justify-between gap-4 mb-2">
-									<h2 class="font-display text-2xl">{t.whatsIncluded}</h2>
-									<button
-										class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
-										type="button"
-										aria-label="Close right panel"
-										onclick={() => (rightSidebarCollapsed = true)}
-									>
-										<i class="ri-close-line text-lg"></i>
-									</button>
-								</div>
-								<div class="mt-7 space-y-6">
-									<div>
-										<h3 class="font-semibold">{currentLocale === 'id' ? 'Ringkasan pesanan' : 'Order summary'}</h3>
-										<p class="mt-1 text-sm text-[var(--muted)]">8 items, {totalQty} total quantity</p>
-									</div>
-									<div>
-										<h3 class="font-semibold">{currentLocale === 'id' ? 'Lini masa' : 'Timeline'}</h3>
-										<p class="mt-1 text-sm text-[var(--muted)]">Production start and ETA</p>
-									</div>
-									<div>
-										<h3 class="font-semibold">{currentLocale === 'id' ? 'Catatan' : 'Notes'}</h3>
-										<p class="mt-1 text-sm text-[var(--muted)]">Special requests or next steps</p>
-									</div>
-								</div>
-
-								<div class="mt-9 rounded-md border border-[var(--line)] bg-[var(--surface-soft)] p-4 shadow-sm">
-									<h3 class="font-display text-xl">{t.preview}</h3>
-									<p class="mt-4 text-sm font-medium">{t.emailTo}: Mia Chen &lt;mia@driftwoodcollective.com&gt;</p>
-									<p class="mt-1 text-sm">{t.emailSubject}: Update on your order #{orderId}</p>
-									
-									<!-- Real-time email preview text rendering instead of dummy bars -->
-									<div class="mt-4 rounded border border-[var(--line)] bg-white p-3 text-xs font-sans whitespace-pre-wrap leading-relaxed shadow-inner max-h-[220px] overflow-auto">
-										{customerUpdate}
-									</div>
-								</div>
-							</aside>
-						{/if}
 					</section>
 				{/if}
 			</div>
@@ -1952,15 +1843,15 @@ Heather Benjamin Jewelry`;
 							<div>
 								<p class="font-semibold">
 									{#if currentStep === 2}
-										{remainingAnswers} {remainingAnswers === 1 ? 'answer' : 'answers'} remaining
+										{answerCountLabel(remainingAnswers)}
 									{:else if currentStep === 3}
-										Ready to send to production
+										{t.readyToProduction}
 									{:else}
-										{sent ? 'Marked as sent' : 'Ready to copy'}
+										{sent ? t.markedAsSent : t.readyToCopy}
 									{/if}
 								</p>
 								{#if currentStep === 4}
-									<p class="text-sm text-[var(--muted)]">No real email is sent by Artisan.</p>
+									<p class="text-sm text-[var(--muted)]">{t.noRealEmail}</p>
 								{/if}
 							</div>
 						</div>
@@ -1968,24 +1859,24 @@ Heather Benjamin Jewelry`;
 						<div class="footer-actions">
 							{#if currentStep > 1}
 								<button class="secondary-button" type="button" onclick={previousStep}>
-									{currentLocale === 'id' ? 'Sebelumnya' : 'Previous'}
+									{t.previous}
 								</button>
 							{/if}
 							{#if currentStep === 2}
 								<div class="flex items-center gap-3">
 									{#if remainingAnswers > 0}
 										<span class="text-xs text-[var(--warning-ink)] bg-[var(--warning-bg)] border border-[var(--warning)] px-2 py-1 rounded">
-											{currentLocale === 'id' ? 'Selesaikan pertanyaan untuk melanjutkan' : 'Resolve blockers to continue'}
+											{t.resolveToContinue}
 										</span>
 									{/if}
 									<button class="primary-button flex items-center justify-center font-bold" type="button" disabled={!allAnswered} onclick={continueToSheets}>
-										{currentLocale === 'id' ? 'Lanjutkan ke lembar kerja' : 'Continue to sheets'} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
+										{t.continueToSheets} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
 									</button>
 								</div>
 							{:else}
 								{#if currentStep === 3}
 									<button class="primary-button flex items-center justify-center font-bold" type="button" onclick={() => setStep(4)}>
-										{currentLocale === 'id' ? 'Lanjutkan ke pembaruan pelanggan' : 'Continue to customer update'} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
+										{t.continueToCustomerUpdate} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
 									</button>
 								{:else}
 									<button class="secondary-button flex items-center gap-1.5" type="button" onclick={copyCustomerUpdate}>
@@ -2008,30 +1899,30 @@ Heather Benjamin Jewelry`;
 		<button
 			class="drawer-backdrop"
 			type="button"
-			aria-label="Close drawer"
+			aria-label={t.closeDrawer}
 			onclick={() => (showOriginalDrawer = false)}
 		></button>
 		<div class="drawer">
 			<div class="drawer-header">
 				<h2 class="font-display text-2xl">{t.viewOriginal}</h2>
-				<button class="icon-button font-bold" type="button" aria-label="Close drawer" onclick={() => (showOriginalDrawer = false)}>
+				<button class="icon-button font-bold" type="button" aria-label={t.closeDrawer} onclick={() => (showOriginalDrawer = false)}>
 					<i class="ri-close-line text-lg" aria-hidden="true"></i>
 				</button>
 			</div>
 			<div class="drawer-content">
 				<div class="rounded bg-[var(--surface-soft)] p-4 border border-[var(--line)] shadow-inner">
-					<p class="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] mb-2">Pasted Source Content</p>
+					<p class="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] mb-2">{t.pastedSourceContent}</p>
 					<pre class="font-mono text-xs whitespace-pre-wrap leading-5 select-text">{intakeText}</pre>
 				</div>
 				<div class="mt-4 text-xs text-[var(--muted)]">
-					Source Channel: {selectedSource} {uploadedFiles.length > 0 ? `(Files: ${uploadedFiles.join(', ')})` : ''}
+					{t.sourceChannel}: {sourceLabel(selectedSource)} {uploadedFiles.length > 0 ? `(${t.uploaded}: ${uploadedFiles.join(', ')})` : ''}
 				</div>
 			</div>
 		</div>
 	{/if}
 
 	{#if toast}
-		<div class="fixed bottom-28 left-1/2 -translate-x-1/2 rounded-full bg-[var(--ink)] px-5 py-3 text-sm text-white shadow-xl animate-fade-in">
+		<div class="fixed bottom-28 left-1/2 -translate-x-1/2 rounded-full bg-[var(--ink)] px-5 py-3 text-sm text-white shadow-xl animate-fade-in" aria-live="polite">
 			{toast}
 		</div>
 	{/if}
