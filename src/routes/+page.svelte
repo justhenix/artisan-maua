@@ -138,15 +138,44 @@ Line  Item Code      Description                  Qty  Unit Price
 5     HB-TSR-2       Thin Stacking Ring           20   $12.00`
 	};
 
-	function handleSourceChange(source: (typeof sourceTypes)[number]) {
-		const oldSource = selectedSource;
-		selectedSource = source;
+	function detectSource(text: string): (typeof sourceTypes)[number] {
+		const cleanText = text.trim();
+		if (!cleanText) return 'sourcePoText';
 		
-		const isCurrentEmpty = !intakeText.trim();
-		const isOldSample = Object.values(samples).map(s => s.trim()).includes(intakeText.trim()) || intakeText.trim() === sampleOrder.trim();
-		if (isCurrentEmpty || isOldSample) {
-			intakeText = samples[source];
+		if (cleanText.includes('From:') || cleanText.includes('Subject:')) {
+			return 'sourceEmail';
 		}
+		if (
+			cleanText.toLowerCase().includes('dm') || 
+			cleanText.toLowerCase().includes('instagram') || 
+			cleanText.toLowerCase().includes('sent via') ||
+			/\[.*\]/.test(cleanText)
+		) {
+			return 'sourceDm';
+		}
+		if (cleanText.includes(',') && (cleanText.toLowerCase().includes('item,qty') || cleanText.toLowerCase().includes('qty,material') || cleanText.toLowerCase().includes('item,qty,material'))) {
+			return 'sourceSpreadsheet';
+		}
+		return 'sourcePoText';
+	}
+
+	function loadSampleType(source: (typeof sourceTypes)[number]) {
+		selectedSource = source;
+		intakeText = samples[source];
+		uploadedFiles = [];
+		sampleUsed = true;
+		resetDemoState();
+		showToast(t.sampleOrderLoaded);
+	}
+
+	function removeUploadedFile(index: number) {
+		uploadedFiles = uploadedFiles.filter((_, i) => i !== index);
+		if (uploadedFiles.length === 0) {
+			intakeText = '';
+		} else {
+			intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + samples[selectedSource];
+		}
+		resetDemoState();
 	}
 
 	const catalog: CatalogItem[] = [
@@ -883,7 +912,7 @@ Heather Benjamin Jewelry`;
 					} 
 				},
 				{ 
-					element: '#try-sample-btn', 
+					element: '#try-sample-container', 
 					popover: { 
 						title: t.tourSampleTitle,
 						description: t.tourSampleDesc,
@@ -1285,118 +1314,115 @@ Heather Benjamin Jewelry`;
 								<p class="mt-4 max-w-3xl text-lg leading-8">{t.intakeDesc}</p>
 
 								<div class="mt-8 rounded-lg border border-[var(--line)] bg-white p-6 shadow-sm">
-									<!-- Ingestion Mode Tabs -->
-									<div class="flex border-b border-[var(--line)] mb-6">
-										<button
-											class={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${activeIngestTab === 'paste' ? 'border-[var(--brand)] text-[var(--brand-dark)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--ink)]'}`}
-											type="button"
-											onclick={() => (activeIngestTab = 'paste')}
-										>
-											<i class="ri-keyboard-line text-base"></i> {t.pasteText}
-										</button>
-										<button
-											class={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${activeIngestTab === 'upload' ? 'border-[var(--brand)] text-[var(--brand-dark)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--ink)]'}`}
-											type="button"
-											onclick={() => (activeIngestTab = 'upload')}
-										>
-											<i class="ri-upload-cloud-2-line text-base"></i> {t.uploadFile}
-										</button>
-									</div>
-
-									{#if activeIngestTab === 'paste'}
-										<!-- Paste Mode Panel -->
-										<div class="flex flex-wrap gap-2 mb-4">
-											{#each sourceTypes as source (source)}
-												<button
-													class={`chip ${selectedSource === source ? 'chip-active' : ''}`}
-													type="button"
-													onclick={() => handleSourceChange(source)}
-												>
-													{sourceLabel(source)}
-												</button>
-											{/each}
-										</div>
-
-										<label class="block">
-											<span class="sr-only">{t.addWholesaleOrder}</span>
-											<textarea
-												id="intake-scratchpad"
-												class="h-[260px] w-full resize-none rounded-md border border-[var(--line)] bg-[var(--surface-soft)] p-4 font-mono text-sm leading-6 outline-none transition focus:border-[var(--brand)] focus:bg-white"
-												bind:value={intakeText}
-											></textarea>
-										</label>
-
-										<div class="mt-5 flex items-center justify-end gap-3">
-											<button id="try-sample-btn" class="secondary-button" type="button" onclick={useSampleOrder}>
-												{t.trySample}
-											</button>
-											<button id="process-order-btn" class="primary-button flex items-center justify-center" type="button" onclick={processOrder}>
-												{t.processOrder} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
-											</button>
-										</div>
-									{:else}
-										<!-- Upload Mode Panel -->
-										<div 
-											class={`border-2 rounded-lg p-10 text-center transition-all duration-300 relative ${isDragging ? 'border-[var(--brand)] bg-[var(--brand)]/10 scale-[1.02] ring-4 ring-[var(--brand)]/20 border-solid' : 'border-dashed border-[var(--line)] bg-[var(--surface-soft)] hover:border-[var(--brand)] hover:bg-[var(--surface-soft)]'}`}
-											role="region"
-											aria-label={t.fileUploadDropzone}
-										>
-											<input 
-												class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-												type="file" 
-												aria-label={t.uploadFile}
-												multiple
-												onchange={handleFileUpload}
-												ondragenter={(e) => { e.preventDefault(); isDragging = true; }}
-												ondragover={(e) => { e.preventDefault(); isDragging = true; }}
-												ondragleave={() => { isDragging = false; }}
-												ondrop={handleFileDrop}
-											/>
-											<i class={`ri-upload-cloud-2-line text-4xl block mb-3 transition-transform duration-300 ${isDragging ? 'text-[var(--brand)] scale-110' : 'text-[var(--brand)]'}`}></i>
-											<strong class="block text-base text-[var(--ink)] mb-1">
-												{t.uploadDropTitle}
-											</strong>
-											<span class="text-xs text-[var(--muted)]">
-												{t.uploadBrowse}
-											</span>
-											<div class="mt-4 text-[var(--muted)] text-[10px] uppercase font-bold tracking-wider">
-												PDF, CSV, XLSX, PNG, JPG, TXT
-											</div>
-										</div>
-
-										{#if uploadedFiles.length > 0}
-											<div class="mt-4 space-y-2">
-												{#each uploadedFiles as file, index (file + '-' + index)}
-													<div class="p-3 border border-emerald-100 bg-emerald-50/30 rounded flex items-center justify-between text-xs text-emerald-800">
-														<span class="flex items-center gap-2">
-															<i class="ri-checkbox-circle-line text-emerald-600 text-base"></i>
-															<strong>{file}</strong> ({t.fileUploaded})
-														</span>
-														<button
-															class="text-red-600 hover:text-red-800 transition font-bold cursor-pointer"
-															type="button"
-															onclick={() => {
-																uploadedFiles = uploadedFiles.filter((_, i) => i !== index);
-																if (uploadedFiles.length > 0) {
-																	intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + samples[selectedSource];
-																} else {
-																	intakeText = '';
-																}
-															}}
-														>
-															{t.remove}
-														</button>
-													</div>
-												{/each}
+									<!-- Unified Intake Composer -->
+									<div 
+										class={`relative border rounded-lg p-1 min-h-[300px] transition-all duration-300 flex flex-col bg-[var(--surface-soft)] ${isDragging ? 'border-[var(--brand)] bg-[var(--brand)]/5 ring-4 ring-[var(--brand)]/10' : 'border-[var(--line)] bg-[var(--surface-soft)] focus-within:border-[var(--brand)] focus-within:bg-white'}`}
+										role="region"
+										aria-label="Unified order composer"
+										ondragenter={(e) => { e.preventDefault(); isDragging = true; }}
+										ondragover={(e) => { e.preventDefault(); isDragging = true; }}
+										ondragleave={() => { isDragging = false; }}
+										ondrop={handleFileDrop}
+									>
+										<!-- Drop Overlay -->
+										{#if isDragging}
+											<div class="absolute inset-0 bg-[var(--brand)]/10 flex flex-col items-center justify-center pointer-events-none rounded-lg z-20 border-2 border-dashed border-[var(--brand)]">
+												<i class="ri-upload-cloud-2-line text-4xl text-[var(--brand)] animate-bounce"></i>
+												<strong class="text-sm mt-2 text-[var(--brand-dark)]">Drop files anywhere to attach</strong>
 											</div>
 										{/if}
 
-										<div class="mt-6 flex justify-end gap-3">
-											<button id="process-file-btn" class="primary-button flex items-center justify-center" type="button" disabled={uploadedFiles.length === 0} onclick={processOrder}>
-												{t.processOrder} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
+										<!-- Textarea -->
+										<textarea
+											id="intake-scratchpad"
+											class="flex-1 w-full min-h-[220px] resize-none p-4 font-mono text-sm leading-6 outline-none bg-transparent border-0"
+											placeholder="Paste purchase order details, email text, DM conversations, spreadsheet rows... or attach files below."
+											bind:value={intakeText}
+										></textarea>
+
+										<!-- Bottom controls bar inside the box -->
+										<div class="flex flex-wrap items-center justify-between border-t border-[var(--line)] p-3 bg-white/50 rounded-b-lg gap-2">
+											<!-- File Attach controls and active file badges -->
+											<div class="flex flex-wrap items-center gap-2">
+												<!-- Attach Button -->
+												<label class="relative cursor-pointer flex items-center justify-center w-8 h-8 rounded-full hover:bg-[var(--surface-muted)] text-[var(--muted)] hover:text-[var(--ink)] transition">
+													<span class="sr-only">Attach files</span>
+													<i class="ri-attachment-line text-lg"></i>
+													<input 
+														type="file" 
+														class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+														multiple 
+														onchange={handleFileUpload} 
+													/>
+												</label>
+
+												<!-- File Badges -->
+												{#if uploadedFiles.length > 0}
+													<div class="flex flex-wrap gap-1.5 max-w-[400px]">
+														{#each uploadedFiles as file, index (file + '-' + index)}
+															<div class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-50 border border-emerald-100 text-xs text-emerald-800 font-medium">
+																<i class="ri-file-text-line text-emerald-600"></i>
+																<span class="max-w-[120px] truncate">{file}</span>
+																<button 
+																	type="button" 
+																	class="hover:text-red-600 text-emerald-600 transition font-bold" 
+																	aria-label="Remove attachment"
+																	onclick={() => removeUploadedFile(index)}
+																>
+																	<i class="ri-close-line"></i>
+																</button>
+															</div>
+														{/each}
+													</div>
+												{/if}
+											</div>
+
+											<!-- Character counter or simple note -->
+											<span class="text-[10px] uppercase tracking-wider font-semibold text-[var(--muted)]">
+												{uploadedFiles.length > 0 ? `${uploadedFiles.length} file(s) attached` : 'Text + files supported'}
+											</span>
+										</div>
+									</div>
+
+									<div class="mt-6 flex flex-wrap items-center justify-between gap-4">
+										<div id="try-sample-container" class="text-xs text-[var(--muted)] flex flex-wrap items-center gap-2 font-medium">
+											<span>{t.trySample}:</span>
+											<button
+												type="button"
+												class="underline hover:text-[var(--brand)] transition cursor-pointer"
+												onclick={() => loadSampleType('sourceEmail')}
+											>
+												{t.sourceEmail}
+											</button>
+											<span class="opacity-50">·</span>
+											<button
+												type="button"
+												class="underline hover:text-[var(--brand)] transition cursor-pointer"
+												onclick={() => loadSampleType('sourceDm')}
+											>
+												{t.sourceDm}
+											</button>
+											<span class="opacity-50">·</span>
+											<button
+												type="button"
+												class="underline hover:text-[var(--brand)] transition cursor-pointer"
+												onclick={() => loadSampleType('sourceSpreadsheet')}
+											>
+												{t.sourceSpreadsheet}
+											</button>
+											<span class="opacity-50">·</span>
+											<button
+												type="button"
+												class="underline hover:text-[var(--brand)] transition cursor-pointer"
+												onclick={() => loadSampleType('sourcePoText')}
+											>
+												{t.sourcePoText}
 											</button>
 										</div>
-									{/if}
+										<button id="process-order-btn" class="primary-button flex items-center justify-center font-bold" type="button" onclick={processOrder}>
+											{t.processOrder} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
+										</button>
+									</div>
 								</div>
 
 								<p class="mt-4 flex items-center gap-2 text-sm text-[var(--muted)]">
