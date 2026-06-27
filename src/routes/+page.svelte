@@ -346,7 +346,7 @@ Heather Benjamin Jewelry`;
 	let mobileSidebarOpen = $state(false);
 
 	// New States
-	let uploadedFile = $state<string>('');
+	let uploadedFiles = $state<string[]>([]);
 	let showOriginalDrawer = $state(false);
 	let silverSpotRate = $state(1.05); // Global silver spot price slider
 	let productionGrouping = $state<'material' | 'category'>('material'); // Production group toggle
@@ -358,7 +358,7 @@ Heather Benjamin Jewelry`;
 	let processClicked = $state(false);
 	let isDragging = $state(false);
 
-	const step1_item1 = $derived(intakeText.trim().length > 0 || uploadedFile.trim().length > 0);
+	const step1_item1 = $derived(intakeText.trim().length > 0 || uploadedFiles.length > 0);
 	const step1_item2 = $derived(sampleUsed);
 	const step1_item3 = $derived(processClicked);
 
@@ -505,7 +505,7 @@ Heather Benjamin Jewelry`;
 				sheetDirty = parsed.sheetDirty ?? false;
 				lastSaved = parsed.lastSaved ?? '10:42 AM';
 				sent = parsed.sent ?? false;
-				uploadedFile = parsed.uploadedFile ?? '';
+				uploadedFiles = parsed.uploadedFiles ?? [];
 				silverSpotRate = parsed.silverSpotRate ?? 1.05;
 				productionGrouping = parsed.productionGrouping ?? 'material';
 				packedItems = parsed.packedItems ?? {};
@@ -535,7 +535,7 @@ Heather Benjamin Jewelry`;
 				sheetDirty,
 				lastSaved,
 				sent,
-				uploadedFile,
+				uploadedFiles,
 				silverSpotRate,
 				productionGrouping,
 				packedItems,
@@ -584,7 +584,7 @@ Heather Benjamin Jewelry`;
 	function useSampleOrder() {
 		intakeText = sampleOrder;
 		selectedSource = 'Email';
-		uploadedFile = '';
+		uploadedFiles = [];
 		sampleUsed = true;
 		resetDemoState();
 		showToast('Sample order loaded.');
@@ -593,22 +593,22 @@ Heather Benjamin Jewelry`;
 	function handleFileUpload(event: Event) {
 		const target = event.target as HTMLInputElement;
 		if (target.files && target.files.length > 0) {
-			const file = target.files[0];
-			uploadedFile = file.name;
-			intakeText = `[File Source: ${file.name}]\n\n` + sampleOrder;
+			const files = Array.from(target.files);
+			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
+			intakeText = `[Files Source: ${uploadedFiles.join(', ')}]\n\n` + sampleOrder;
 			resetDemoState();
-			showToast(`Uploaded ${file.name}. Click Process to begin.`);
+			showToast(currentLocale === 'id' ? `${files.length} file berhasil diunggah.` : `${files.length} files uploaded successfully.`);
 		}
 	}
 	function handleFileDrop(event: DragEvent) {
 		event.preventDefault();
 		isDragging = false;
 		if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
-			const file = event.dataTransfer.files[0];
-			uploadedFile = file.name;
-			intakeText = `[File Source: ${file.name}]\n\n` + sampleOrder;
+			const files = Array.from(event.dataTransfer.files);
+			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
+			intakeText = `[Files Source: ${uploadedFiles.join(', ')}]\n\n` + sampleOrder;
 			resetDemoState();
-			showToast(currentLocale === 'id' ? `File ${file.name} berhasil diunggah` : `File ${file.name} uploaded successfully.`);
+			showToast(currentLocale === 'id' ? `${files.length} file berhasil diunggah.` : `${files.length} files uploaded successfully.`);
 		}
 	}
 	function processOrder() {
@@ -1177,6 +1177,7 @@ Heather Benjamin Jewelry`;
 											<input 
 												class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
 												type="file" 
+												multiple
 												onchange={handleFileUpload}
 												ondragenter={(e) => { e.preventDefault(); isDragging = true; }}
 												ondragover={(e) => { e.preventDefault(); isDragging = true; }}
@@ -1195,24 +1196,35 @@ Heather Benjamin Jewelry`;
 											</div>
 										</div>
 
-										{#if uploadedFile}
-											<div class="mt-4 p-3 border border-emerald-100 bg-emerald-50/30 rounded flex items-center justify-between text-xs text-emerald-800">
-												<span class="flex items-center gap-2">
-													<i class="ri-checkbox-circle-line text-emerald-600 text-base"></i>
-													<strong>{uploadedFile}</strong> ({currentLocale === 'id' ? 'File berhasil diunggah' : 'File uploaded successfully'})
-												</span>
-												<button
-													class="text-red-600 hover:text-red-800 transition font-bold cursor-pointer"
-													type="button"
-													onclick={() => (uploadedFile = '')}
-												>
-													{currentLocale === 'id' ? 'Hapus' : 'Remove'}
-												</button>
+										{#if uploadedFiles.length > 0}
+											<div class="mt-4 space-y-2">
+												{#each uploadedFiles as file, index (file + '-' + index)}
+													<div class="p-3 border border-emerald-100 bg-emerald-50/30 rounded flex items-center justify-between text-xs text-emerald-800">
+														<span class="flex items-center gap-2">
+															<i class="ri-checkbox-circle-line text-emerald-600 text-base"></i>
+															<strong>{file}</strong> ({currentLocale === 'id' ? 'File berhasil diunggah' : 'File uploaded successfully'})
+														</span>
+														<button
+															class="text-red-600 hover:text-red-800 transition font-bold cursor-pointer"
+															type="button"
+															onclick={() => {
+																uploadedFiles = uploadedFiles.filter((_, i) => i !== index);
+																if (uploadedFiles.length > 0) {
+																	intakeText = `[Files Source: ${uploadedFiles.join(', ')}]\n\n` + sampleOrder;
+																} else {
+																	intakeText = '';
+																}
+															}}
+														>
+															{currentLocale === 'id' ? 'Hapus' : 'Remove'}
+														</button>
+													</div>
+												{/each}
 											</div>
 										{/if}
 
 										<div class="mt-6 flex justify-end gap-3">
-											<button id="process-file-btn" class="primary-button flex items-center justify-center" type="button" disabled={!uploadedFile} onclick={processOrder}>
+											<button id="process-file-btn" class="primary-button flex items-center justify-center" type="button" disabled={uploadedFiles.length === 0} onclick={processOrder}>
 												{t.processOrder} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
 											</button>
 										</div>
@@ -1318,7 +1330,7 @@ Heather Benjamin Jewelry`;
 												{t.allResolved}
 											{/if}
 										</p>
-										<p class="mt-4 text-sm text-[var(--muted)]">Source: {uploadedFile ? `Uploaded ${uploadedFile}` : 'Pasted text'}</p>
+										<p class="mt-4 text-sm text-[var(--muted)]">Source: {uploadedFiles.length > 0 ? `Uploaded ${uploadedFiles.join(', ')}` : 'Pasted text'}</p>
 									</div>
 
 									<div class="page-actions">
@@ -2012,7 +2024,7 @@ Heather Benjamin Jewelry`;
 					<pre class="font-mono text-xs whitespace-pre-wrap leading-5 select-text">{intakeText}</pre>
 				</div>
 				<div class="mt-4 text-xs text-[var(--muted)]">
-					Source Channel: {selectedSource} {uploadedFile ? `(File: ${uploadedFile})` : ''}
+					Source Channel: {selectedSource} {uploadedFiles.length > 0 ? `(Files: ${uploadedFiles.join(', ')})` : ''}
 				</div>
 			</div>
 		</div>
