@@ -5,7 +5,7 @@ import { db } from '$lib/server/db';
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json();
-		const { orderId, client, blockers, lineItems, customerUpdate, uploadedFiles, sourceText } = body;
+		const { orderId, client, blockers, lineItems, customerUpdate, uploadedFiles, sourceText, status, milestones } = body;
 
 		if (!orderId) {
 			return json({ success: false, error: 'orderId is required' }, { status: 400 });
@@ -16,22 +16,26 @@ export const POST: RequestHandler = async ({ request }) => {
 		// 1. Upsert purchase_order
 		await db.execute({
 			sql: `
-				INSERT INTO purchase_orders (id, po_number, client_name, status, source_text, uploaded_files, customer_update, created_at, updated_at)
-				VALUES (?, ?, ?, 'Review', ?, ?, ?, ?, ?)
+				INSERT INTO purchase_orders (id, po_number, client_name, status, source_text, uploaded_files, customer_update, milestones, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 				ON CONFLICT(id) DO UPDATE SET
 					client_name = excluded.client_name,
+					status = excluded.status,
 					source_text = excluded.source_text,
 					uploaded_files = excluded.uploaded_files,
 					customer_update = excluded.customer_update,
+					milestones = excluded.milestones,
 					updated_at = excluded.updated_at
 			`,
 			args: [
 				orderId,
 				orderId,
 				client || 'Driftwood Collective',
+				status || 'Review',
 				sourceText || '',
 				JSON.stringify(uploadedFiles || []),
 				customerUpdate || '',
+				JSON.stringify(milestones || { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false }),
 				now,
 				now
 			]

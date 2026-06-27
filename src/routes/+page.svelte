@@ -65,8 +65,9 @@
 	type AppMessages = typeof enMessages;
 
 	const storageKey = 'artisan-demo-flow-v3';
-	const orderId = 'HB-250416';
-	const client = 'Driftwood Collective';
+	let selectedOrderId = $state('HB-250416');
+	const orderId = $derived(selectedOrderId);
+	let client = $state('Driftwood Collective');
 
 	const messageCatalog: Record<Locale, AppMessages> = {
 		en: enMessages,
@@ -712,14 +713,37 @@ Heather Benjamin Jewelry`;
 	let mobileSidebarOpen = $state(false);
 	let showWelcomeModal = $state(false);
 
+	let orders = $state<any[]>([]);
+	let activeView = $state<'dashboard' | 'workbench'>('dashboard');
+	let orderStatus = $state('Review');
+	let milestones = $state({
+		moldsChecked: false,
+		silverCast: false,
+		qualityChecked: false,
+		readyForShipping: false
+	});
+
 	let dbLoaded = false;
 	$effect(() => {
-		if (!dbLoaded && data.savedOrder) {
-			intakeText = data.savedOrder.sourceText;
-			blockers = data.savedOrder.blockers;
-			lineItems = data.savedOrder.lineItems;
-			customerUpdate = data.savedOrder.customerUpdate;
-			uploadedFiles = data.savedOrder.uploadedFiles;
+		if (!dbLoaded && data.orders && data.orders.length > 0) {
+			orders = data.orders;
+			
+			// Load the default selected order
+			const defaultOrder = data.orders.find((o: any) => o.id === selectedOrderId) || data.orders[0];
+			if (defaultOrder) {
+				selectedOrderId = defaultOrder.id;
+				client = defaultOrder.clientName;
+				intakeText = defaultOrder.sourceText;
+				customerUpdate = defaultOrder.customerUpdate;
+				uploadedFiles = defaultOrder.uploadedFiles;
+				orderStatus = defaultOrder.status;
+				milestones = defaultOrder.milestones || { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false };
+				
+				lineItems = data.allItems.filter((item: any) => item.poId === selectedOrderId);
+				blockers = data.allBlockers.filter((bl: any) => bl.poId === selectedOrderId);
+				restoreSession(selectedOrderId);
+			}
+			
 			dbLoaded = true;
 		}
 	});
@@ -803,8 +827,9 @@ Heather Benjamin Jewelry`;
 	const maxStep = $derived(allAnswered ? Math.max(completedSteps, 3) as Step : completedSteps as Step);
 
 	// Session Restoration
-	if (browser) {
-		const saved = sessionStorage.getItem(storageKey);
+	function restoreSession(orderId: string) {
+		if (!browser) return;
+		const saved = sessionStorage.getItem(`${storageKey}-${orderId}`);
 		if (saved) {
 			try {
 				const parsed = JSON.parse(saved) as any;
@@ -829,15 +854,17 @@ Heather Benjamin Jewelry`;
 				sampleUsed = parsed.sampleUsed ?? false;
 				processClicked = parsed.processClicked ?? false;
 			} catch {
-				sessionStorage.removeItem(storageKey);
+				sessionStorage.removeItem(`${storageKey}-${orderId}`);
 			}
 		}
 	}
 
+
+
 	$effect(() => {
 		if (!browser) return;
 		sessionStorage.setItem(
-			storageKey,
+			`${storageKey}-${selectedOrderId}`,
 			JSON.stringify({
 				currentStep,
 				selectedSource,
@@ -1142,18 +1169,136 @@ Heather Benjamin Jewelry`;
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					orderId,
+					orderId: selectedOrderId,
 					client,
 					blockers,
 					lineItems,
 					customerUpdate,
 					uploadedFiles,
-					sourceText: intakeText
+					sourceText: intakeText,
+					status: orderStatus,
+					milestones
 				})
 			});
 		} catch (err) {
 			console.error('Failed to sync to database:', err);
 		}
+	}
+
+	function selectOrder(orderId: string) {
+		const order = orders.find(o => o.id === orderId);
+		if (!order) return;
+		selectedOrderId = orderId;
+		client = order.clientName;
+		intakeText = order.sourceText;
+		customerUpdate = order.customerUpdate;
+		uploadedFiles = order.uploadedFiles;
+		orderStatus = order.status;
+		milestones = order.milestones || { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false };
+		
+		lineItems = data.allItems.filter((item: any) => item.poId === selectedOrderId);
+		blockers = data.allBlockers.filter((bl: any) => bl.poId === selectedOrderId);
+		
+		activeView = 'workbench';
+		
+		// Map status to Wizard Steps
+		if (orderStatus === 'Review') {
+			currentStep = 2;
+		} else if (orderStatus === 'Production') {
+			currentStep = 3;
+			activeTab = 'production';
+		} else if (orderStatus === 'Packing') {
+			currentStep = 3;
+			activeTab = 'packing';
+		} else if (orderStatus === 'Completed') {
+			currentStep = 4;
+		} else {
+			currentStep = 1;
+		}
+		restoreSession(orderId);
+	}
+
+	function createNewOrder() {
+		const newId = `HB-25${Math.floor(1000 + Math.random() * 9000)}`;
+		const newOrder = {
+			id: newId,
+			poNumber: newId,
+			clientName: 'New Boutique Partner',
+			status: 'Review',
+			sourceText: '',
+			customerUpdate: '',
+			uploadedFiles: [],
+			milestones: { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false },
+			createdAt: Date.now(),
+			updatedAt: Date.now()
+		};
+		
+		orders = [newOrder, ...orders];
+		selectedOrderId = newId;
+		client = newOrder.clientName;
+		intakeText = '';
+		customerUpdate = '';
+		uploadedFiles = [];
+		orderStatus = 'Review';
+		milestones = { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false };
+		lineItems = [];
+		blockers = [];
+		
+		activeView = 'workbench';
+		currentStep = 1;
+		
+		markDirty();
+		markAutoSaved();
+	}
+
+	function getMilestoneCompletedCount(ms: any) {
+		if (!ms) return 0;
+		let count = 0;
+		if (ms.moldsChecked) count++;
+		if (ms.silverCast) count++;
+		if (ms.qualityChecked) count++;
+		if (ms.readyForShipping) count++;
+		return count;
+	}
+
+	function onMilestoneChange() {
+		if (milestones.moldsChecked && milestones.silverCast && milestones.qualityChecked && milestones.readyForShipping) {
+			orderStatus = 'Completed';
+		} else if (milestones.readyForShipping) {
+			orderStatus = 'Packing';
+		} else if (milestones.moldsChecked || milestones.silverCast) {
+			orderStatus = 'Production';
+		}
+		
+		const order = orders.find(o => o.id === selectedOrderId);
+		if (order) {
+			order.milestones = { ...milestones };
+			order.status = orderStatus;
+			order.updatedAt = Date.now();
+		}
+		markDirty();
+		markAutoSaved();
+	}
+
+	function onOrderStatusChange() {
+		if (orderStatus === 'Completed') {
+			milestones = { moldsChecked: true, silverCast: true, qualityChecked: true, readyForShipping: true };
+		} else if (orderStatus === 'Packing') {
+			milestones.moldsChecked = true;
+			milestones.silverCast = true;
+			milestones.qualityChecked = true;
+		} else if (orderStatus === 'Review') {
+			milestones = { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false };
+		}
+		
+		const order = orders.find(o => o.id === selectedOrderId);
+		if (order) {
+			order.status = orderStatus;
+			order.milestones = { ...milestones };
+			order.updatedAt = Date.now();
+		}
+		markDirty();
+		markAutoSaved();
 	}
 
 	function markDirty() {
@@ -1629,7 +1774,12 @@ Heather Benjamin Jewelry`;
 			<nav class="mt-10 space-y-2 flex-1">
 				<div class="relative group">
 					<button
-						class="flex w-full items-center gap-3 rounded-md bg-[var(--nav-active)] px-4 py-3 text-left font-semibold"
+						onclick={() => (activeView = 'dashboard')}
+						class={`flex w-full items-center gap-3 rounded-md px-4 py-3 text-left transition cursor-pointer border-0 ${
+							activeView === 'dashboard'
+								? 'bg-[var(--nav-active)] font-semibold text-[var(--ink)] shadow-sm'
+								: 'text-[var(--ink)] hover:bg-[var(--surface-soft)] bg-transparent'
+						}`}
 						type="button"
 					>
 						<i class="ri-file-list-3-line text-lg" aria-hidden="true"></i>
@@ -1732,7 +1882,171 @@ Heather Benjamin Jewelry`;
 				</div>
 			</header>
 
-			<div class="step-scroll border-b border-[var(--line)] bg-white px-4 md:px-10">
+			{#if activeView === 'dashboard'}
+				<div class="flex-1 overflow-y-auto bg-gray-50/50 p-6 md:p-10 font-sans">
+					<div class="max-w-6xl mx-auto">
+						<div class="flex items-center justify-between mb-8">
+							<div>
+								<h1 class="font-display text-3xl font-bold tracking-tight text-[var(--ink)]">Orders Dashboard</h1>
+								<p class="text-sm text-[var(--muted)]">Manage production pipelines and Bali factory status</p>
+							</div>
+							<button
+								onclick={createNewOrder}
+								class="flex items-center gap-2 px-4 py-2.5 rounded bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] text-sm font-semibold transition cursor-pointer border-0 shadow-sm"
+							>
+								<i class="ri-add-line text-base"></i>
+								New Purchase Order
+							</button>
+						</div>
+
+						<!-- Kanban Grid -->
+						<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+							{#each ['Review', 'Production', 'Packing', 'Completed'] as colStatus}
+								<div class="flex flex-col bg-[var(--surface-soft)] rounded-lg p-4 border border-[var(--line)] min-h-[400px]">
+									<div class="flex items-center justify-between mb-4 pb-2 border-b border-[var(--line)]">
+										<div class="flex items-center gap-2">
+											<span class={`w-2.5 h-2.5 rounded-full ${
+												colStatus === 'Review' ? 'bg-amber-500' :
+												colStatus === 'Production' ? 'bg-blue-500' :
+												colStatus === 'Packing' ? 'bg-purple-500' : 'bg-emerald-500'
+											}`}></span>
+											<h3 class="font-semibold text-sm text-[var(--ink)]">
+												{colStatus === 'Review' ? 'Review Required' :
+												 colStatus === 'Production' ? 'In Production' :
+												 colStatus === 'Packing' ? 'Fulfillment / Packing' : 'Completed / Shipped'}
+											</h3>
+										</div>
+										<span class="rounded bg-white px-2 py-0.5 text-xs border border-[var(--line)] font-medium text-[var(--muted)]">
+											{orders.filter(o => o.status === colStatus).length}
+										</span>
+									</div>
+
+									<div class="flex-1 space-y-4 overflow-y-auto max-h-[600px] pr-1">
+										{#each orders.filter(o => o.status === colStatus) as order (order.id)}
+											<button
+												onclick={() => selectOrder(order.id)}
+												class="w-full text-left bg-white rounded border border-[var(--line)] hover:border-[var(--brand)] hover:shadow-sm p-4 transition cursor-pointer focus:outline-none flex flex-col gap-3"
+											>
+												<div class="flex items-center justify-between">
+													<span class="text-xs font-mono font-medium text-[var(--muted)]">{order.id}</span>
+													<span class={`px-2 py-0.5 rounded text-[10px] font-semibold leading-none ${
+														order.status === 'Review' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+														order.status === 'Production' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+														order.status === 'Packing' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+														'bg-emerald-50 text-emerald-700 border border-emerald-200'
+													}`}>
+														{order.status === 'Review' ? 'Review' :
+														 order.status === 'Production' ? 'Production' :
+														 order.status === 'Packing' ? 'Packing' : 'Completed'}
+													</span>
+												</div>
+
+												<div>
+													<h4 class="font-semibold text-sm text-[var(--ink)] leading-tight">{order.clientName}</h4>
+													<p class="text-[11px] text-[var(--muted)] mt-1">
+														Updated: {new Date(order.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+													</p>
+												</div>
+
+												<!-- Checklist milestones progress -->
+												<div class="space-y-1">
+													<div class="flex items-center justify-between text-[11px] text-[var(--muted)]">
+														<span>Bali Milestones</span>
+														<span class="font-medium">{getMilestoneCompletedCount(order.milestones)}/4</span>
+													</div>
+													<div class="w-full h-1.5 bg-gray-100 rounded overflow-hidden">
+														<div 
+															class={`h-full transition-all ${
+																order.status === 'Review' ? 'bg-amber-400' :
+																order.status === 'Production' ? 'bg-blue-500' :
+																order.status === 'Packing' ? 'bg-purple-500' : 'bg-emerald-500'
+															}`}
+															style={`width: ${(getMilestoneCompletedCount(order.milestones) / 4) * 100}%`}
+														></div>
+													</div>
+												</div>
+											</button>
+										{/each}
+
+										{#if orders.filter(o => o.status === colStatus).length === 0}
+											<div class="h-20 flex items-center justify-center border border-dashed border-[var(--line)] rounded text-xs text-[var(--muted)] border-gray-200 text-gray-400">
+												No orders
+											</div>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				</div>
+			{:else}
+				<!-- Status Milestone Tracker Banner -->
+				<div class="bg-[var(--surface-soft)] border-b border-[var(--line)] px-4 md:px-10 py-3 flex flex-wrap items-center justify-between gap-4 text-xs shadow-sm font-sans shrink-0">
+					<button onclick={() => (activeView = 'dashboard')} class="flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--brand)] transition cursor-pointer border-0 bg-transparent p-0 font-medium">
+						<i class="ri-arrow-left-line"></i>
+						Back to Dashboard
+					</button>
+
+					<div class="flex items-center gap-3">
+						<span class="text-xs uppercase tracking-wider font-semibold text-[var(--muted)]">Status:</span>
+						<select 
+							bind:value={orderStatus} 
+							onchange={onOrderStatusChange}
+							class="rounded border border-[var(--line)] bg-white px-2 py-0.5 text-xs font-semibold focus:border-[var(--brand)] outline-none cursor-pointer"
+						>
+							<option value="Review">Review Required</option>
+							<option value="Production">In Production</option>
+							<option value="Packing">Fulfillment / Packing</option>
+							<option value="Completed">Completed / Shipped</option>
+						</select>
+					</div>
+
+					<div class="flex items-center gap-6 flex-wrap">
+						<span class="text-xs uppercase tracking-wider font-semibold text-[var(--muted)]">Bali Milestones:</span>
+						
+						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-[var(--ink)]">
+							<input 
+								type="checkbox" 
+								bind:checked={milestones.moldsChecked} 
+								onchange={onMilestoneChange}
+								class="rounded border-[var(--line)] text-[var(--brand)] focus:ring-[var(--brand)] h-3.5 w-3.5"
+							/>
+							<span>Molds Verified</span>
+						</label>
+
+						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-[var(--ink)]">
+							<input 
+								type="checkbox" 
+								bind:checked={milestones.silverCast} 
+								onchange={onMilestoneChange}
+								class="rounded border-[var(--line)] text-[var(--brand)] focus:ring-[var(--brand)] h-3.5 w-3.5"
+							/>
+							<span>Silver Cast</span>
+						</label>
+
+						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-[var(--ink)]">
+							<input 
+								type="checkbox" 
+								bind:checked={milestones.qualityChecked} 
+								onchange={onMilestoneChange}
+								class="rounded border-[var(--line)] text-[var(--brand)] focus:ring-[var(--brand)] h-3.5 w-3.5"
+							/>
+							<span>QC Passed</span>
+						</label>
+
+						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-[var(--ink)]">
+							<input 
+								type="checkbox" 
+								bind:checked={milestones.readyForShipping} 
+								onchange={onMilestoneChange}
+								class="rounded border-[var(--line)] text-[var(--brand)] focus:ring-[var(--brand)] h-3.5 w-3.5"
+							/>
+							<span>Ready to Ship</span>
+						</label>
+					</div>
+				</div>
+
+				<div class="step-scroll border-b border-[var(--line)] bg-white px-4 md:px-10">
 				<div class="mx-auto flex h-full min-w-max max-w-6xl items-center justify-between gap-3 md:gap-4">
 					{#each steps as step, index (step.id)}
 						<button
@@ -2318,6 +2632,7 @@ Heather Benjamin Jewelry`;
 						</div>
 					</div>
 				</footer>
+			{/if}
 			{/if}
 		</section>
 	</div>

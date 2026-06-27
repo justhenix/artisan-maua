@@ -3,90 +3,80 @@ import { db } from '$lib/server/db';
 
 export const load: PageServerLoad = async () => {
 	try {
-		const orderId = 'HB-250416'; // Demo order ID
+		// 1. Fetch all purchase orders
+		const poRes = await db.execute('SELECT * FROM purchase_orders ORDER BY updated_at DESC');
+		const orders = poRes.rows.map((row: any) => ({
+			id: row.id as string,
+			poNumber: row.po_number as string,
+			clientName: row.client_name as string,
+			status: row.status as string,
+			sourceText: row.source_text as string,
+			customerUpdate: row.customer_update as string,
+			uploadedFiles: JSON.parse((row.uploaded_files as string) || '[]'),
+			milestones: JSON.parse((row.milestones as string) || '{}'),
+			createdAt: row.created_at as number,
+			updatedAt: row.updated_at as number
+		}));
 
-		// 1. Fetch purchase order
-		const poRes = await db.execute({
-			sql: 'SELECT * FROM purchase_orders WHERE id = ?',
-			args: [orderId]
-		});
+		// 2. Fetch all order items
+		const itemsRes = await db.execute('SELECT * FROM order_items');
+		const allItems = itemsRes.rows.map((row: any) => ({
+			id: row.id as string,
+			poId: row.po_id as string,
+			item: row.item_name as string,
+			styleCode: row.style_code as string,
+			qty: row.qty as number,
+			finish: row.finish as string,
+			notes: row.notes as string,
+			unitPrice: row.unit_price as number,
+			imageUrl: row.image_url as string,
+			source: row.source as string
+		}));
 
-		// 2. Fetch catalog items
+		// 3. Fetch all blockers
+		const blockersRes = await db.execute('SELECT * FROM blockers');
+		const allBlockers = blockersRes.rows.map((row: any) => ({
+			id: row.id as string,
+			poId: row.po_id as string,
+			impact: row.impact as string,
+			impactKey: row.impact === 'High impact' ? 'highImpact' : 'mediumImpact',
+			question: row.question as string,
+			questionKey: row.id === 'starburst-size' ? 'starburstQuestion' : 'horseQuestion',
+			evidence: row.evidence as string,
+			source: row.source as string,
+			risk: row.risk as string,
+			riskKey: row.id === 'starburst-size' ? 'starburstRisk' : 'horseRisk',
+			options: JSON.parse((row.options as string) || '[]'),
+			answer: (row.answer as string) || ''
+		}));
+
+		// 4. Fetch catalog items
 		const catalogRes = await db.execute('SELECT * FROM catalog_items');
 		const catalogItems = catalogRes.rows.map((row: any) => ({
-			styleCode: row.style_code,
-			creativeTitle: row.title,
-			baseLabor: row.base_labor,
-			silverWeight: row.silver_weight,
-			stoneCost: row.stone_cost,
-			category: row.category,
-			material: row.material,
-			notes_en: row.notes_en,
-			notes_id: row.notes_id,
-			imageUrl: row.image_url
-		}));
-
-		if (poRes.rows.length === 0) {
-			return {
-				savedOrder: null,
-				catalogItems
-			};
-		}
-
-		const po = poRes.rows[0];
-
-		// 3. Fetch order items
-		const itemsRes = await db.execute({
-			sql: 'SELECT * FROM order_items WHERE po_id = ?',
-			args: [orderId]
-		});
-		const lineItems = itemsRes.rows.map((row: any) => ({
-			id: row.id,
-			item: row.item_name,
-			styleCode: row.style_code,
-			qty: row.qty,
-			finish: row.finish,
-			notes: row.notes,
-			source: row.source,
-			unitPrice: row.unit_price,
-			imageUrl: row.image_url
-		}));
-
-		// 4. Fetch blockers
-		const blockersResReal = await db.execute({
-			sql: 'SELECT * FROM blockers WHERE po_id = ?',
-			args: [orderId]
-		});
-		const blockers = blockersResReal.rows.map((row: any) => ({
-			id: row.id,
-			impact: row.impact,
-			impactKey: row.impact === 'High impact' ? 'highImpact' : 'mediumImpact',
-			question: row.question,
-			questionKey: row.id === 'starburst-size' ? 'starburstQuestion' : 'horseQuestion',
-			evidence: row.evidence,
-			source: row.source,
-			risk: row.risk,
-			riskKey: row.id === 'starburst-size' ? 'starburstRisk' : 'horseRisk',
-			options: JSON.parse(row.options || '[]'),
-			answer: row.answer || ''
+			styleCode: row.style_code as string,
+			creativeTitle: row.title as string,
+			baseLabor: row.base_labor as number,
+			silverWeight: row.silver_weight as number,
+			stoneCost: row.stone_cost as number,
+			category: row.category as string,
+			material: row.material as string,
+			notes_en: row.notes_en as string,
+			notes_id: row.notes_id as string,
+			imageUrl: row.image_url as string
 		}));
 
 		return {
-			savedOrder: {
-				orderId: po.id as string,
-				client: po.client_name as string,
-				sourceText: po.source_text as string,
-				customerUpdate: po.customer_update as string,
-				uploadedFiles: JSON.parse((po.uploaded_files as string) || '[]'),
-				lineItems,
-				blockers
-			},
+			orders,
+			allItems,
+			allBlockers,
 			catalogItems
 		};
 	} catch (err) {
 		console.error('Failed to load database data:', err);
 		return {
-			savedOrder: null,
+			orders: [],
+			allItems: [],
+			allBlockers: [],
 			catalogItems: []
 		};
 	}
