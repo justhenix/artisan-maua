@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
+	import { fade, scale } from 'svelte/transition';
 	import { driver } from 'driver.js';
 	import 'driver.js/dist/driver.css';
 	import { resolve } from '$app/paths';
@@ -443,6 +444,7 @@ Heather Benjamin Jewelry`;
 	let contentPanel = $state<HTMLDivElement | undefined>();
 	let sidebarCollapsed = $state(false);
 	let mobileSidebarOpen = $state(false);
+	let showWelcomeModal = $state(false);
 
 	// New States
 	let uploadedFiles = $state<string[]>([]);
@@ -1071,15 +1073,25 @@ Heather Benjamin Jewelry`;
 	}
 
 	onMount(() => {
-		// Launch tour automatically on first load
-		const onboarded = localStorage.getItem('artisan-onboarded');
+		// Launch welcome modal automatically on first load
+		const onboarded = localStorage.getItem('artisan-onboarded-v3');
 		if (!onboarded) {
-			localStorage.setItem('artisan-onboarded', 'true');
-			setTimeout(() => {
-				startTour();
-			}, 600);
+			showWelcomeModal = true;
 		}
 	});
+
+	function handleLetsGo() {
+		showWelcomeModal = false;
+		localStorage.setItem('artisan-onboarded-v3', 'true');
+		setTimeout(() => {
+			startTour();
+		}, 300);
+	}
+
+	function closeWelcomeModal() {
+		showWelcomeModal = false;
+		localStorage.setItem('artisan-onboarded-v3', 'true');
+	}
 
 	// Packing Helpers
 	function getPackagingSpecifics(styleCode: string): string {
@@ -1880,6 +1892,102 @@ Heather Benjamin Jewelry`;
 	{#if toast}
 		<div class="fixed bottom-28 left-1/2 -translate-x-1/2 rounded-full bg-[var(--ink)] px-5 py-3 text-sm text-white shadow-xl animate-fade-in" aria-live="polite">
 			{toast}
+		</div>
+	{/if}
+	{#if showWelcomeModal}
+		<div transition:fade={{ duration: 200 }} class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+			<!-- Modal Container -->
+			<div transition:scale={{ duration: 250, start: 0.95 }} class="relative bg-white rounded-lg border border-[var(--line)] shadow-2xl max-w-lg w-full mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+				<!-- Top Close button -->
+				<button 
+					type="button" 
+					class="absolute right-4 top-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition border-0 cursor-pointer p-0"
+					aria-label={t.closeDrawer}
+					onclick={closeWelcomeModal}
+				>
+					<i class="ri-close-line text-xl"></i>
+				</button>
+
+				<!-- Modal Content -->
+				<div class="p-6 md:p-8 overflow-y-auto">
+					<!-- Version & Subtitle -->
+					<div class="flex items-center gap-2 mb-4">
+						<span class="px-2 py-0.5 rounded bg-[var(--brand)]/10 text-[var(--brand)] text-[10px] font-bold uppercase tracking-wider">
+							What's New
+						</span>
+						<span class="text-[10px] text-[var(--muted)] font-semibold">
+							{t.welcomeSubtitle}
+						</span>
+					</div>
+
+					<!-- Header Illustration / Icon -->
+					<div class="flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--surface-soft)] text-[var(--brand)] mb-6 shadow-sm border border-[var(--line)]">
+						<i class="ri-sparkling-2-line text-3xl"></i>
+					</div>
+
+					<!-- Headings -->
+					<h2 class="font-display text-2xl md:text-3xl tracking-tight text-[var(--ink)]">
+						{t.welcomeHeading}
+					</h2>
+					<p class="mt-3 text-sm text-[var(--muted)] leading-relaxed">
+						{t.welcomeSubheading}
+					</p>
+
+					<!-- Features list -->
+					<ul class="mt-6 space-y-4">
+						<li class="flex gap-3 items-start text-xs leading-relaxed text-[var(--ink)]">
+							<span class="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5 animate-pulse">
+								<i class="ri-checkbox-circle-line text-sm"></i>
+							</span>
+							<div>
+								<strong class="font-bold text-[var(--brand-dark)]">Composer</strong>: {t.welcomeFeature1}
+							</div>
+						</li>
+						<li class="flex gap-3 items-start text-xs leading-relaxed text-[var(--ink)]">
+							<span class="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
+								<i class="ri-checkbox-circle-line text-sm"></i>
+							</span>
+							<div>
+								<strong class="font-bold text-[var(--brand-dark)]">SKU Match</strong>: {t.welcomeFeature2}
+							</div>
+						</li>
+						<li class="flex gap-3 items-start text-xs leading-relaxed text-[var(--ink)]">
+							<span class="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
+								<i class="ri-checkbox-circle-line text-sm"></i>
+							</span>
+							<div>
+								<strong class="font-bold text-[var(--brand-dark)]">Guardrail</strong>: {t.welcomeFeature3}
+							</div>
+						</li>
+						<li class="flex gap-3 items-start text-xs leading-relaxed text-[var(--ink)]">
+							<span class="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
+								<i class="ri-checkbox-circle-line text-sm"></i>
+							</span>
+							<div>
+								<strong class="font-bold text-[var(--brand-dark)]">Automation</strong>: {t.welcomeFeature4}
+							</div>
+						</li>
+					</ul>
+				</div>
+
+				<!-- Modal Footer -->
+				<div class="border-t border-[var(--line)] bg-[var(--surface-soft)] p-4 flex items-center justify-between gap-3 shrink-0">
+					<button 
+						type="button" 
+						class="text-xs text-[var(--muted)] hover:text-[var(--ink)] font-semibold transition cursor-pointer px-3 py-2 rounded hover:bg-[var(--surface-muted)]"
+						onclick={closeWelcomeModal}
+					>
+						{t.skipGuide}
+					</button>
+					<button 
+						type="button" 
+						class="primary-button text-xs font-bold py-2 px-5 shadow-md flex items-center gap-1.5 cursor-pointer"
+						onclick={handleLetsGo}
+					>
+						{t.letsGo} <i class="ri-arrow-right-line"></i>
+					</button>
+				</div>
+			</div>
 		</div>
 	{/if}
 </main>

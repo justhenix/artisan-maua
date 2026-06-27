@@ -190,5 +190,15 @@
 	"tourCustomerUpdateTitle": "Customer update",
 	"tourCustomerUpdateDesc": "Review the drafted email status update. You can edit the text directly before copying.",
 	"tourMarkSentTitle": "Complete workflow",
-	"tourMarkSentDesc": "Mark the order as sent to complete your workspace review."
+	"tourMarkSentDesc": "Mark the order as sent to complete your workspace review.",
+	"welcomeTitle": "Welcome to Artisan",
+	"welcomeSubtitle": "v1.1.0 · June 2026",
+	"welcomeHeading": "AI Order-to-Production Assistant",
+	"welcomeSubheading": "Streamline your Heather Benjamin Jewelry wholesale operations from purchase order to Bali production.",
+	"welcomeFeature1": "Unified Ingestion Composer: Paste order text (emails, DMs, spreadsheets) or drag-and-drop files in one place.",
+	"welcomeFeature2": "Catalog SKU Resolution: Automatic mapping of messy boutique item names to factory style codes.",
+	"welcomeFeature3": "Human Review Gates: Amber blockers flag missing sizes or variants to prevent costly casting mistakes in Bali.",
+	"welcomeFeature4": "Bali Operations Sheets: English and Indonesian production instructions, packing lists, and customer updates generated instantly.",
+	"letsGo": "Let's Go!",
+	"skipGuide": "Skip guide"
 }

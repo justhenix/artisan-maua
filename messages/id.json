@@ -190,5 +190,15 @@
 	"tourCustomerUpdateTitle": "Pembaruan pelanggan",
 	"tourCustomerUpdateDesc": "Tinjau draf pembaruan status email. Anda dapat mengedit teks secara langsung sebelum menyalin.",
 	"tourMarkSentTitle": "Selesaikan alur kerja",
-	"tourMarkSentDesc": "Tandai pesanan sebagai terkirim untuk menyelesaikan tinjauan ruang kerja Anda."
+	"tourMarkSentDesc": "Tandai pesanan sebagai terkirim untuk menyelesaikan tinjauan ruang kerja Anda.",
+	"welcomeTitle": "Selamat datang di Artisan",
+	"welcomeSubtitle": "v1.1.0 · Juni 2026",
+	"welcomeHeading": "Asisten AI Order-ke-Produksi",
+	"welcomeSubheading": "Sederhanakan operasional grosir Heather Benjamin Jewelry dari pesanan pembelian hingga produksi di Bali.",
+	"welcomeFeature1": "Composer Ingest Terpadu: Tempel teks pesanan (email, DM, spreadsheet) atau seret-dan-lepas file di satu tempat.",
+	"welcomeFeature2": "Resolusi SKU Katalog: Pemetaan otomatis nama item butik yang tidak teratur ke kode gaya pabrik.",
+	"welcomeFeature3": "Gerbang Review Manusia: Blocker amber menandai ukuran atau varian yang hilang untuk mencegah kesalahan cor di Bali.",
+	"welcomeFeature4": "Lembar Operasional Bali: Instruksi produksi bahasa Inggris dan Indonesia, daftar kemas, dan pembaruan pelanggan dibuat seketika.",
+	"letsGo": "Mulai!",
+	"skipGuide": "Lewati panduan"
 }
