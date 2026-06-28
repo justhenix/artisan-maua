@@ -2,6 +2,8 @@
 	import { resolve } from '$app/paths';
 	import { localizeHref } from '$lib/paraglide/runtime';
 	import type { Pathname } from '$app/types';
+	import { goto } from '$app/navigation';
+	import { logout } from '$lib/auth';
 
 	type Messages = Record<string, string>;
 
@@ -44,6 +46,11 @@
 
 	const ordersHref = $derived(resolve(localizeHref('/', { locale: currentLocale }) as Pathname));
 	const catalogHref = $derived(resolve(localizeHref('/catalog', { locale: currentLocale }) as Pathname));
+
+	function handleLogout() {
+		logout();
+		goto('/login', { replaceState: true });
+	}
 </script>
 
 {#if mobileSidebarOpen}
@@ -205,4 +212,21 @@
 			</div>
 		{/if}
 	</nav>
+
+	<!-- Logout -->
+	<div class="relative group border-t border-(--line) mt-auto pt-3 pb-3">
+		<button
+			type="button"
+			onclick={handleLogout}
+			class="flex w-full items-center gap-3 rounded-md px-4 py-2.5 text-left text-(--muted) hover:bg-(--surface-soft) hover:text-(--ink) transition cursor-pointer border-0 bg-transparent"
+		>
+			<i class="ri-logout-box-r-line text-lg shrink-0" aria-hidden="true"></i>
+			<span class="sidebar-label text-sm">Sign out</span>
+		</button>
+		{#if sidebarCollapsed}
+			<div class="absolute left-14 top-1/2 -translate-y-1/2 ml-2 bg-(--surface-muted) text-(--ink) text-[10px] font-semibold px-2 py-1 rounded shadow border border-(--line) whitespace-nowrap z-50 hidden group-hover:block">
+				Sign out
+			</div>
+		{/if}
+	</div>
 </aside>
