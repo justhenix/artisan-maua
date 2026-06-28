@@ -1503,6 +1503,8 @@ Line  Item Code      Description                  Qty  Unit Price
 							description: t.tourSheetsTabsDesc,
 							side: 'bottom',
 							onNextClick: () => {
+								const el = document.getElementById('export-dropdown-btn');
+								if (el) el.scrollIntoView({ block: 'nearest' });
 								d.moveNext();
 							},
 							onPrevClick: () => {
@@ -1520,9 +1522,13 @@ Line  Item Code      Description                  Qty  Unit Price
 							description: t.tourExportDesc,
 							side: 'bottom',
 							onNextClick: () => {
+								const el = document.getElementById('continue-to-update-btn');
+								if (el) el.scrollIntoView({ block: 'nearest' });
 								d.moveNext();
 							},
 							onPrevClick: () => {
+								const el = document.getElementById('sheets-tabs');
+								if (el) el.scrollIntoView({ block: 'nearest' });
 								d.movePrevious();
 							}
 						}
@@ -1541,6 +1547,8 @@ Line  Item Code      Description                  Qty  Unit Price
 							},
 							onPrevClick: () => {
 								rightSidebarCollapsed = false;
+								const el = document.getElementById('export-dropdown-btn');
+								if (el) el.scrollIntoView({ block: 'nearest' });
 								d.movePrevious();
 							}
 						}
