@@ -54,8 +54,12 @@
 		{#if !sidebarCollapsed}
 			<!-- Open State Header -->
 			<div class="flex w-full items-center justify-between">
-				<div class="sidebar-title flex items-center">
-					<img src="/logo.webp" alt="Artisan" class="h-14 w-auto object-contain" />
+				<div class="sidebar-title flex items-center gap-2">
+					<img src="/icon.webp" alt="Artisan Logo" class="w-8 h-8 object-contain" />
+					<div>
+						<p class="font-display text-xl leading-tight">Artisan</p>
+						<p class="text-[10px] text-(--muted)">Order-to-Production</p>
+					</div>
 				</div>
 				<div class="relative group">
 					<button
