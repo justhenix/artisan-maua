@@ -102,7 +102,6 @@
 			rightSidebarCollapsed={headerRightSidebarCollapsed}
 			onToggleRightSidebar={headerOnToggleRightSidebar}
 			onToggleSidebar={toggleSidebar}
-			{onReplayTour}
 		/>
 
 		{@render children()}

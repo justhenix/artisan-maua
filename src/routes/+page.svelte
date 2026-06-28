@@ -2003,7 +2003,6 @@ Heather Benjamin Jewelry`;
 
 					<div class="flex items-center gap-3">
 						<div class="flex items-center gap-1.5">
-							<span class="text-xs uppercase tracking-wider font-semibold text-(--muted)">{t.workflow}:</span>
 							<div class="relative group flex items-center">
 								<span class="text-(--muted) hover:text-(--ink) transition cursor-pointer flex items-center justify-center" aria-label="Workflow help">
 									<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -2016,6 +2015,7 @@ Heather Benjamin Jewelry`;
 									{t.workflowHelp}
 								</div>
 							</div>
+							<span class="text-xs uppercase tracking-wider font-semibold text-(--muted)">{t.workflow}:</span>
 						</div>
 						<select 
 							bind:value={orderStatus} 

@@ -13,6 +13,7 @@
 		mobileSidebarOpen = $bindable(false),
 		onToggleSidebar,
 		onCloseMobileSidebar,
+		onReplayTour,
 		onClickLogo
 	}: {
 		t: Messages;
@@ -22,6 +23,7 @@
 		mobileSidebarOpen: boolean;
 		onToggleSidebar: () => void;
 		onCloseMobileSidebar: () => void;
+		onReplayTour?: () => void;
 		onClickLogo?: () => void;
 	} = $props();
 
@@ -144,5 +146,28 @@
 				</div>
 			{/if}
 		</div>
+
+		{#if onReplayTour}
+			<div class="relative group">
+				<button
+					id="replay-tour-btn"
+					class="flex w-full items-center gap-3 rounded-md px-4 py-3 text-left text-(--ink) hover:bg-(--surface-soft) transition cursor-pointer border-0 bg-transparent"
+					type="button"
+					onclick={onReplayTour}
+				>
+					<svg class="w-4.5 h-4.5 shrink-0 text-(--muted) group-hover:text-(--ink) transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+						<circle cx="12" cy="12" r="10"></circle>
+						<line x1="12" y1="16" x2="12" y2="12"></line>
+						<line x1="12" y1="8" x2="12.01" y2="8"></line>
+					</svg>
+					<span class="sidebar-label">{t.guide}</span>
+				</button>
+				{#if sidebarCollapsed}
+					<div class="absolute left-14 top-1/2 -translate-y-1/2 ml-2 bg-(--surface-muted) text-(--ink) text-[10px] font-semibold px-2 py-1 rounded shadow border border-(--line) whitespace-nowrap z-50 hidden group-hover:block">
+						{t.guide}
+					</div>
+				{/if}
+			</div>
+		{/if}
 	</nav>
 </aside>

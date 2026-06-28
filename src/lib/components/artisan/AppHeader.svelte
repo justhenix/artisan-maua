@@ -12,8 +12,7 @@
 		lastSaved,
 		rightSidebarCollapsed,
 		onToggleRightSidebar,
-		onToggleSidebar,
-		onReplayTour
+		onToggleSidebar
 	}: {
 		t: Messages;
 		currentLocale: 'en' | 'id';
@@ -22,7 +21,6 @@
 		rightSidebarCollapsed?: boolean;
 		onToggleRightSidebar?: () => void;
 		onToggleSidebar: () => void;
-		onReplayTour?: () => void;
 	} = $props();
 
 	const showRightToggle = $derived(
@@ -115,28 +113,6 @@
 				</svg>
 			</a>
 		</div>
-		
-		<!-- Help Tour Launcher Button (using native SVG info icon) -->
-		{#if onReplayTour}
-			<div class="relative group">
-				<button
-					id="header-help-btn"
-					class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-(--surface-soft) text-(--muted) hover:text-(--ink) transition bg-transparent border-0 p-0 cursor-pointer"
-					type="button"
-					aria-label={t.replayTour}
-					onclick={onReplayTour}
-				>
-					<svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-						<circle cx="12" cy="12" r="10"></circle>
-						<line x1="12" y1="16" x2="12" y2="12"></line>
-						<line x1="12" y1="8" x2="12.01" y2="8"></line>
-					</svg>
-				</button>
-				<div class="absolute left-1/2 -translate-x-1/2 top-10 bg-(--surface-muted) text-(--ink) text-[10px] font-semibold px-2 py-1 rounded shadow border border-(--line) whitespace-nowrap z-50 hidden group-hover:block">
-					{t.replayTour}
-				</div>
-			</div>
-		{/if}
 
 		{#if showRightToggle}
 			<!-- Right Sidebar Toggle Button -->
