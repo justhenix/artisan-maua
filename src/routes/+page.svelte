@@ -515,6 +515,7 @@ Line  Item Code      Description                  Qty  Unit Price
 	let sent = $state(false);
 	let contentPanel = $state<HTMLDivElement | undefined>();
 	let showWelcomeModal = $state(false);
+	let orderPendingDelete = $state<{ id: string; label: string } | null>(null);
 
 	let orders = $state<any[]>([]);
 	let activeView = $state<'dashboard' | 'workbench'>('dashboard');
@@ -1404,8 +1405,16 @@ Line  Item Code      Description                  Qty  Unit Price
 
 	async function deleteOrder(orderId: string, event: MouseEvent) {
 		event.stopPropagation();
-		if (!confirm(`Delete order ${orderId}? This cannot be undone.`)) return;
-		orders = orders.filter(o => o.id !== orderId);
+		const order = orders.find((item) => item.id === orderId);
+		if (!order) return;
+		orderPendingDelete = { id: orderId, label: order.id };
+	}
+
+	async function confirmDeleteOrder() {
+		if (!orderPendingDelete) return;
+		const { id: orderId } = orderPendingDelete;
+		orderPendingDelete = null;
+		orders = orders.filter((o) => o.id !== orderId);
 		// If the deleted order is currently open, navigate back to the dashboard
 		if (selectedOrderId === orderId) {
 			selectedOrderId = '';
@@ -2166,8 +2175,8 @@ Line  Item Code      Description                  Qty  Unit Price
 		{currentLocale}
 		currentPath={page.url.pathname}
 		headerLastSaved={lastSaved}
-		headerRightSidebarCollapsed={activeView === 'workbench' && currentStep !== 4 ? rightSidebarCollapsed : undefined}
-		headerOnToggleRightSidebar={activeView === 'workbench' && currentStep !== 4 ? () => (rightSidebarCollapsed = !rightSidebarCollapsed) : undefined}
+		headerRightSidebarCollapsed={activeView === 'workbench' ? rightSidebarCollapsed : undefined}
+		headerOnToggleRightSidebar={activeView === 'workbench' ? () => (rightSidebarCollapsed = !rightSidebarCollapsed) : undefined}
 		onReplayTour={handleReplayTour}
 		onClickLogo={() => (activeView = 'dashboard')}
 		{activeView}
@@ -2712,6 +2721,32 @@ Line  Item Code      Description                  Qty  Unit Price
 									<i class="ri-information-line text-lg text-blue-600 shrink-0" aria-hidden="true"></i>
 									<span>{t.infoNote}</span>
 								</div>
+
+								{#if lineItems.length > 0}
+									<div class="mt-6 border-t border-(--line) pt-5">
+										<h3 class="text-sm font-bold text-(--ink) mb-2.5">{t.orderProgress}</h3>
+										<ul class="space-y-1.5" aria-label="Order progress">
+											{#each [
+												{ label: t.progressOrderReviewed, done: progressOrderReviewed },
+												{ label: t.progressProductionSheet, done: progressProductionSheet },
+												{ label: t.progressPackingChecklist, done: progressPackingChecklist },
+												{ label: t.progressBaliHandoff, done: progressBaliHandoff },
+												{ label: t.progressQualityCheck, done: progressQualityCheck },
+												{ label: t.progressPackingComplete, done: progressPackingComplete },
+												{ label: t.progressCustomerUpdate, done: progressCustomerUpdate }
+											] as row (row.label)}
+												<li class="flex items-center gap-2 text-xs">
+													<span class={`flex items-center justify-center w-4 h-4 rounded-full shrink-0 border ${row.done ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-(--line) bg-white'}`} aria-hidden="true">
+														{#if row.done}
+															<i class="ri-check-line text-[10px] font-bold"></i>
+														{/if}
+													</span>
+													<span class={row.done ? 'text-(--ink) font-medium' : 'text-(--muted)'}>{row.label}</span>
+												</li>
+											{/each}
+										</ul>
+									</div>
+								{/if}
 							</aside>
 						{/if}
 					</section>
@@ -2985,8 +3020,8 @@ Line  Item Code      Description                  Qty  Unit Price
 						</div>
 					</section>
 				{:else}
-					<section class="px-4 py-6 md:px-10 md:py-9">
-						<div>
+					<section class={`grid min-h-full transition-all duration-300 ${rightSidebarCollapsed ? 'xl:grid-cols-1' : 'xl:grid-cols-[1fr_352px]'}`}>
+						<div class="px-4 py-6 md:px-10 md:py-9">
 							<div class="mx-auto max-w-5xl">
 								<p class="text-sm font-medium text-(--muted)">
 									Order #{orderId}
@@ -3030,6 +3065,64 @@ Line  Item Code      Description                  Qty  Unit Price
 								</div>
 							</div>
 						</div>
+
+						{#if !rightSidebarCollapsed}
+							<aside class="output-side shadow-sm">
+								<div class="mb-5 border-b border-(--line) pb-4">
+									<div class="flex items-center justify-between gap-4 mb-3">
+										<h2 class="font-display text-lg font-bold text-(--brand-dark)">{t.orderSummary}</h2>
+										<button
+											class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-(--surface-soft) text-(--muted) hover:text-(--ink) transition bg-transparent border-0 p-0 cursor-pointer"
+											type="button"
+											style="margin-right: -6px;"
+											aria-label={t.closeRightPanel}
+											onclick={() => (rightSidebarCollapsed = true)}
+										>
+											<i class="ri-close-line text-lg"></i>
+										</button>
+									</div>
+									<div class="space-y-2.5 text-xs">
+										<div class="flex justify-between">
+											<span class="text-(--muted)">{t.lineItems}</span>
+											<strong class="font-semibold">{lineItems.length}</strong>
+										</div>
+										<div class="flex justify-between">
+											<span class="text-(--muted)">{t.totalQuantity}</span>
+											<strong class="font-semibold">{totalQty}</strong>
+										</div>
+										<div class="flex flex-col">
+											<span class="text-(--muted) mb-0.5">{t.finishes}</span>
+											<strong class="font-semibold leading-normal">{finishSummary}</strong>
+										</div>
+									</div>
+								</div>
+
+								<!-- Order progress checklist -->
+								<div class="mb-4">
+									<h3 class="text-sm font-bold text-(--ink) mb-2.5">{t.orderProgress}</h3>
+									<ul class="space-y-1.5" aria-label="Order progress">
+										{#each [
+											{ label: t.progressOrderReviewed, done: progressOrderReviewed },
+											{ label: t.progressProductionSheet, done: progressProductionSheet },
+											{ label: t.progressPackingChecklist, done: progressPackingChecklist },
+											{ label: t.progressBaliHandoff, done: progressBaliHandoff },
+											{ label: t.progressQualityCheck, done: progressQualityCheck },
+											{ label: t.progressPackingComplete, done: progressPackingComplete },
+											{ label: t.progressCustomerUpdate, done: progressCustomerUpdate }
+										] as row (row.label)}
+											<li class="flex items-center gap-2 text-xs">
+												<span class={`flex items-center justify-center w-4 h-4 rounded-full shrink-0 border ${row.done ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-(--line) bg-white'}`} aria-hidden="true">
+													{#if row.done}
+														<i class="ri-check-line text-[10px] font-bold"></i>
+													{/if}
+												</span>
+												<span class={row.done ? 'text-(--ink) font-medium' : 'text-(--muted)'}>{row.label}</span>
+											</li>
+										{/each}
+									</ul>
+								</div>
+							</aside>
+						{/if}
 					</section>
 				{/if}
 			</div>
@@ -3129,6 +3222,51 @@ Line  Item Code      Description                  Qty  Unit Price
 					</div>
 				</footer>
 			{/if}
+			{/if}
+			{#if orderPendingDelete}
+				<div
+					class="modal-backdrop"
+					transition:fade={{ duration: 150 }}
+					role="presentation"
+					onclick={() => (orderPendingDelete = null)}
+				></div>
+			<div
+				class="modal max-w-md w-full p-6 text-center"
+				transition:fade={{ duration: 150 }}
+				role="dialog"
+					aria-modal="true"
+					aria-labelledby="delete-order-title"
+					aria-describedby="delete-order-copy"
+					style="width: min(90vw, 440px); max-height: auto;"
+				>
+					<div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-600">
+						<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+						</svg>
+					</div>
+
+					<h3 id="delete-order-title" class="mb-2 font-display text-2xl font-bold text-(--ink)">Delete order</h3>
+					<p id="delete-order-copy" class="mb-6 text-xs leading-relaxed text-(--muted)">
+						Delete order <span class="font-semibold text-(--ink)">{orderPendingDelete.label}</span>? This cannot be undone.
+					</p>
+
+					<div class="flex items-center justify-center gap-3">
+						<button
+							type="button"
+							onclick={() => (orderPendingDelete = null)}
+							class="cursor-pointer rounded border border-(--line) px-4 py-2 text-xs font-semibold transition hover:bg-slate-50"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							onclick={confirmDeleteOrder}
+							class="cursor-pointer rounded border-0 bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-700"
+						>
+							Delete order
+						</button>
+					</div>
+			</div>
 			{/if}
 	</AppShell>
 
