@@ -2,7 +2,6 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { login, isLoggedIn } from '$lib/auth';
-	import logoUrl from '$lib/assets/favicon.svg';
 
 	let email = $state('');
 	let password = $state('');
@@ -43,7 +42,7 @@
 	<div class="login-card">
 		<!-- Logo + Brand -->
 		<div class="login-brand">
-			<img src={logoUrl} alt="Artisan" class="login-logo" />
+			<img src="/icon.webp" alt="Artisan" class="login-logo" />
 			<div>
 				<h1 class="login-title">Artisan</h1>
 				<p class="login-subtitle">AI order-to-production assistant<br />for Heather Benjamin Jewelry</p>
