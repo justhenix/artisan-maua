@@ -3,6 +3,9 @@ node_modules
 .pnp
 .pnp.*
 
+# CommandCode agent state
+.commandcode/
+
 # Build output
 .output
 .vercel
