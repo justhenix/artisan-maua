@@ -613,6 +613,7 @@ Heather Benjamin Jewelry`;
 	let activeIngestTab = $state<'paste' | 'upload'>('paste');
 	let sampleUsed = $state(false);
 	let processClicked = $state(false);
+	let isProcessing = $state(false);
 	let isDragging = $state(false);
 	let readyItemsExpanded = $state(false);
 	const step1_item1 = $derived(intakeText.trim().length > 0 || uploadedFiles.length > 0);
@@ -931,7 +932,7 @@ Heather Benjamin Jewelry`;
 			showToast(`${files.length} ${t.fileUploaded}`);
 		}
 	}
-	function processOrder() {
+	async function processOrder() {
 		if (!intakeText.trim()) {
 			intakeText = samples[selectedSource];
 		}
@@ -941,57 +942,112 @@ Heather Benjamin Jewelry`;
 		const isDefaultSample = Object.values(samples).some(s => s.trim() === intakeText.trim()) && !uploadedFiles.length;
 
 		if (!isDefaultSample) {
-			const parsed = parseMessyInput(intakeText);
-			if (parsed.length > 0) {
-				parsed.forEach((item) => {
-					if (item.styleCode) {
-						const cat = catalog.find(c => c.styleCode === item.styleCode);
-						if (cat && cat.imageUrl && !item.imageUrl) {
-							item.imageUrl = cat.imageUrl;
-						}
-					}
+			isProcessing = true;
+			let apiSuccess = false;
+			try {
+				const res = await fetch('/api/process-order', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ text: intakeText, client })
 				});
-				lineItems = parsed;
+				const data = await res.json();
+				if (data.success) {
+					lineItems = data.lineItems;
+					// Map blocker keys for translation compatibility
+					blockers = data.blockers.map((b: any) => ({
+						id: b.id,
+						impact: b.impact || 'Medium impact',
+						impactKey: b.impact === 'High impact' ? 'highImpact' : 'mediumImpact',
+						question: b.question,
+						questionKey: b.id === 'star-bird-finish' ? 'starBirdQuestion' : 'birdOfPreyQuestion', // fallback mapping
+						evidence: b.evidence || '',
+						source: b.source || 'Source',
+						risk: b.risk || '',
+						riskKey: b.id === 'star-bird-finish' ? 'starBirdRisk' : 'birdOfPreyRisk', // fallback mapping
+						options: b.options || [],
+						answer: b.answer || ''
+					}));
 
-				const activeBlockers: Blocker[] = [];
-				const hasStarBirdUnresolved = parsed.some(item => !item.styleCode && (item.item.toLowerCase().includes('star') || item.item.toLowerCase().includes('dangle')));
-				const hasBirdUnresolved = parsed.some(item => !item.styleCode && item.item.toLowerCase().includes('bird'));
+					// Generate customer update draft
+					customerUpdate = `Hi ${client.split(' ')[0] || 'there'},
 
-				if (hasStarBirdUnresolved) {
-					activeBlockers.push({
-						id: 'star-bird-finish',
-						impact: 'High impact',
-						impactKey: 'highImpact',
-						question: 'Which Black Lip Star with Bird of Prey Dangle finish should Bali make?',
-						questionKey: 'starburstQuestion',
-						evidence: parsed.find(item => (item.item.toLowerCase().includes('star') || item.item.toLowerCase().includes('dangle')))?.notes || 'star bird dangle',
-						source: parsed.find(item => (item.item.toLowerCase().includes('star') || item.item.toLowerCase().includes('dangle')))?.source || 'Source',
-						risk: 'Finish changes the metal casting, material cost, and production scheduling.',
-						riskKey: 'starburstRisk',
-						options: ['Golden', 'Recycled Sterling Silver'],
-						answer: ''
-					});
+Thank you for your order. We reviewed the details and everything needed for production is now ready.
+
+Order summary
+- ${lineItems.length} items
+- Total quantity: ${lineItems.reduce((sum, item) => sum + item.qty, 0)}
+- Finishes: ${Array.from(new Set(lineItems.map(item => item.finish).filter(Boolean))).join(', ')}
+
+Timeline
+- Production start: June 3, 2026
+- Estimated completion: June 20, 2026
+- Need by: July 10, 2026
+
+We will send another update once production begins. Please reach out if anything needs to change.
+
+Thank you,
+Heather Benjamin Jewelry`;
+					apiSuccess = true;
 				}
+			} catch (err) {
+				console.error('Failed to process via API, falling back to heuristics:', err);
+			} finally {
+				isProcessing = false;
+			}
 
-				if (hasBirdUnresolved) {
-					activeBlockers.push({
-						id: 'bird-of-prey-size',
-						impact: 'Medium impact',
-						impactKey: 'mediumImpact',
-						question: 'Which Golden Bird of Prey Hat Stud size is this?',
-						questionKey: 'horseQuestion',
-						evidence: parsed.find(item => item.item.toLowerCase().includes('bird'))?.notes || 'new smaller golden bird of prey',
-						source: parsed.find(item => item.item.toLowerCase().includes('bird'))?.source || 'Source',
-						risk: 'Size changes the bone carving template, casting mold, and unit price.',
-						riskKey: 'horseRisk',
-						options: ['Mini', 'Medium'],
-						answer: ''
+			if (!apiSuccess) {
+				// Local Heuristic Fallback
+				const parsed = parseMessyInput(intakeText);
+				if (parsed.length > 0) {
+					parsed.forEach((item) => {
+						if (item.styleCode) {
+							const cat = catalog.find(c => c.styleCode === item.styleCode);
+							if (cat && cat.imageUrl && !item.imageUrl) {
+								item.imageUrl = cat.imageUrl;
+							}
+						}
 					});
-				}
+					lineItems = parsed;
 
-				blockers = activeBlockers;
+					const activeBlockers: Blocker[] = [];
+					const hasStarBirdUnresolved = parsed.some(item => !item.styleCode && (item.item.toLowerCase().includes('star') || item.item.toLowerCase().includes('dangle')));
+					const hasBirdUnresolved = parsed.some(item => !item.styleCode && item.item.toLowerCase().includes('bird'));
 
-				customerUpdate = `Hi Mia,
+					if (hasStarBirdUnresolved) {
+						activeBlockers.push({
+							id: 'star-bird-finish',
+							impact: 'High impact',
+							impactKey: 'highImpact',
+							question: 'Which Black Lip Star with Bird of Prey Dangle finish should Bali make?',
+							questionKey: 'starburstQuestion',
+							evidence: parsed.find(item => (item.item.toLowerCase().includes('star') || item.item.toLowerCase().includes('dangle')))?.notes || 'star bird dangle',
+							source: parsed.find(item => (item.item.toLowerCase().includes('star') || item.item.toLowerCase().includes('dangle')))?.source || 'Source',
+							risk: 'Finish changes the metal casting, material cost, and production scheduling.',
+							riskKey: 'starburstRisk',
+							options: ['Golden', 'Recycled Sterling Silver'],
+							answer: ''
+						});
+					}
+
+					if (hasBirdUnresolved) {
+						activeBlockers.push({
+							id: 'bird-of-prey-size',
+							impact: 'Medium impact',
+							impactKey: 'mediumImpact',
+							question: 'Which Golden Bird of Prey Hat Stud size is this?',
+							questionKey: 'horseQuestion',
+							evidence: parsed.find(item => item.item.toLowerCase().includes('bird'))?.notes || 'new smaller golden bird of prey',
+							source: parsed.find(item => item.item.toLowerCase().includes('bird'))?.source || 'Source',
+							risk: 'Size changes the bone carving template, casting mold, and unit price.',
+							riskKey: 'horseRisk',
+							options: ['Mini', 'Medium'],
+							answer: ''
+						});
+					}
+
+					blockers = activeBlockers;
+
+					customerUpdate = `Hi Mia,
 
 Thank you for your order. We reviewed the details and everything needed for production is now ready.
 
@@ -1009,6 +1065,7 @@ We will send another update once production begins. Please reach out if anything
 
 Thank you,
 Heather Benjamin Jewelry`;
+				}
 			}
 		} else {
 			if (lineItems.length === 0) {
@@ -2103,8 +2160,19 @@ Heather Benjamin Jewelry`;
 												{t.sourcePoText}
 											</button>
 										</div>
-										<button id="process-order-btn" class="primary-button flex items-center justify-center font-bold" type="button" onclick={processOrder}>
-											{t.processOrder} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
+										<button 
+											id="process-order-btn" 
+											class="primary-button flex items-center justify-center font-bold min-w-[160px]" 
+											type="button" 
+											onclick={processOrder}
+											disabled={isProcessing}
+										>
+											{#if isProcessing}
+												<span class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent inline-block"></span>
+												{currentLocale === 'id' ? 'Memproses...' : 'Processing...'}
+											{:else}
+												{t.processOrder} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
+											{/if}
 										</button>
 									</div>
 								</div>
