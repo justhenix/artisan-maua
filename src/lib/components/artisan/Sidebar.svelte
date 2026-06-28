@@ -55,7 +55,7 @@
 			<!-- Open State Header -->
 			<div class="flex w-full items-center justify-between">
 				<div class="sidebar-title flex items-center">
-					<img src="/logo.webp" alt="Artisan" class="h-9 w-auto object-contain" />
+					<img src="/logo.webp" alt="Artisan" class="h-14 w-auto object-contain" />
 				</div>
 				<div class="relative group">
 					<button
@@ -74,8 +74,8 @@
 		{:else}
 			<!-- Collapsed State Header -->
 			<div class="relative w-10 h-10 flex items-center justify-center mx-auto group">
-				<div class="w-8 h-8 flex items-center justify-center transition-opacity duration-150 group-hover:opacity-0">
-					<img src="/icon.webp" alt="Artisan" class="w-8 h-8 object-contain" />
+				<div class="w-10 h-10 flex items-center justify-center transition-opacity duration-150 group-hover:opacity-0">
+					<img src="/icon.webp" alt="Artisan" class="w-10 h-10 object-contain" />
 				</div>
 				<button
 					class="absolute inset-0 w-10 h-10 flex items-center justify-center rounded-full hover:bg-(--surface-muted) text-(--muted) hover:text-(--ink) opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-transparent border-0 p-0 cursor-pointer"
