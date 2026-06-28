@@ -29,6 +29,22 @@
 
 	let sidebarCollapsed = $state(false);
 	let mobileSidebarOpen = $state(false);
+	let hasLoaded = $state(false);
+
+	$effect(() => {
+		const stored = localStorage.getItem('sidebarCollapsed');
+		if (stored !== null) {
+			sidebarCollapsed = stored === 'true';
+		}
+	});
+
+	$effect(() => {
+		if (!hasLoaded) {
+			hasLoaded = true;
+			return;
+		}
+		localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed));
+	});
 
 	function toggleSidebar() {
 		if (typeof window !== 'undefined' && window.innerWidth < 1024) {
@@ -46,6 +62,7 @@
 <div class={`app-shell ${sidebarCollapsed ? 'app-shell-collapsed' : ''}`}>
 	<Sidebar
 		{t}
+		{currentLocale}
 		activePath={currentPath}
 		bind:sidebarCollapsed
 		bind:mobileSidebarOpen
