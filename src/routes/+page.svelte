@@ -1789,8 +1789,14 @@ Heather Benjamin Jewelry`;
 		{currentLocale}
 		currentPath={page.url.pathname}
 		headerLastSaved={lastSaved}
-		headerRightSidebarCollapsed={!isRightSidebarOpen}
-		headerOnToggleRightSidebar={() => (isRightSidebarOpen = !isRightSidebarOpen)}
+		headerRightSidebarCollapsed={activeView === 'workbench' ? rightSidebarCollapsed : !isRightSidebarOpen}
+		headerOnToggleRightSidebar={() => {
+			if (activeView === 'workbench') {
+				rightSidebarCollapsed = !rightSidebarCollapsed;
+			} else {
+				isRightSidebarOpen = !isRightSidebarOpen;
+			}
+		}}
 		onReplayTour={handleReplayTour}
 		mainClass={`${activeView === 'dashboard' ? 'app-main-dashboard' : ''} ${activeView === 'workbench' ? 'app-main-workbench-status' : ''}`}
 	>
