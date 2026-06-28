@@ -14,9 +14,9 @@
 	--brand: oklch(0.47 0.055 230);
 	--brand-dark: oklch(0.35 0.045 230);
 	--brand-ink: oklch(0.24 0.045 220);
-	--warning: oklch(0.83 0.11 75);
-	--warning-bg: oklch(0.97 0.015 75);
-	--warning-ink: oklch(0.33 0.06 55);
+	--warning: oklch(0.72 0.13 65);
+	--warning-bg: oklch(0.97 0.018 75);
+	--warning-ink: oklch(0.28 0.07 45);
 	--ready: oklch(0.77 0.07 145);
 	--ready-bg: oklch(0.96 0.02 145);
 	--ready-ink: oklch(0.29 0.05 145);
@@ -258,6 +258,13 @@ button:disabled {
 	background: var(--brand-dark);
 }
 
+.primary-button:focus-visible,
+.secondary-button:focus-visible,
+.ghost-button:focus-visible {
+	outline: 2px solid var(--brand);
+	outline-offset: 2px;
+}
+
 .secondary-button,
 .ghost-button {
 	border: 1px solid var(--line);
@@ -299,6 +306,11 @@ button:disabled {
 .step-button-active {
 	border-color: var(--brand);
 	font-weight: 700;
+}
+
+.step-button:focus-visible {
+	outline: 2px solid var(--brand);
+	outline-offset: -2px;
 }
 
 .step-index {
@@ -485,7 +497,7 @@ button:disabled {
 }
 
 .cell-input-wide {
-	min-width: 180px;
+	min-width: 120px;
 }
 
 .cell-input:focus {
@@ -633,8 +645,8 @@ button:disabled {
 }
 
 .status-warn {
-	border-color: var(--warning);
-	color: var(--warning);
+	border-color: oklch(0.60 0.14 65);
+	color: oklch(0.28 0.07 45);
 }
 
 .action-footer {

@@ -672,6 +672,25 @@ Line  Item Code      Description                  Qty  Unit Price
 
 	const maxStep = $derived(allAnswered ? Math.max(completedSteps, 3) as Step : completedSteps as Step);
 
+	// Display-only workflow status — reflects current UI step, not just DB orderStatus
+	const displayWorkflowStatus = $derived(
+		(currentStep >= 4 || sent) ? 'Customer update ready'
+		: currentStep === 3
+			? (handoffCreated && handoffShared ? 'Bali handoff ready' : 'Sheets ready')
+			: (currentStep === 2 && allAnswered) ? 'Sheets ready'
+			: remainingAnswers > 0 ? 'Review required'
+			: t.reviewRequiredOption
+	);
+
+	// Order progress checklist states
+	const progressOrderReviewed = $derived(currentStep >= 3 || allAnswered);
+	const progressProductionSheet = $derived(currentStep >= 3);
+	const progressPackingChecklist = $derived(currentStep >= 3 && (activeTab === 'packing' || packedCount > 0));
+	const progressBaliHandoff = $derived(handoffCreated && handoffShared);
+	const progressQualityCheck = $derived(milestones.qualityChecked);
+	const progressPackingComplete = $derived(packedCount > 0 && packedCount >= lineItems.length);
+	const progressCustomerUpdate = $derived(sent || currentStep >= 4);
+
 	// Session Restoration
 	function restoreSession(orderId: string) {
 		if (!browser) return;
@@ -1985,10 +2004,23 @@ Line  Item Code      Description                  Qty  Unit Price
 							</div>
 							<span class="text-xs uppercase tracking-wider font-semibold text-(--muted)">{t.workflow}:</span>
 						</div>
+						<span class={`rounded border px-2.5 py-1 text-xs font-semibold ${
+							displayWorkflowStatus === 'Review required'
+								? 'border-amber-300 bg-amber-50 text-amber-900'
+								: displayWorkflowStatus === 'Sheets ready'
+									? 'border-blue-200 bg-blue-50 text-blue-800'
+									: displayWorkflowStatus === 'Bali handoff ready'
+										? 'border-indigo-200 bg-indigo-50 text-indigo-800'
+										: displayWorkflowStatus === 'Customer update ready'
+											? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+											: 'border-(--line) bg-white text-(--ink)'
+						}`} aria-live="polite">{displayWorkflowStatus}</span>
 						<select 
 							bind:value={orderStatus} 
 							onchange={onOrderStatusChange}
-							class="rounded border border-(--line) bg-white px-2 py-0.5 text-xs font-semibold focus:border-(--brand) outline-none cursor-pointer"
+							class="rounded border border-(--line) bg-white px-2 py-0.5 text-[10px] font-semibold focus:border-(--brand) outline-none cursor-pointer text-(--muted)"
+							aria-label="Manual workflow override (demo)"
+							title="Manual stage override for demo"
 						>
 							<option value="Review">{t.reviewRequiredOption}</option>
 							<option value="Production">{t.inProductionOption}</option>
@@ -2457,8 +2489,33 @@ Line  Item Code      Description                  Qty  Unit Price
 											</div>
 										</div>
 
-										<div>
-											<h2 class="font-display text-xs font-bold text-(--muted) uppercase tracking-wider mb-3">{t.readyNext}</h2>
+											<!-- Order progress checklist -->
+											<div class="mb-4 border-b border-(--line) pb-4">
+												<h3 class="text-xs font-bold text-(--muted) uppercase tracking-wider mb-2.5">{t.orderProgress}</h3>
+												<ul class="space-y-1.5" aria-label="Order progress">
+													{#each [
+														{ label: t.progressOrderReviewed, done: progressOrderReviewed },
+														{ label: t.progressProductionSheet, done: progressProductionSheet },
+														{ label: t.progressPackingChecklist, done: progressPackingChecklist },
+														{ label: t.progressBaliHandoff, done: progressBaliHandoff },
+														{ label: t.progressQualityCheck, done: progressQualityCheck },
+														{ label: t.progressPackingComplete, done: progressPackingComplete },
+														{ label: t.progressCustomerUpdate, done: progressCustomerUpdate }
+													] as row (row.label)}
+														<li class="flex items-center gap-2 text-xs">
+															<span class={`flex items-center justify-center w-4 h-4 rounded-full shrink-0 border ${row.done ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-(--line) bg-white'}`} aria-hidden="true">
+																{#if row.done}
+																	<i class="ri-check-line text-[10px] font-bold"></i>
+																{/if}
+															</span>
+															<span class={row.done ? 'text-(--ink) font-medium' : 'text-(--muted)'}>{row.label}</span>
+														</li>
+													{/each}
+												</ul>
+											</div>
+
+											<div>
+												<h2 class="font-display text-xs font-bold text-(--muted) uppercase tracking-wider mb-3">{t.readyNext}</h2>
 											{#if activeTab === 'production'}
 												<div class="space-y-3">
 													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadXlsx('production')}>
