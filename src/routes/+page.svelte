@@ -623,7 +623,6 @@ Heather Benjamin Jewelry`;
 	let isRightSidebarOpen = $state(false);
 	let silverSpotRate = $state(1.00);
 
-	// Mutual exclusivity between Global Control Panel and "What Happens Next" checklist
 	$effect(() => {
 		if (isRightSidebarOpen) {
 			rightSidebarCollapsed = true;
@@ -635,6 +634,29 @@ Heather Benjamin Jewelry`;
 		if (!rightSidebarCollapsed) {
 			isRightSidebarOpen = false;
 		}
+	});
+
+	$effect(() => {
+		function handleKeyDown(event: KeyboardEvent) {
+			const target = event.target as HTMLElement;
+			if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+				return;
+			}
+			
+			const isAltR = event.altKey && (event.key === 'r' || event.key === 'R');
+			if (event.key === ']' || isAltR) {
+				event.preventDefault();
+				if (activeView === 'workbench') {
+					rightSidebarCollapsed = !rightSidebarCollapsed;
+				} else {
+					isRightSidebarOpen = !isRightSidebarOpen;
+				}
+			}
+		}
+		window.addEventListener('keydown', handleKeyDown);
+		return () => {
+			window.removeEventListener('keydown', handleKeyDown);
+		};
 	});
 
 	let wholesaleAccounts = $state([

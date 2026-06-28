@@ -46,6 +46,25 @@
 		localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed));
 	});
 
+	$effect(() => {
+		function handleKeyDown(event: KeyboardEvent) {
+			const target = event.target as HTMLElement;
+			if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+				return;
+			}
+			
+			const isAltL = event.altKey && (event.key === 'l' || event.key === 'L');
+			if (event.key === '[' || isAltL) {
+				event.preventDefault();
+				toggleSidebar();
+			}
+		}
+		window.addEventListener('keydown', handleKeyDown);
+		return () => {
+			window.removeEventListener('keydown', handleKeyDown);
+		};
+	});
+
 	function toggleSidebar() {
 		if (typeof window !== 'undefined' && window.innerWidth < 1024) {
 			mobileSidebarOpen = !mobileSidebarOpen;
