@@ -2021,8 +2021,8 @@ Line  Item Code      Description                  Qty  Unit Price
 		{currentLocale}
 		currentPath={page.url.pathname}
 		headerLastSaved={lastSaved}
-		headerRightSidebarCollapsed={activeView === 'workbench' ? rightSidebarCollapsed : undefined}
-		headerOnToggleRightSidebar={activeView === 'workbench' ? () => (rightSidebarCollapsed = !rightSidebarCollapsed) : undefined}
+		headerRightSidebarCollapsed={activeView === 'workbench' && currentStep !== 4 ? rightSidebarCollapsed : undefined}
+		headerOnToggleRightSidebar={activeView === 'workbench' && currentStep !== 4 ? () => (rightSidebarCollapsed = !rightSidebarCollapsed) : undefined}
 		onReplayTour={handleReplayTour}
 		onClickLogo={() => (activeView = 'dashboard')}
 		{activeView}
