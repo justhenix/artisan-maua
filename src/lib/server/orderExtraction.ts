@@ -1,5 +1,6 @@
 import { fixtureBlockers, fixtureLineItems } from '../artisan/fixtures';
 import type { ReviewBlocker, SheetLineItem } from '../artisan/types';
+import { mergeAndDeduplicateItems } from '../artisan/review';
 
 export type ExtractionEnv = {
 	AI_PROVIDER?: string;
@@ -605,14 +606,34 @@ export function parsePastedOrder(text: string, client = '', catalog: CatalogCont
 		item.id = stableId(item.item || item.source, index);
 	});
 
+	const { deduped, conflicts } = mergeAndDeduplicateItems(allLineItems);
+
+	const conflictBlockers = conflicts.map(c => ({
+		id: `${c.itemId}-conflict-${c.field}`,
+		impact: 'High impact' as const,
+		impactKey: 'highImpact' as const,
+		question: c.message,
+		evidence: c.evidence,
+		source: c.sources.join(', '),
+		risk: 'Conflicting source files can lead to incorrect production quantities or style variations.',
+		options: ['Custom'],
+		answer: '',
+		required: true,
+		field: c.field,
+		itemId: c.itemId
+	}));
+
 	return {
 		success: true,
 		mode: 'deterministic',
 		provider: 'fixture',
 		client: detectedClient || 'Unresolved',
 		poNumber: detectedPoNumber,
-		lineItems: allLineItems,
-		blockers: deterministicBlockersForItems(allLineItems, catalog)
+		lineItems: deduped,
+		blockers: [
+			...deterministicBlockersForItems(deduped, catalog),
+			...conflictBlockers
+		]
 	};
 }
 

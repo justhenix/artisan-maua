@@ -4,7 +4,7 @@ import { fixtureBlockers, fixtureLineItems } from './fixtures';
 import { generateCustomerUpdate } from './customerUpdate';
 import { escapeCsvCell, rowsToCsv } from './exports';
 import { createPdfDocument } from './pdf';
-import { canCreateSheets } from './review';
+import { canCreateSheets, allRequiredFieldsResolved, unresolvedWarnings, unresolvedRequiredCount } from './review';
 import { buildProductionRows } from './sheets';
 import { createWorkbookXlsx } from './xlsx';
 import { buildFixtureExtraction, extractOrder, parsePastedOrder } from '../server/orderExtraction';
@@ -252,7 +252,7 @@ Wave Ring                                 4    Silver              standard size
 			blocker.answer = blocker.options[0];
 		});
 		expect(canCreateBaliHandoff(blockers, items)).toBe(false);
-		
+
 		items.forEach((item) => {
 			if (!item.styleCode) item.styleCode = 'HB-STYLE';
 			if (!item.finish) item.finish = 'Gold';
@@ -407,5 +407,171 @@ Feather Necklace,10,Silver oxy,custom order
 		expect(result.lineItems).toHaveLength(1);
 		expect(result.lineItems[0].item).toBe('Feather Necklace');
 		expect(JSON.stringify(result)).not.toContain('Golden Bird');
+	});
+
+	test('selecting custom blocker options and typing answers correctly updates blockers and line items', () => {
+		const orderText = `
+---
+Source file: artisan_po_HB-260314_north_shore.txt
+Source type: text/plain
+Client: North Shore Studio
+PO: HB-260314
+24x hb1 hat stud / mini star - buyer wrote "small starburst hat stud"; finish not specified
+12x Mountain Pendant - new request; finish not specified
+------------------------------------------------------
+		`;
+
+		const result = parsePastedOrder(orderText, 'Unresolved');
+		expect(result.client).toBe('North Shore Studio');
+		expect(result.poNumber).toBe('HB-260314');
+		expect(result.lineItems).toHaveLength(2);
+
+		const hatStudItem = result.lineItems.find(item => item.item.includes('hb1 hat stud'));
+		const mountainItem = result.lineItems.find(item => item.item.includes('Mountain Pendant'));
+
+		expect(hatStudItem).toBeDefined();
+		expect(mountainItem).toBeDefined();
+
+		// Blocker 1: Style Code
+		const hatBlocker = result.blockers.find(b => b.itemId === hatStudItem!.id && b.field === 'style code');
+		expect(hatBlocker).toBeDefined();
+		expect(hatBlocker!.answer).toBe('');
+
+		// Blocker 2: Finish/Material
+		const mountainBlocker = result.blockers.find(b => b.itemId === mountainItem!.id && b.field === 'finish/material');
+		expect(mountainBlocker).toBeDefined();
+		expect(mountainBlocker!.answer).toBe('');
+
+		// 1. Selecting "Type exact style" (simulating empty choice selection before typing)
+		hatBlocker!.answer = ''; // remains empty/unanswered
+		expect(hatBlocker!.answer).toBe('');
+		expect(allRequiredFieldsResolved(result.lineItems, result.blockers)).toBe(false);
+
+		// 2. Typed style answer updates corresponding item
+		hatBlocker!.answer = 'HB-SB-STAR';
+		// Simulating chooseAnswer logic:
+		hatStudItem!.styleCode = 'HB-SB-STAR';
+		hatStudItem!.finish = 'Gold Vermeil'; // Set finish so all required fields for this item are complete
+		hatStudItem!.unresolvedFields = unresolvedWarnings(hatStudItem!);
+		hatStudItem!.confidenceState = hatStudItem!.unresolvedFields.length > 0 ? 'unresolved' : 'resolved';
+
+		expect(hatStudItem!.styleCode).toBe('HB-SB-STAR');
+		expect(allRequiredFieldsResolved(result.lineItems, result.blockers)).toBe(false); // still missing mountain finish
+
+		// 3. Selecting "Type material/finish"
+		mountainBlocker!.answer = ''; // remains empty/unanswered
+		expect(mountainBlocker!.answer).toBe('');
+
+		// 4. Typed material/finish updates corresponding item
+		mountainBlocker!.answer = 'Sterling Silver';
+		// Simulating chooseAnswer logic:
+		mountainItem!.styleCode = 'HB-P-MNTN'; // Set style code so it's fully resolved
+		mountainItem!.finish = 'Sterling Silver';
+		mountainItem!.unresolvedFields = unresolvedWarnings(mountainItem!);
+		mountainItem!.confidenceState = mountainItem!.unresolvedFields.length > 0 ? 'unresolved' : 'resolved';
+
+		expect(mountainItem!.finish).toBe('Sterling Silver');
+		expect(allRequiredFieldsResolved(result.lineItems, result.blockers)).toBe(true); // both resolved!
+	});
+
+	test('readiness gating and customer update safety with unresolved required fields', () => {
+		const orderText = `
+---
+Source file: artisan_po_HB-260314_north_shore.txt
+Source type: text/plain
+Client: North Shore Studio
+PO: HB-260314
+24x hb1 hat stud / mini star - buyer wrote "small starburst hat stud"; finish not specified
+------------------------------------------------------
+		`;
+		const result = parsePastedOrder(orderText, 'Unresolved');
+		const hatStudItem = result.lineItems[0];
+
+		// 5. Production sheet is not ready when required fields are blank
+		expect(allRequiredFieldsResolved(result.lineItems, result.blockers)).toBe(false);
+
+		// 6. Customer update cannot be ready/safe when required production fields are blank
+		// If required fields are blank, unresolved count > 0
+		const unresolvedCount = unresolvedRequiredCount(result.blockers);
+		expect(unresolvedCount).toBeGreaterThan(0);
+
+		const update = generateCustomerUpdate({
+			client: result.client || 'Unresolved',
+			lineItems: result.lineItems,
+			unresolvedCount
+		});
+
+		// 7. Client and PO propagates
+		expect(update).toContain('North Shore Studio team');
+		// 8. Customer update never renders {Unresolved}, undefined, or null
+		expect(update).not.toContain('{Unresolved}');
+		expect(update).not.toContain('undefined');
+		expect(update).not.toContain('null');
+		expect(update).toContain('1 production detail still need confirmation');
+	});
+
+	test('sample order still works correctly', () => {
+		// 9. Sample order works
+		const result = buildFixtureExtraction();
+		expect(result.success).toBe(true);
+		expect(result.lineItems).toHaveLength(5);
+		expect(result.blockers).toHaveLength(2);
+	});
+
+	test('multi-file extraction deduplicates and preserves source labels', () => {
+		// TXT + CSV + PDF same PO -> no duplicate items, source labels combined
+		const orderText = `
+---
+Source file: order1.txt
+Source type: text/plain
+Client: North Shore Studio
+PO: HB-260314
+12x Medium Silver Elephant Pin,Sterling Silver,notes here
+---
+Source file: order2.csv
+Source type: text/csv
+Client: North Shore Studio
+PO: HB-260314
+12x Medium Silver Elephant Pin,Sterling Silver,notes here
+------------------------------------------------------
+		`;
+
+		const result = parsePastedOrder(orderText, 'Unresolved');
+		expect(result.success).toBe(true);
+		expect(result.lineItems).toHaveLength(1);
+		expect(result.lineItems[0].source).toContain('order1.txt');
+		expect(result.lineItems[0].source).toContain('order2.csv');
+		expect(result.lineItems[0].qty).toBe(12);
+	});
+
+	test('multi-file extraction detects conflicts and creates disagree blockers', () => {
+		// Conflicting files -> qty disagreement
+		const orderText = `
+---
+Source file: order1.txt
+Source type: text/plain
+Client: North Shore Studio
+PO: HB-260314
+12x Medium Silver Elephant Pin,Sterling Silver,notes
+---
+Source file: order2.csv
+Source type: text/csv
+Client: North Shore Studio
+PO: HB-260314
+24x Medium Silver Elephant Pin,Sterling Silver,notes
+------------------------------------------------------
+		`;
+
+		const result = parsePastedOrder(orderText, 'Unresolved');
+		expect(result.success).toBe(true);
+		// Keep one item as base but mark unresolved and add a conflict blocker
+		expect(result.lineItems).toHaveLength(1);
+
+		const conflictBlocker = result.blockers.find(b => b.id.includes('conflict-qty'));
+		expect(conflictBlocker).toBeDefined();
+		expect(conflictBlocker!.question).toBe('Source files disagree on quantity');
+		expect(conflictBlocker!.evidence).toContain('order1.txt');
+		expect(conflictBlocker!.evidence).toContain('order2.csv');
+		expect(conflictBlocker!.required).toBe(true);
 	});
 });

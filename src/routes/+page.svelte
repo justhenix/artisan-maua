@@ -25,14 +25,14 @@
 	import { rowsToCopyTable, rowsToCsv } from '$lib/artisan/exports';
 	import { createPdfDocument, createBaliHandoffPdf } from '$lib/artisan/pdf';
 	import { buildPackingRows, buildProductionRows } from '$lib/artisan/sheets';
-	import { canCreateSheets, confidenceStateFor, unresolvedRequiredCount, unresolvedWarnings, allRequiredFieldsResolved } from '$lib/artisan/review';
+	import { canCreateSheets, confidenceStateFor, unresolvedRequiredCount, unresolvedWarnings, allRequiredFieldsResolved, mergeAndDeduplicateItems } from '$lib/artisan/review';
 	import type { ReviewBlocker, SheetLineItem, TableCell } from '$lib/artisan/types';
 	import { createWorkbookXlsx } from '$lib/artisan/xlsx';
 
 	let { data }: { data: any } = $props();
 
 	type Step = 1 | 2 | 3 | 4;
-	type Tab = 'production' | 'packing' | 'customer';
+	type Tab = 'production' | 'packing' | 'handoff';
 
 	type Blocker = ReviewBlocker;
 	type LineItem = SheetLineItem;
@@ -125,13 +125,13 @@ Line  Item Code      Description                  Qty  Unit Price
 	function detectSource(text: string): (typeof sourceTypes)[number] {
 		const cleanText = text.trim();
 		if (!cleanText) return 'sourcePoText';
-		
+
 		if (cleanText.includes('From:') || cleanText.includes('Subject:')) {
 			return 'sourceEmail';
 		}
 		if (
-			cleanText.toLowerCase().includes('dm') || 
-			cleanText.toLowerCase().includes('instagram') || 
+			cleanText.toLowerCase().includes('dm') ||
+			cleanText.toLowerCase().includes('instagram') ||
 			cleanText.toLowerCase().includes('sent via') ||
 			/\[.*\]/.test(cleanText)
 		) {
@@ -373,32 +373,32 @@ Line  Item Code      Description                  Qty  Unit Price
 				} else {
 					// Dynamic matching fallback: find items in catalog sharing keywords
 					const inputWords = name.split(/[\s,.\-_/]+/).filter(w => w.length > 2 && !['and', 'with', 'for', 'the', 'pin', 'stud', 'pendant', 'ring', 'cuff', 'chain', 'size', 'medium', 'small', 'large', 'mini', 'golden', 'silver'].includes(w));
-					
+
 					let bestMatch: CatalogItem | undefined;
 					let maxMatchedWords = 0;
-					
+
 					for (const cat of catalog) {
 						const catTitle = cat.creativeTitle.toLowerCase();
 						const catCode = cat.styleCode.toLowerCase();
-						
+
 						let matches = 0;
 						for (const word of inputWords) {
 							if (catTitle.includes(word) || catCode.includes(word)) {
 								matches++;
 							}
 						}
-						
+
 						if (matches > maxMatchedWords) {
 							maxMatchedWords = matches;
 							bestMatch = cat;
 						}
 					}
-					
+
 					if (bestMatch && maxMatchedWords > 0) {
 						// Size variant matching
 						let resolvedStyle = bestMatch.styleCode;
 						let resolvedTitle = bestMatch.creativeTitle;
-						
+
 						if (name.includes('horse') && name.includes('pin')) {
 							if (name.includes('medium')) {
 								resolvedStyle = 'HB-HORSE-M';
@@ -448,7 +448,7 @@ Line  Item Code      Description                  Qty  Unit Price
 								}
 							}
 						}
-						
+
 						item.styleCode = resolvedStyle;
 						item.item = resolvedTitle;
 					}
@@ -530,7 +530,7 @@ Line  Item Code      Description                  Qty  Unit Price
 	$effect(() => {
 		if (!dbLoaded && data.orders && data.orders.length > 0) {
 			orders = data.orders;
-			
+
 			// Load from URL or default selected order
 			const urlOrderId = page.url.searchParams.get('orderId');
 			const targetOrderId = urlOrderId && data.orders.some((o: any) => o.id === urlOrderId) ? urlOrderId : selectedOrderId;
@@ -543,7 +543,7 @@ Line  Item Code      Description                  Qty  Unit Price
 				uploadedFiles = defaultOrder.uploadedFiles;
 				orderStatus = defaultOrder.status;
 				milestones = defaultOrder.milestones || { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false };
-				
+
 				lineItems = data.allItems.filter((item: any) => item.poId === selectedOrderId);
 				blockers = data.allBlockers.filter((bl: any) => bl.poId === selectedOrderId);
 				restoreSession(selectedOrderId);
@@ -557,7 +557,7 @@ Line  Item Code      Description                  Qty  Unit Price
 					}
 				}
 			}
-			
+
 			dbLoaded = true;
 		}
 	});
@@ -565,7 +565,7 @@ Line  Item Code      Description                  Qty  Unit Price
 	$effect(() => {
 		if (!browser) return;
 		if (!dbLoaded) return;
-		
+
 		const url = new URL(window.location.href);
 		if (url.searchParams.get('step') !== String(currentStep) || url.searchParams.get('orderId') !== selectedOrderId) {
 			url.searchParams.set('step', String(currentStep));
@@ -600,7 +600,7 @@ Line  Item Code      Description                  Qty  Unit Price
 			if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
 				return;
 			}
-			
+
 			const isAltR = event.altKey && (event.key === 'r' || event.key === 'R');
 			if (event.key === ']' || isAltR) {
 				event.preventDefault();
@@ -716,7 +716,13 @@ Line  Item Code      Description                  Qty  Unit Price
 	const productionOrders = $derived(orders.filter(o => o.status === 'Production' || o.status === 'Packing').length);
 	const completedOrders = $derived(orders.filter(o => o.status === 'Completed').length);
 
-	const maxStep = $derived(canContinueToSheets ? Math.max(completedSteps, 3) as Step : completedSteps as Step);
+	const maxStep = $derived(
+		!canContinueToSheets
+			? (completedSteps > 2 ? 2 : completedSteps) as Step
+			: !allRequiredResolved
+				? 3
+				: (Math.max(completedSteps, 3) as Step)
+	);
 
 	function hasRequiredRowBlocker(item: LineItem) {
 		const warnings = unresolvedWarnings(item);
@@ -760,10 +766,10 @@ Line  Item Code      Description                  Qty  Unit Price
 	);
 
 	// Order progress checklist states
-	const progressOrderReviewed = $derived(currentStep >= 3 || allAnswered);
+	const progressOrderReviewed = $derived(currentStep >= 3);
 	const progressProductionSheet = $derived(currentStep >= 3 && allRequiredResolved);
-	const progressPackingChecklist = $derived(currentStep >= 3 && allRequiredResolved && (activeTab === 'packing' || packedCount > 0));
-	const progressBaliHandoff = $derived(allRequiredResolved && handoffCreated && handoffShared);
+	const progressPackingChecklist = $derived(currentStep >= 3 && allRequiredResolved);
+	const progressBaliHandoff = $derived(currentStep >= 3 && allRequiredResolved && handoffCreated);
 	const progressQualityCheck = $derived(milestones.qualityChecked);
 	const progressPackingComplete = $derived(packedCount > 0 && packedCount >= lineItems.length);
 	const progressCustomerUpdate = $derived(sent);
@@ -1001,6 +1007,34 @@ Line  Item Code      Description                  Qty  Unit Price
 		);
 	}
 
+	function detectClientLocal(text: string, fallbackClient = 'Unresolved') {
+		const patterns = [
+			/^\s*(?:client|customer|account)\s*:\s*(.+)$/im,
+			/^\s*from\s*:\s*(.+)$/im,
+			/^\s*buyer\s*:\s*(.+)$/im
+		];
+		for (const pattern of patterns) {
+			const match = text.match(pattern);
+			if (match?.[1]) {
+				return match[1].replace(/\s*\[[^\]]+\]/g, '').trim();
+			}
+		}
+		const uppercaseClient = text.match(/^\s*([A-Z][A-Z0-9 &'.-]{5,})\s*$/m)?.[1];
+		return uppercaseClient ? uppercaseClient.replace(/\s+/g, ' ').trim() : fallbackClient.trim();
+	}
+
+	function detectPoNumberLocal(text: string) {
+		const patterns = [
+			/\b(?:po|p\.o\.|po number|order|order number)\s*#?\s*:?\s*([A-Z]{1,4}-?\d{3,}[\w-]*)/i,
+			/\b(HB-\d{3,}[\w-]*)\b/i
+		];
+		for (const pattern of patterns) {
+			const match = text.match(pattern);
+			if (match?.[1]) return match[1].trim().toUpperCase();
+		}
+		return 'Unresolved';
+	}
+
 	async function processOrder() {
 		if (!intakeText.trim() && uploadedFiles.length === 0) {
 			return;
@@ -1018,21 +1052,38 @@ Line  Item Code      Description                  Qty  Unit Price
 			let combinedText = '';
 			let fileContents = '';
 			let hasTxtOrCsvOrPdf = false;
-			let hasPdf = false;
+			let parseableCount = 0;
+			let unparseableCount = 0;
 
 			for (const file of uploadedFileObjects) {
 				const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
 				if (['txt', 'csv'].includes(extension)) {
 					hasTxtOrCsvOrPdf = true;
 					const content = await file.text();
-					fileContents += `\n---\nSource file: ${file.name}\nSource type: ${file.type || extension}\n${content}\n------------------------------------------------------\n`;
+					if (content.trim().length > 0) {
+						fileContents += `\n---\nSource file: ${file.name}\nSource type: ${file.type || extension}\n${content}\n------------------------------------------------------\n`;
+						parseableCount++;
+					} else {
+						unparseableCount++;
+					}
 				} else if (extension === 'pdf') {
 					hasTxtOrCsvOrPdf = true;
-					hasPdf = true;
+					unparseableCount++;
+				} else {
+					unparseableCount++;
 				}
 			}
 
 			const trimmedText = intakeText.trim();
+
+			if (uploadedFileObjects.length > 0 && parseableCount === 0) {
+				extractionNotice = 'Upload a text-based PDF, CSV, TXT, or paste PO text.';
+				lineItems = [];
+				blockers = [];
+				processClicked = true;
+				return;
+			}
+
 			if (hasTxtOrCsvOrPdf && fileContents) {
 				if (trimmedText && !isShortOrDoIt(trimmedText)) {
 					combinedText = trimmedText + '\n' + fileContents;
@@ -1077,8 +1128,19 @@ Line  Item Code      Description                  Qty  Unit Price
 						field: b.field,
 						itemId: b.itemId
 					})) : [];
-					if (data.client && data.client !== 'Unresolved') client = data.client;
-					if (data.poNumber) selectedOrderId = data.poNumber;
+					if (data.client && data.client !== 'Unresolved') {
+						client = data.client;
+					} else {
+						const detected = detectClientLocal(combinedText);
+						if (detected && detected !== 'Unresolved') client = detected;
+					}
+					if (data.poNumber && data.poNumber !== 'Unresolved') {
+						selectedOrderId = data.poNumber;
+					} else {
+						const detected = detectPoNumberLocal(combinedText);
+						if (detected && detected !== 'Unresolved') selectedOrderId = detected;
+					}
+
 					if (data.combinedText) intakeText = data.combinedText;
 					extractionNotice = data.helperMessage || (lineItems.length === 0 ? 'Artisan could not read line items from this source. Paste the PO text or use the sample order for the demo.' : '');
 					customerUpdate = generateCustomerUpdate({
@@ -1096,7 +1158,7 @@ Line  Item Code      Description                  Qty  Unit Price
 
 			if (!apiSuccess) {
 				// Fallback client-side PDF scan warning
-				if (hasPdf && !fileContents && (!trimmedText || isShortOrDoIt(trimmedText))) {
+				if (uploadedFileObjects.length > 0 && !fileContents && (!trimmedText || isShortOrDoIt(trimmedText))) {
 					extractionNotice = 'This file does not contain readable text. Upload a text-based PDF/CSV/TXT or paste the PO text.';
 					lineItems = [];
 					blockers = [];
@@ -1111,12 +1173,42 @@ Line  Item Code      Description                  Qty  Unit Price
 								}
 							}
 						});
-						lineItems = parsed;
-						blockers = fallbackBlockersForItems(parsed);
+
+						const { deduped, conflicts } = mergeAndDeduplicateItems(parsed);
+						lineItems = deduped;
+
+						const baseBlockers = fallbackBlockersForItems(deduped);
+						const conflictBlockers = conflicts.map(c => ({
+							id: `${c.itemId}-conflict-${c.field}`,
+							impact: 'High impact' as const,
+							impactKey: 'highImpact' as const,
+							question: c.message,
+							evidence: c.evidence,
+							source: c.sources.join(', '),
+							risk: 'Conflicting source files can lead to incorrect production quantities or style variations.',
+							options: ['Custom'],
+							answer: '',
+							required: true,
+							field: c.field,
+							itemId: c.itemId
+						}));
+						blockers = [...baseBlockers, ...conflictBlockers];
+
 						if (combinedText) intakeText = combinedText;
+
+						// Detect Client and PO locally from messy input text
+						const detectedC = detectClientLocal(combinedText);
+						if (detectedC && detectedC !== 'Unresolved') client = detectedC;
+						const detectedP = detectPoNumberLocal(combinedText);
+						if (detectedP && detectedP !== 'Unresolved') selectedOrderId = detectedP;
+
+						if (uploadedFileObjects.length > 0 && unparseableCount > 0) {
+							extractionNotice = 'Some files could not be read.';
+						}
+
 						customerUpdate = generateCustomerUpdate({
 							client: client || 'Unresolved',
-							lineItems: parsed,
+							lineItems: deduped,
 							unresolvedCount: unresolvedRequiredCount(blockers)
 						});
 					} else {
@@ -1162,6 +1254,38 @@ Line  Item Code      Description                  Qty  Unit Price
 		if (!blocker) return;
 
 		blocker.answer = answer;
+
+		// Sync blocker answer to line item fields
+		if (blocker.itemId && blocker.field) {
+			const item = lineItems.find((li) => li.id === blocker.itemId);
+			if (item) {
+				const val = answer.trim();
+				const field = blocker.field.toLowerCase();
+				if (field === 'style code') {
+					item.styleCode = val;
+					if (val) {
+						// Auto-populate from catalog if there is an exact match
+						const exactMatch = catalog.find(c => c.styleCode.toLowerCase() === val.toLowerCase());
+						if (exactMatch) {
+							item.item = exactMatch.creativeTitle;
+							if (exactMatch.imageUrl) item.imageUrl = exactMatch.imageUrl;
+						}
+					}
+				} else if (field === 'finish/material' || field === 'material/finish' || field === 'finish') {
+					item.finish = val;
+				} else if (field === 'qty' || field === 'quantity') {
+					item.qty = val ? (Number(val) || item.qty) : 0;
+				} else if (field === 'variant' || field === 'notes') {
+					item.notes = val;
+				}
+
+				// Re-resolve warnings and confidence state for the item!
+				const warnings = unresolvedWarnings(item);
+				item.unresolvedFields = warnings;
+				item.confidenceState = warnings.length > 0 ? 'unresolved' : 'resolved';
+			}
+		}
+
 		if (blockerId === 'bird-of-prey-size') {
 			const bird = lineItems.find((item) => item.id === 'bird-unclear');
 			if (bird) {
@@ -1172,7 +1296,7 @@ Line  Item Code      Description                  Qty  Unit Price
 				bird.unitPrice = 0;
 				bird.confidenceState = 'resolved';
 				bird.unresolvedFields = [];
-				bird.imageUrl = answer === 'Mini' 
+				bird.imageUrl = answer === 'Mini'
 					? 'https://cdn.shopify.com/s/files/1/0277/4286/3462/products/ScreenShot2022-09-27at2.37.29PM.png?v=1664311054'
 					: 'https://cdn.shopify.com/s/files/1/0277/4286/3462/files/Screenshot2025-12-09at12.22.01AM.png?v=1765261804';
 			}
@@ -1192,6 +1316,7 @@ Line  Item Code      Description                  Qty  Unit Price
 					: 'https://cdn.shopify.com/s/files/1/0277/4286/3462/products/ScreenShot2022-09-28at3.38.04PM.png?v=1664401090';
 			}
 		}
+		lineItems = [...lineItems];
 		customerUpdate = generateCustomerUpdate({
 			client,
 			lineItems,
@@ -1288,14 +1413,14 @@ Line  Item Code      Description                  Qty  Unit Price
 		uploadedFileObjects = [];
 		orderStatus = order.status;
 		milestones = order.milestones || { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false };
-		
+
 		lineItems = data.allItems.filter((item: any) => item.poId === selectedOrderId);
 		blockers = data.allBlockers.filter((bl: any) => bl.poId === selectedOrderId);
 		handoffCreated = false;
 		handoffShared = false;
-		
+
 		activeView = 'workbench';
-		
+
 		// Map status to Wizard Steps
 		if (orderStatus === 'Review') {
 			currentStep = 2;
@@ -1327,7 +1452,7 @@ Line  Item Code      Description                  Qty  Unit Price
 			createdAt: Date.now(),
 			updatedAt: Date.now()
 		};
-		
+
 		orders = [newOrder, ...orders];
 		selectedOrderId = newId;
 		client = newOrder.clientName;
@@ -1341,10 +1466,10 @@ Line  Item Code      Description                  Qty  Unit Price
 		blockers = [];
 		handoffCreated = false;
 		handoffShared = false;
-		
+
 		activeView = 'workbench';
 		currentStep = 1;
-		
+
 		markDirty();
 		markAutoSaved();
 	}
@@ -1375,7 +1500,7 @@ Line  Item Code      Description                  Qty  Unit Price
 			orderStatus = 'Review';
 			setStep(2);
 		}
-		
+
 		const order = orders.find(o => o.id === selectedOrderId);
 		if (order) {
 			order.milestones = { ...milestones };
@@ -1409,7 +1534,7 @@ Line  Item Code      Description                  Qty  Unit Price
 			milestones = { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false };
 			setStep(2);
 		}
-		
+
 		const order = orders.find(o => o.id === selectedOrderId);
 		if (order) {
 			order.status = orderStatus;
@@ -1660,12 +1785,12 @@ Line  Item Code      Description                  Qty  Unit Price
 				doneBtnText: t.tourDone,
 				animate: true, // Animations enabled as viewport fits clean and scroll-free
 				steps: [
-					{ 
-						element: '#sidebar-logo', 
-						popover: { 
+					{
+						element: '#sidebar-logo',
+						popover: {
 							title: t.tourWelcomeTitle,
 							description: t.tourWelcomeDesc,
-							side: 'right', 
+							side: 'right',
 							align: 'start',
 							onNextClick: () => {
 								activeView = 'workbench';
@@ -1673,11 +1798,11 @@ Line  Item Code      Description                  Qty  Unit Price
 									d.moveNext();
 								});
 							}
-						} 
+						}
 					},
-					{ 
-						element: '#intake-scratchpad', 
-						popover: { 
+					{
+						element: '#intake-scratchpad',
+						popover: {
 							title: t.tourIntakeTitle,
 							description: t.tourIntakeDesc,
 							side: 'bottom',
@@ -1687,19 +1812,19 @@ Line  Item Code      Description                  Qty  Unit Price
 									d.movePrevious();
 								});
 							}
-						} 
+						}
 					},
-					{ 
-						element: '#try-sample-container', 
-						popover: { 
+					{
+						element: '#try-sample-container',
+						popover: {
 							title: t.tourSampleTitle,
 							description: t.tourSampleDesc,
-							side: 'top' 
-						} 
+							side: 'top'
+						}
 					},
-					{ 
-						element: '#process-order-btn', 
-						popover: { 
+					{
+						element: '#process-order-btn',
+						popover: {
 							title: t.tourProcessTitle,
 							description: t.tourProcessDesc,
 							side: 'top',
@@ -1709,7 +1834,7 @@ Line  Item Code      Description                  Qty  Unit Price
 									d.moveNext();
 								});
 							}
-						} 
+						}
 					},
 					{
 						element: '#blockers-section',
@@ -2138,7 +2263,7 @@ Line  Item Code      Description                  Qty  Unit Price
 														<span class="font-medium">{getMilestoneCompletedCount(order.milestones)}/4</span>
 													</div>
 													<div class="w-full h-1.5 bg-gray-100 rounded overflow-hidden">
-														<div 
+														<div
 															class={`h-full transition-all ${
 																order.status === 'Review' ? 'bg-amber-400' :
 																order.status === 'Production' ? 'bg-blue-500' :
@@ -2241,7 +2366,7 @@ Line  Item Code      Description                  Qty  Unit Price
 
 								<div class="mt-8 rounded-lg border border-(--line) bg-white p-6 shadow-sm">
 									<!-- Unified Intake Composer -->
-									<div 
+									<div
 										class={`relative border rounded-lg p-1 min-h-75 transition-all duration-300 flex flex-col bg-(--surface-soft) ${isDragging ? 'border-(--brand) bg-(--brand)/5 ring-4 ring-(--brand)/10' : 'border-(--line) bg-(--surface-soft) focus-within:border-(--brand) focus-within:bg-white'}`}
 										role="region"
 										aria-label="Unified order composer"
@@ -2276,11 +2401,11 @@ Line  Item Code      Description                  Qty  Unit Price
 												<label class="relative cursor-pointer flex items-center justify-center w-8 h-8 rounded-full hover:bg-(--surface-muted) text-(--muted) hover:text-(--ink) transition">
 													<span class="sr-only">Attach files</span>
 													<i class="ri-attachment-line text-lg"></i>
-													<input 
-														type="file" 
-														class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-														multiple 
-														onchange={handleFileUpload} 
+													<input
+														type="file"
+														class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+														multiple
+														onchange={handleFileUpload}
 													/>
 												</label>
 
@@ -2291,9 +2416,9 @@ Line  Item Code      Description                  Qty  Unit Price
 															<div class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-50 border border-emerald-100 text-xs text-emerald-800 font-medium">
 																<i class="ri-file-text-line text-emerald-600"></i>
 																<span class="max-w-30 truncate">{file}</span>
-																<button 
-																	type="button" 
-																	class="hover:text-red-600 text-emerald-600 transition font-bold" 
+																<button
+																	type="button"
+																	class="hover:text-red-600 text-emerald-600 transition font-bold"
 																	aria-label="Remove attachment"
 																	onclick={() => removeUploadedFile(index)}
 																>
@@ -2349,10 +2474,10 @@ Line  Item Code      Description                  Qty  Unit Price
 												{t.sourcePoText}
 											</button>
 										</div>
-										<button 
-											id="process-order-btn" 
-											class="primary-button flex items-center justify-center font-bold min-w-[160px]" 
-											type="button" 
+										<button
+											id="process-order-btn"
+											class="primary-button flex items-center justify-center font-bold min-w-[160px]"
+											type="button"
 											onclick={processOrder}
 											disabled={isProcessing}
 										>
@@ -2528,7 +2653,7 @@ Line  Item Code      Description                  Qty  Unit Price
 										<div class={`document-card document-card-compact shadow-sm relative overflow-hidden transition-all duration-300 ${isUnlocked ? 'border-emerald-200 bg-emerald-50/10' : ''}`}>
 											<!-- Progress Bar -->
 											<div class="absolute bottom-0 left-0 h-1 bg-emerald-500 transition-all duration-500 ease-out" style="width: {progress}%"></div>
-											
+
 											<div>
 												<h3 class={isUnlocked ? 'text-(--ink) font-semibold' : ''}>{doc}</h3>
 												<p class="text-xs text-(--muted) mt-1">
@@ -2598,12 +2723,14 @@ Line  Item Code      Description                  Qty  Unit Price
 								{#each [
 									['production', t.productionSheet],
 									['packing', t.packingChecklist],
-									['customer', t.customerUpdate]
+									['handoff', t.baliHandoff]
 								] as tab (tab[0])}
 									<button
 										class={`tab-button ${activeTab === tab[0] ? 'tab-button-active' : ''}`}
 										type="button"
-										onclick={() => (activeTab = tab[0] as Tab)}
+										onclick={() => {
+											activeTab = tab[0] as Tab;
+										}}
 									>
 										{tab[1]}
 									</button>
@@ -2611,25 +2738,24 @@ Line  Item Code      Description                  Qty  Unit Price
 							</div>
 
 							<!-- Compact Action Row for Exports -->
-							<div class="mt-5 flex items-center justify-between border-b border-(--line) pb-4">
-								<div class="flex items-center gap-3">
-									<span class="text-xs font-bold text-(--muted) uppercase tracking-wider">Export:</span>
-									{#if activeTab === 'production'}
-										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadXlsx('production')}>XLSX</button>
-										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadPdf('production')}>PDF</button>
-										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadCsv('production')}>CSV</button>
-										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={copyTable}>Copy table</button>
-									{:else if activeTab === 'packing'}
-										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadXlsx('packing')}>XLSX</button>
-										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadPdf('packing')}>PDF</button>
-										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadCsv('packing')}>CSV</button>
-										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={copyTable}>Copy table</button>
-									{:else}
-										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={copyCustomerUpdate}>Copy update</button>
-										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={openEmailClient}>Open Email</button>
-									{/if}
+							{#if activeTab === 'production' || activeTab === 'packing'}
+								<div class="mt-5 flex items-center justify-between border-b border-(--line) pb-4">
+									<div class="flex items-center gap-3">
+										<span class="text-xs font-bold text-(--muted) uppercase tracking-wider">Export:</span>
+										{#if activeTab === 'production'}
+											<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadXlsx('production')}>XLSX</button>
+											<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadPdf('production')}>PDF</button>
+											<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadCsv('production')}>CSV</button>
+											<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={copyTable}>Copy table</button>
+										{:else if activeTab === 'packing'}
+											<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadXlsx('packing')}>XLSX</button>
+											<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadPdf('packing')}>PDF</button>
+											<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadCsv('packing')}>CSV</button>
+											<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={copyTable}>Copy table</button>
+										{/if}
+									</div>
 								</div>
-							</div>
+							{/if}
 
 							<div class={`output-grid mt-7 ${rightSidebarCollapsed ? 'output-grid-collapsed' : ''}`}>
 								<div class="output-card shadow-sm">
@@ -2657,15 +2783,99 @@ Line  Item Code      Description                  Qty  Unit Price
 											onTogglePacked={setPackedItem}
 											onUpdateItem={(id, field, value) => updateLineItem(id, field, value)}
 										/>
-									{:else}
-										<h2 class="font-display text-2xl">{t.customerUpdateDraft}</h2>
-										<p class="mt-1 text-sm text-(--muted)">{t.editDraftDirectly}</p>
-										<CustomerUpdateEditor
-											label={t.message}
-											value={customerUpdate}
-											onInput={updateCustomerUpdate}
-											textareaClass="mt-5 h-[420px] w-full resize-none rounded-md border border-(--line) bg-(--surface-soft) p-4 leading-7 outline-none focus:border-(--brand) focus:bg-white"
-										/>
+									{:else if activeTab === 'handoff'}
+										<!-- Bali Handoff Content -->
+										<div class="p-1">
+											<div class="flex flex-wrap items-start justify-between gap-4">
+												<div class="max-w-2xl">
+													<h2 id="bali-handoff-title" class="font-display text-2xl text-(--ink)">{t.baliHandoff}</h2>
+													<p class="mt-2 text-sm leading-6 text-(--muted)">{t.handoffSubtitle}</p>
+												</div>
+												<div class="flex flex-wrap items-center gap-2">
+													<button
+														class="primary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+														type="button"
+														disabled={!handoffReady || !allRequiredResolved}
+														aria-disabled={!handoffReady || !allRequiredResolved}
+														aria-describedby={!handoffReady ? 'handoff-blocked-reason' : undefined}
+														title={!allRequiredResolved ? (t.reviewNeededHelp || '') : ''}
+														onclick={createBaliHandoff}
+													>
+														<i class="ri-file-list-3-line" aria-hidden="true"></i> {t.createBaliHandoff}
+													</button>
+													{#if handoffShared}
+														<span class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+															{t.handoffSharedLocal}
+														</span>
+													{/if}
+												</div>
+											</div>
+
+											{#if !handoffReady}
+												<p id="handoff-blocked-reason" class="mt-3 text-sm font-semibold text-(--warning-ink)">
+													{!allRequiredResolved ? (t.reviewNeededHelp || 'Resolve required production fields first.') : t.handoffBlocked}
+												</p>
+											{/if}
+
+											{#if handoffCreated}
+												<div class="mt-5 border-t border-(--line) pt-5">
+													<div class="flex items-center justify-between gap-2">
+														<h3 class="font-semibold text-sm text-(--ink)">{t.packetPreview}</h3>
+														{#if allRequiredResolved}
+															<span class="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5">
+																{t.handoffReadyStatus || 'Ready for Bali handoff'}
+															</span>
+														{:else}
+															<span class="text-xs font-semibold text-(--warning-ink) bg-(--warning-bg) border border-(--warning) rounded px-2 py-0.5">
+																{t.handoffReviewStatus || 'Review needed before Bali handoff'}
+															</span>
+														{/if}
+													</div>
+													<div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+														<textarea
+															class="min-h-64 w-full resize-y rounded-md border border-(--line) bg-(--surface-soft) p-4 font-mono text-xs leading-6 text-(--ink) outline-none focus:border-(--brand) focus:bg-white"
+															readonly
+															value={baliHandoffText}
+															aria-label={t.baliHandoff}
+														></textarea>
+														<div class="flex flex-wrap gap-2 lg:w-44 lg:flex-col">
+															<button
+																class="secondary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+																type="button"
+																disabled={!handoffCreated}
+																onclick={copyBaliHandoff}
+															>
+																<i class="ri-file-copy-line" aria-hidden="true"></i> {t.copyHandoff}
+															</button>
+															<button
+																class="secondary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+																type="button"
+																disabled={!handoffCreated}
+																onclick={downloadBaliHandoffPdf}
+															>
+																<i class="ri-file-pdf-2-line" aria-hidden="true"></i> {t.downloadPdf}
+															</button>
+															<button
+																class="secondary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+																type="button"
+																disabled={!handoffCreated || !allRequiredResolved}
+																aria-describedby={!allRequiredResolved ? 'handoff-blocked-reason' : undefined}
+																onclick={markBaliHandoffShared}
+															>
+																<i class="ri-checkbox-circle-line" aria-hidden="true"></i> {t.markAsShared}
+															</button>
+														</div>
+													</div>
+													<p class="mt-3 text-xs text-(--muted)">
+														{#if allRequiredResolved}
+															{t.handoffReadyDesc}
+														{:else}
+															{t.handoffHelperText}
+														{/if}
+													</p>
+												</div>
+											{/if}
+										</div>
 									{/if}
 								</div>
 
@@ -2739,97 +2949,7 @@ Line  Item Code      Description                  Qty  Unit Price
 								{/if}
 							</div>
 
-													<section class="mt-6 rounded-lg border border-(--line) bg-white p-5 shadow-sm" aria-labelledby="bali-handoff-title">
-							<div class="flex flex-wrap items-start justify-between gap-4">
-								<div class="max-w-2xl">
-									<h2 id="bali-handoff-title" class="font-display text-2xl text-(--ink)">{t.baliHandoff}</h2>
-									<p class="mt-2 text-sm leading-6 text-(--muted)">{t.handoffSubtitle}</p>
-								</div>
-								<div class="flex flex-wrap items-center gap-2">
-									<button
-										class="primary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-										type="button"
-										disabled={!handoffReady || !allRequiredResolved}
-										aria-disabled={!handoffReady || !allRequiredResolved}
-										aria-describedby={!handoffReady ? 'handoff-blocked-reason' : undefined}
-										title={!allRequiredResolved ? (t.reviewNeededHelp || '') : ''}
-										onclick={createBaliHandoff}
-									>
-										<i class="ri-file-list-3-line" aria-hidden="true"></i> {t.createBaliHandoff}
-									</button>
-									{#if handoffShared}
-										<span class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
-											{t.handoffSharedLocal}
-										</span>
-									{/if}
-								</div>
-							</div>
 
-							{#if !handoffReady}
-								<p id="handoff-blocked-reason" class="mt-3 text-sm font-semibold text-(--warning-ink)">
-									{!allRequiredResolved ? (t.reviewNeededHelp || 'Resolve required production fields first.') : t.handoffBlocked}
-								</p>
-							{/if}
-
-							{#if handoffCreated}
-								<div class="mt-5 border-t border-(--line) pt-5">
-									<div class="flex items-center justify-between gap-2">
-										<h3 class="font-semibold text-sm text-(--ink)">{t.packetPreview}</h3>
-										{#if allRequiredResolved}
-											<span class="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5">
-												{t.handoffReadyStatus || 'Ready for Bali handoff'}
-											</span>
-										{:else}
-											<span class="text-xs font-semibold text-(--warning-ink) bg-(--warning-bg) border border-(--warning) rounded px-2 py-0.5">
-												{t.handoffReviewStatus || 'Review needed before Bali handoff'}
-											</span>
-										{/if}
-									</div>
-									<div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-										<textarea
-											class="min-h-64 w-full resize-y rounded-md border border-(--line) bg-(--surface-soft) p-4 font-mono text-xs leading-6 text-(--ink) outline-none focus:border-(--brand) focus:bg-white"
-											readonly
-											value={baliHandoffText}
-											aria-label={t.baliHandoff}
-										></textarea>
-										<div class="flex flex-wrap gap-2 lg:w-44 lg:flex-col">
-											<button
-												class="secondary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-												type="button"
-												disabled={!handoffCreated}
-												onclick={copyBaliHandoff}
-											>
-												<i class="ri-file-copy-line" aria-hidden="true"></i> {t.copyHandoff}
-											</button>
-											<button
-												class="secondary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-												type="button"
-												disabled={!handoffCreated}
-												onclick={downloadBaliHandoffPdf}
-											>
-												<i class="ri-file-pdf-2-line" aria-hidden="true"></i> {t.downloadPdf}
-											</button>
-											<button
-												class="secondary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-												type="button"
-												disabled={!handoffCreated || !allRequiredResolved}
-												aria-describedby={!allRequiredResolved ? 'handoff-blocked-reason' : undefined}
-												onclick={markBaliHandoffShared}
-											>
-												<i class="ri-checkbox-circle-line" aria-hidden="true"></i> {t.markAsShared}
-											</button>
-										</div>
-									</div>
-									<p class="mt-3 text-xs text-(--muted)">
-										{#if allRequiredResolved}
-											{t.handoffReadyDesc}
-										{:else}
-											{t.handoffHelperText}
-										{/if}
-									</p>
-								</div>
-							{/if}
-						</section>
 						</div>
 					</section>
 				{:else}
@@ -2860,6 +2980,13 @@ Line  Item Code      Description                  Qty  Unit Price
 										</button>
 									</div>
 								</div>
+
+								{#if !client || client.trim() === '' || client.toLowerCase() === 'unresolved'}
+									<div class="mt-6 flex items-center gap-2 rounded-md border border-(--warning) bg-(--warning-bg) p-4 text-sm text-(--warning-ink) font-semibold">
+										<i class="ri-error-warning-line text-base shrink-0" aria-hidden="true"></i>
+										<span>Customer name needs review</span>
+									</div>
+								{/if}
 
 								<div id="customer-update-editor" class="mt-8">
 									<CustomerUpdateEditor
@@ -2992,8 +3119,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			<!-- Modal Container -->
 			<div transition:scale={{ duration: 250, start: 0.95 }} class="relative bg-white rounded-lg border border-(--line) shadow-2xl max-w-lg w-full mx-4 overflow-hidden flex flex-col max-h-[90vh]">
 				<!-- Top Close button -->
-				<button 
-					type="button" 
+				<button
+					type="button"
 					class="absolute right-4 top-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-(--surface-soft) text-(--muted) hover:text-(--ink) transition border-0 cursor-pointer p-0"
 					aria-label={t.closeDrawer}
 					onclick={closeWelcomeModal}
@@ -3009,7 +3136,7 @@ Line  Item Code      Description                  Qty  Unit Price
 						<div class="flex items-center justify-center w-14 h-14 rounded-xl bg-(--surface-soft) text-(--brand) shadow-sm border border-(--line) shrink-0">
 							<i class="ri-sparkling-2-line text-2xl"></i>
 						</div>
-						
+
 						<!-- Header Text -->
 						<div class="flex-1 min-w-0">
 							<div class="flex items-center gap-2 mb-1.5 text-[10px] text-(--muted) font-semibold">
@@ -3069,15 +3196,15 @@ Line  Item Code      Description                  Qty  Unit Price
 
 				<!-- Modal Footer -->
 				<div class="border-t border-(--line) bg-(--surface-soft) p-4 flex items-center justify-between gap-3 shrink-0">
-					<button 
-						type="button" 
+					<button
+						type="button"
 						class="text-xs text-(--muted) hover:text-(--ink) font-semibold transition cursor-pointer px-4 py-2.5 rounded hover:bg-(--surface-muted) bg-transparent border-0"
 						onclick={closeWelcomeModal}
 					>
 						{t.skipGuide}
 					</button>
-					<button 
-						type="button" 
+					<button
+						type="button"
 						class="bg-(--brand) hover:bg-(--brand-dark) text-white text-xs font-bold py-2.5 px-6 rounded shadow transition duration-150 flex items-center gap-1.5 cursor-pointer border-0"
 						onclick={handleLetsGo}
 					>

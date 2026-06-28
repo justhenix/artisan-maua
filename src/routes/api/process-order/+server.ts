@@ -55,7 +55,8 @@ export const POST: RequestHandler = async ({ request }) => {
 		let combinedText = '';
 		let fileContents = '';
 		let hasTxtOrCsvOrPdf = false;
-		let hasUnsupportedPdf = false;
+		let parseableCount = 0;
+		let unparseableCount = 0;
 
 		for (const file of files) {
 			const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
@@ -75,34 +76,48 @@ export const POST: RequestHandler = async ({ request }) => {
 							pages.push({ pageNum: i + 1, text: pageText });
 						}
 						if (totalTextLength === 0) {
-							hasUnsupportedPdf = true;
+							unparseableCount++;
 						} else {
 							fileContents += formatFileExtraction(file.name, mimeType, '', pages);
+							parseableCount++;
 						}
 					} catch (err) {
 						console.error(`Failed to parse PDF ${file.name}:`, err);
-						hasUnsupportedPdf = true;
+						unparseableCount++;
 					}
 				} else {
 					const content = await file.text();
-					fileContents += formatFileExtraction(file.name, mimeType, content);
+					if (content.trim().length > 0) {
+						fileContents += formatFileExtraction(file.name, mimeType, content);
+						parseableCount++;
+					} else {
+						unparseableCount++;
+					}
 				}
+			} else {
+				unparseableCount++;
 			}
 		}
 
-		if (hasUnsupportedPdf && !fileContents) {
-			return json({
-				success: true,
-				mode: 'failed',
-				provider: 'fixture',
-				fallbackReason: 'unsupported-scan',
-				helperMessage: 'This file does not contain readable text. Upload a text-based PDF/CSV/TXT or paste the PO text.',
-				lineItems: [],
-				blockers: []
-			});
+		const trimmedText = text.trim();
+		let helperMessage = '';
+
+		if (files.length > 0) {
+			if (parseableCount === 0) {
+				return json({
+					success: true,
+					mode: 'failed',
+					provider: 'fixture',
+					fallbackReason: 'unsupported-scan',
+					helperMessage: 'Upload a text-based PDF, CSV, TXT, or paste PO text.',
+					lineItems: [],
+					blockers: []
+				});
+			} else if (unparseableCount > 0) {
+				helperMessage = 'Some files could not be read.';
+			}
 		}
 
-		const trimmedText = text.trim();
 		if (hasTxtOrCsvOrPdf && fileContents) {
 			if (trimmedText && !isShortOrDoIt(trimmedText)) {
 				combinedText = trimmedText + '\n' + fileContents;
@@ -138,7 +153,8 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		return json({
 			...result,
-			combinedText
+			combinedText,
+			helperMessage: helperMessage || result.helperMessage
 		});
 	} catch (err) {
 		console.error('API extraction failed:', err);
