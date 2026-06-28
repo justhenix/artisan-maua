@@ -13,7 +13,6 @@
 		mobileSidebarOpen = $bindable(false),
 		onToggleSidebar,
 		onCloseMobileSidebar,
-		onReplayTour,
 		onClickLogo
 	}: {
 		t: Messages;
@@ -23,7 +22,6 @@
 		mobileSidebarOpen: boolean;
 		onToggleSidebar: () => void;
 		onCloseMobileSidebar: () => void;
-		onReplayTour?: () => void;
 		onClickLogo?: () => void;
 	} = $props();
 
@@ -146,24 +144,5 @@
 				</div>
 			{/if}
 		</div>
-
-		{#if onReplayTour}
-			<div class="relative group">
-				<button
-					id="replay-tour-btn"
-					class="flex w-full items-center gap-3 rounded-md px-4 py-3 text-left text-(--ink) hover:bg-(--surface-soft) transition cursor-pointer border-0 bg-transparent"
-					type="button"
-					onclick={onReplayTour}
-				>
-					<i class="ri-question-line text-lg" aria-hidden="true"></i>
-					<span class="sidebar-label">{t.replayTour}</span>
-				</button>
-				{#if sidebarCollapsed}
-					<div class="absolute left-14 top-1/2 -translate-y-1/2 ml-2 bg-(--surface-muted) text-(--ink) text-[10px] font-semibold px-2 py-1 rounded shadow border border-(--line) whitespace-nowrap z-50 hidden group-hover:block">
-						{t.replayTour}
-					</div>
-				{/if}
-			</div>
-		{/if}
 	</nav>
 </aside>

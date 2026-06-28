@@ -2002,7 +2002,21 @@ Heather Benjamin Jewelry`;
 					</button>
 
 					<div class="flex items-center gap-3">
-						<span class="text-xs uppercase tracking-wider font-semibold text-(--muted)">{t.workflow}:</span>
+						<div class="flex items-center gap-1.5">
+							<span class="text-xs uppercase tracking-wider font-semibold text-(--muted)">{t.workflow}:</span>
+							<div class="relative group flex items-center">
+								<span class="text-(--muted) hover:text-(--ink) transition cursor-pointer flex items-center justify-center" aria-label="Workflow help">
+									<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+										<circle cx="12" cy="12" r="10"></circle>
+										<line x1="12" y1="16" x2="12" y2="12"></line>
+										<line x1="12" y1="8" x2="12.01" y2="8"></line>
+									</svg>
+								</span>
+								<div class="absolute left-1/2 -translate-x-1/2 top-6 bg-(--surface-muted) text-(--ink) text-[10px] font-semibold px-2.5 py-1.5 rounded shadow border border-(--line) w-64 leading-normal z-50 hidden group-hover:block whitespace-normal">
+									{t.workflowHelp}
+								</div>
+							</div>
+						</div>
 						<select 
 							bind:value={orderStatus} 
 							onchange={onOrderStatusChange}
