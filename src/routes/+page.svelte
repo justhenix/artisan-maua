@@ -16,6 +16,8 @@
 	import ReviewBlockerList from '$lib/components/artisan/ReviewBlockerList.svelte';
 	import enMessages from '../../messages/en.json';
 	import idMessages from '../../messages/id.json';
+	import AppShell from '$lib/components/artisan/AppShell.svelte';
+	import { fallbackCatalog, type CatalogItem } from '$lib/data/fallbackCatalog';
 
 	let { data }: { data: any } = $props();
 
@@ -45,19 +47,6 @@
 		notes: string;
 		source: string;
 		unitPrice: number; // Client PO price
-		imageUrl?: string;
-	};
-
-	type CatalogItem = {
-		styleCode: string;
-		creativeTitle: string;
-		baseLabor: number;
-		silverWeight: number; // in grams
-		stoneCost: number;
-		category: 'Pins' | 'Brim Pinches' | 'Traditional Jewelry' | 'Others';
-		material: 'Silver' | 'Gold' | 'Brass' | 'Others';
-		notes_en: string;
-		notes_id: string;
 		imageUrl?: string;
 	};
 
@@ -290,9 +279,7 @@ Line  Item Code      Description                  Qty  Unit Price
 				for (const cat of catalog) {
 					if (
 						line.toLowerCase().includes(cat.styleCode.toLowerCase()) ||
-						line.toLowerCase().includes(cat.creativeTitle.toLowerCase()) ||
-						(cat.creativeTitle === 'Horse Pin Medium' && line.toLowerCase().includes('horse pin')) ||
-						(cat.creativeTitle === 'Bali Starburst Large' && line.toLowerCase().includes('starburst'))
+						line.toLowerCase().includes(cat.creativeTitle.toLowerCase())
 					) {
 						matchedCatalog = cat;
 						break;
@@ -429,140 +416,9 @@ Line  Item Code      Description                  Qty  Unit Price
 		markAutoSaved();
 	}
 
-	const catalog = $derived<CatalogItem[]>(data.catalogItems && data.catalogItems.length > 0 ? data.catalogItems : [
-		{ 
-			styleCode: 'HB-HORSE-M', 
-			creativeTitle: 'Horse Pin Medium', 
-			baseLabor: 12.00, 
-			silverWeight: 8.5, 
-			stoneCost: 0,
-			category: 'Pins',
-			material: 'Silver',
-			notes_en: 'Cast in sterling silver. Match master horse mold size M.',
-			notes_id: 'Cor dalam perak murni. Sesuaikan dengan cetakan induk kuda ukuran M.',
-			imageUrl: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=120&h=120&fit=crop'
-		},
-		{ 
-			styleCode: 'HB-HORSE-S', 
-			creativeTitle: 'Horse Pin Small', 
-			baseLabor: 9.50, 
-			silverWeight: 5.0, 
-			stoneCost: 0,
-			category: 'Pins',
-			material: 'Silver',
-			notes_en: 'Cast in sterling silver. Match master horse mold size S.',
-			notes_id: 'Cor dalam perak murni. Sesuaikan dengan cetakan induk kuda ukuran S.',
-			imageUrl: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=120&h=120&fit=crop'
-		},
-		{ 
-			styleCode: 'HB-HORSE-L', 
-			creativeTitle: 'Horse Pin Large', 
-			baseLabor: 15.00, 
-			silverWeight: 11.5, 
-			stoneCost: 0,
-			category: 'Pins',
-			material: 'Silver',
-			notes_en: 'Cast in sterling silver. Match master horse mold size L.',
-			notes_id: 'Cor dalam perak murni. Sesuaikan dengan cetakan induk kuda ukuran L.',
-			imageUrl: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=120&h=120&fit=crop'
-		},
-		{ 
-			styleCode: 'HB-MTN-P', 
-			creativeTitle: 'Mountain Pendant', 
-			baseLabor: 18.00, 
-			silverWeight: 12.0, 
-			stoneCost: 5.50,
-			category: 'Traditional Jewelry',
-			material: 'Silver',
-			notes_en: 'Hand-carved snow structures and mother-of-pearl accent. Long chain.',
-			notes_id: 'Struktur salju diukir tangan dengan hiasan kerang mutiara. Rantai panjang.',
-			imageUrl: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=120&h=120&fit=crop'
-		},
-		{ 
-			styleCode: 'HB-WAVE-C', 
-			creativeTitle: 'Wave Cuff', 
-			baseLabor: 22.00, 
-			silverWeight: 18.5, 
-			stoneCost: 0,
-			category: 'Traditional Jewelry',
-			material: 'Silver',
-			notes_en: 'Wave textured cuff. Hand-finish silver. 6.5 inch circumference.',
-			notes_id: 'Gelang bertekstur ombak. Perak polesan tangan. Lingkar 6.5 inci.',
-			imageUrl: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=120&h=120&fit=crop'
-		},
-		{ 
-			styleCode: 'HB-SB-STUD', 
-			creativeTitle: 'Starburst Studs', 
-			baseLabor: 15.00, 
-			silverWeight: 6.2, 
-			stoneCost: 2.00,
-			category: 'Traditional Jewelry',
-			material: 'Gold',
-			notes_en: 'Starburst design with gold vermeil finish. Match gold thickness rules.',
-			notes_id: 'Desain starburst dengan lapisan emas vermeil. Sesuaikan ketebalan emas.',
-			imageUrl: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=120&h=120&fit=crop'
-		},
-		{ 
-			styleCode: 'HB-TSR-2', 
-			creativeTitle: 'Thin Stacking Ring', 
-			baseLabor: 5.00, 
-			silverWeight: 2.1, 
-			stoneCost: 0,
-			category: 'Traditional Jewelry',
-			material: 'Silver',
-			notes_en: 'Thin stacking ring. Mix sizes 7 and 8.',
-			notes_id: 'Cincin tumpuk tipis. Campuran ukuran 7 dan 8.',
-			imageUrl: 'https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=120&h=120&fit=crop'
-		},
-		{ 
-			styleCode: 'HB-CC-18', 
-			creativeTitle: 'Cable Chain 18"', 
-			baseLabor: 4.00, 
-			silverWeight: 4.5, 
-			stoneCost: 0,
-			category: 'Others',
-			material: 'Silver',
-			notes_en: 'Cable chain 18 inches. Check links and clasp durability.',
-			notes_id: 'Rantai kabel 18 inci. Periksa ketahanan sambungan dan pengait.',
-			imageUrl: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=120&h=120&fit=crop'
-		},
-		{ 
-			styleCode: 'HB-SB-MINI', 
-			creativeTitle: 'Bali Starburst Mini', 
-			baseLabor: 8.00, 
-			silverWeight: 3.5, 
-			stoneCost: 0,
-			category: 'Traditional Jewelry',
-			material: 'Silver',
-			notes_en: 'Mini starburst studs in sterling silver.',
-			notes_id: 'Anting giwang starburst mini dalam perak murni.',
-			imageUrl: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=120&h=120&fit=crop'
-		},
-		{ 
-			styleCode: 'HB-SB-SMALL', 
-			creativeTitle: 'Bali Starburst Small', 
-			baseLabor: 10.00, 
-			silverWeight: 4.8, 
-			stoneCost: 0,
-			category: 'Traditional Jewelry',
-			material: 'Silver',
-			notes_en: 'Small starburst studs in sterling silver.',
-			notes_id: 'Anting giwang starburst kecil dalam perak murni.',
-			imageUrl: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=120&h=120&fit=crop'
-		},
-		{ 
-			styleCode: 'HB-SB-LARGE', 
-			creativeTitle: 'Bali Starburst Large', 
-			baseLabor: 14.00, 
-			silverWeight: 7.2, 
-			stoneCost: 0,
-			category: 'Traditional Jewelry',
-			material: 'Silver',
-			notes_en: 'Large starburst studs in sterling silver.',
-			notes_id: 'Anting giwang starburst besar dalam perak murni.',
-			imageUrl: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=120&h=120&fit=crop'
-		}
-	]);
+	const catalog = $derived<CatalogItem[]>(
+		data.catalogItems && data.catalogItems.length > 0 ? data.catalogItems : fallbackCatalog
+	);
 
 	const initialBlockers = (): Blocker[] => [
 		{
@@ -709,8 +565,6 @@ Heather Benjamin Jewelry`;
 	let toastTimeout: number | undefined;
 	let sent = $state(false);
 	let contentPanel = $state<HTMLDivElement | undefined>();
-	let sidebarCollapsed = $state(false);
-	let mobileSidebarOpen = $state(false);
 	let showWelcomeModal = $state(false);
 
 	let orders = $state<any[]>([]);
@@ -823,6 +677,10 @@ Heather Benjamin Jewelry`;
 	);
 	const packedCount = $derived(Object.values(packedItems).filter(Boolean).length);
 	const customerEmail = $derived(extractEmail(intakeText));
+
+	const reviewOrders = $derived(orders.filter(o => o.status === 'Review').length);
+	const productionOrders = $derived(orders.filter(o => o.status === 'Production' || o.status === 'Packing').length);
+	const completedOrders = $derived(orders.filter(o => o.status === 'Completed').length);
 
 	const maxStep = $derived(allAnswered ? Math.max(completedSteps, 3) as Step : completedSteps as Step);
 
@@ -1056,6 +914,10 @@ Thank you,
 Heather Benjamin Jewelry`;
 			}
 		} else {
+			if (lineItems.length === 0) {
+				lineItems = initialLineItems();
+				blockers = initialBlockers();
+			}
 			lineItems.forEach((item) => {
 				if (item.styleCode) {
 					const cat = catalog.find(c => c.styleCode === item.styleCode);
@@ -1066,6 +928,7 @@ Heather Benjamin Jewelry`;
 			});
 		}
 
+		markAutoSaved();
 		setStep(2);
 	}
 
@@ -1074,7 +937,6 @@ Heather Benjamin Jewelry`;
 		if (step > completedSteps) {
 			completedSteps = step;
 		}
-		mobileSidebarOpen = false;
 		if (!browser) return;
 		window.requestAnimationFrame(() => contentPanel?.scrollTo({ top: 0, left: 0 }));
 	}
@@ -1083,14 +945,6 @@ Heather Benjamin Jewelry`;
 		if (currentStep > 1) {
 			setStep((currentStep - 1) as Step);
 		}
-	}
-
-	function toggleSidebar() {
-		if (browser && window.innerWidth < 1024) {
-			mobileSidebarOpen = !mobileSidebarOpen;
-			return;
-		}
-		sidebarCollapsed = !sidebarCollapsed;
 	}
 
 	function chooseAnswer(blockerId: string, answer: string) {
@@ -1264,10 +1118,18 @@ Heather Benjamin Jewelry`;
 	function onMilestoneChange() {
 		if (milestones.moldsChecked && milestones.silverCast && milestones.qualityChecked && milestones.readyForShipping) {
 			orderStatus = 'Completed';
+			setStep(4);
 		} else if (milestones.readyForShipping) {
 			orderStatus = 'Packing';
+			setStep(3);
+			activeTab = 'packing';
 		} else if (milestones.moldsChecked || milestones.silverCast) {
 			orderStatus = 'Production';
+			setStep(3);
+			activeTab = 'production';
+		} else {
+			orderStatus = 'Review';
+			setStep(2);
 		}
 		
 		const order = orders.find(o => o.id === selectedOrderId);
@@ -1283,12 +1145,25 @@ Heather Benjamin Jewelry`;
 	function onOrderStatusChange() {
 		if (orderStatus === 'Completed') {
 			milestones = { moldsChecked: true, silverCast: true, qualityChecked: true, readyForShipping: true };
+			setStep(4);
 		} else if (orderStatus === 'Packing') {
 			milestones.moldsChecked = true;
 			milestones.silverCast = true;
 			milestones.qualityChecked = true;
+			milestones.readyForShipping = false;
+			setStep(3);
+			activeTab = 'packing';
+		} else if (orderStatus === 'Production') {
+			if (!milestones.moldsChecked && !milestones.silverCast) {
+				milestones.moldsChecked = true;
+			}
+			milestones.qualityChecked = false;
+			milestones.readyForShipping = false;
+			setStep(3);
+			activeTab = 'production';
 		} else if (orderStatus === 'Review') {
 			milestones = { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false };
+			setStep(2);
 		}
 		
 		const order = orders.find(o => o.id === selectedOrderId);
@@ -1707,251 +1582,102 @@ Heather Benjamin Jewelry`;
 	/>
 </svelte:head>
 
-<main class="h-screen overflow-hidden bg-[var(--bg)] text-[var(--ink)]">
-	<div class={`app-shell ${sidebarCollapsed ? 'app-shell-collapsed' : ''}`}>
-		{#if mobileSidebarOpen}
-			<button
-				class="sidebar-backdrop"
-				type="button"
-				aria-label={t.closeSidebar}
-				onclick={() => (mobileSidebarOpen = false)}
-			></button>
-		{/if}
-
-		<aside
-			class={`sidebar ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileSidebarOpen ? 'sidebar-open' : ''} flex flex-col h-screen`}
-		>
-			<div class="sidebar-heading" id="sidebar-logo">
-				{#if !sidebarCollapsed}
-					<!-- Open State Header -->
-					<div class="flex w-full items-center justify-between">
-						<div class="sidebar-title flex items-center gap-2">
-							<div class="w-8 h-8 rounded-full bg-[var(--surface-muted)] flex items-center justify-center text-[var(--brand)]">
-								<i class="ri-sparkling-fill text-lg"></i>
-							</div>
-							<div>
-								<p class="font-display text-xl leading-tight">Artisan</p>
-								<p class="text-[10px] text-[var(--muted)]">Order-to-Production</p>
-							</div>
-						</div>
-						<div class="relative group">
-							<button
-								class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-muted)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
-								type="button"
-								aria-label={t.closeSidebar}
-								onclick={toggleSidebar}
-							>
-								<i class="ri-sidebar-fold-line text-lg"></i>
-							</button>
-							<div class="absolute right-10 top-1/2 -translate-y-1/2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
-								{t.closeSidebar}
-							</div>
-						</div>
-					</div>
-				{:else}
-					<!-- Collapsed State Header: shows logo, on hover replaces with toggle button -->
-					<div class="relative w-10 h-10 flex items-center justify-center mx-auto group">
-						<!-- Logo: visible by default, hidden on hover -->
-						<div class="w-8 h-8 rounded-full bg-[var(--surface-muted)] flex items-center justify-center text-[var(--brand)] transition-opacity duration-150 group-hover:opacity-0">
-							<i class="ri-sparkling-fill text-lg"></i>
-						</div>
-						<!-- Toggle button: hidden by default, visible on hover -->
-						<button
-							class="absolute inset-0 w-10 h-10 flex items-center justify-center rounded-full hover:bg-[var(--surface-muted)] text-[var(--muted)] hover:text-[var(--ink)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-transparent border-0 p-0 cursor-pointer"
-							type="button"
-							aria-label={t.openSidebar}
-							onclick={toggleSidebar}
-						>
-							<i class="ri-sidebar-unfold-line text-lg"></i>
-						</button>
-							<div class="absolute left-12 top-1/2 -translate-y-1/2 ml-2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
-								{t.openSidebar}
-						</div>
-					</div>
-				{/if}
-			</div>
-
-			<nav class="mt-10 space-y-2 flex-1">
-				<div class="relative group">
-					<button
-						onclick={() => (activeView = 'dashboard')}
-						class={`flex w-full items-center gap-3 rounded-md px-4 py-3 text-left transition cursor-pointer border-0 ${
-							activeView === 'dashboard'
-								? 'bg-[var(--nav-active)] font-semibold text-[var(--ink)] shadow-sm'
-								: 'text-[var(--ink)] hover:bg-[var(--surface-soft)] bg-transparent'
-						}`}
-						type="button"
-					>
-						<i class="ri-file-list-3-line text-lg" aria-hidden="true"></i>
-						<span class="sidebar-label">{t.orders}</span>
-					</button>
-					{#if sidebarCollapsed}
-						<div class="absolute left-14 top-1/2 -translate-y-1/2 ml-2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
-							{t.orders}
-						</div>
-					{/if}
-				</div>
-
-				<div class="relative group">
-					<button
-						class="flex w-full items-center justify-between rounded-md px-4 py-3 text-left text-[var(--ink)]"
-						type="button"
-					>
-						<span class="flex items-center gap-3">
-							<i class="ri-book-open-line text-lg" aria-hidden="true"></i>
-							<span class="sidebar-label">{t.catalog}</span>
-						</span>
-						<span class="sidebar-label rounded bg-[var(--surface-muted)] px-2 py-1 text-xs text-[var(--muted)]">{t.later}</span>
-					</button>
-					{#if sidebarCollapsed}
-						<div class="absolute left-14 top-1/2 -translate-y-1/2 ml-2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
-							{t.catalog}
-						</div>
-					{/if}
-				</div>
-
-				<div class="relative group">
-					<button
-						id="replay-tour-btn"
-						class="flex w-full items-center gap-3 rounded-md px-4 py-3 text-left text-[var(--ink)] hover:bg-[var(--surface-soft)] transition"
-						type="button"
-						onclick={startTour}
-					>
-						<i class="ri-question-line text-lg" aria-hidden="true"></i>
-						<span class="sidebar-label">{t.replayTour}</span>
-					</button>
-					{#if sidebarCollapsed}
-						<div class="absolute left-14 top-1/2 -translate-y-1/2 ml-2 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
-							{t.replayTour}
-						</div>
-					{/if}
-				</div>
-			</nav>
-
-		</aside>
-
-		<section class="app-main">
-			<header class="app-header flex items-center justify-between px-6 py-3 border-b border-[var(--line)] bg-white">
-				<div class="flex items-center gap-4">
-					<button class="icon-button header-toggle" type="button" aria-label={t.toggleSidebar} onclick={toggleSidebar}>
-						<i class="ri-menu-line text-lg" aria-hidden="true"></i>
-					</button>
-					<span class="text-xs text-[var(--muted)]">{t.lastSaved} {lastSaved}</span>
-				</div>
-				<div class="flex items-center gap-4">
-					<!-- i18n Language Segment Control -->
-					<div class="flex items-center gap-1 border border-[var(--line)] rounded bg-[var(--surface-soft)] p-0.5 text-xs shadow-sm">
-						<a
-							href={resolve(localizeHref(page.url.pathname, { locale: 'en' }) as Pathname)}
-							class={`px-2.5 py-1 rounded font-semibold text-xs leading-none transition-all ${currentLocale === 'en' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
-							aria-label="English US"
-							title="English US"
-						>
-							US
-						</a>
-						<a
-							href={resolve(localizeHref(page.url.pathname, { locale: 'id' }) as Pathname)}
-							class={`px-2.5 py-1 rounded font-semibold text-xs leading-none transition-all ${currentLocale === 'id' ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
-							aria-label="Indonesia ID"
-							title="Indonesia ID"
-						>
-							ID
-						</a>
-					</div>
-
-					<!-- Right Sidebar Toggle Button -->
-					<div class="relative group">
-						<button
-							class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
-							type="button"
-							aria-label={rightSidebarCollapsed ? t.openRightPanel : t.closeRightPanel}
-							onclick={() => (rightSidebarCollapsed = !rightSidebarCollapsed)}
-						>
-							{#if rightSidebarCollapsed}
-								<i class="ri-layout-right-line text-lg"></i>
-							{:else}
-								<i class="ri-layout-right-fill text-lg text-[var(--brand)]"></i>
-							{/if}
-						</button>
-						<div class="absolute right-0 top-10 bg-[var(--surface-muted)] text-[var(--ink)] text-[10px] font-semibold px-2 py-1 rounded shadow border border-[var(--line)] whitespace-nowrap z-50 hidden group-hover:block">
-							{rightSidebarCollapsed 
-								? t.openRightPanel
-								: t.closeRightPanel}
-						</div>
-					</div>
-				</div>
-			</header>
-
-			{#if activeView === 'dashboard'}
+<main class="h-screen overflow-hidden bg-(--bg) text-(--ink)">
+	<AppShell
+		{t}
+		{currentLocale}
+		currentPath={page.url.pathname}
+		headerLastSaved={lastSaved}
+		headerRightSidebarCollapsed={rightSidebarCollapsed}
+		headerOnToggleRightSidebar={() => (rightSidebarCollapsed = !rightSidebarCollapsed)}
+		onReplayTour={startTour}
+		mainClass={`${activeView === 'dashboard' ? 'app-main-dashboard' : ''} ${activeView === 'workbench' && currentStep > 1 ? 'app-main-workbench-status' : ''}`}
+	>
+		{#if activeView === 'dashboard'}
 				<div class="flex-1 overflow-y-auto bg-gray-50/50 p-6 md:p-10 font-sans">
 					<div class="max-w-6xl mx-auto">
 						<div class="flex items-center justify-between mb-8">
 							<div>
-								<h1 class="font-display text-3xl font-bold tracking-tight text-[var(--ink)]">Orders Dashboard</h1>
-								<p class="text-sm text-[var(--muted)]">Manage production pipelines and Bali factory status</p>
+								<h1 class="font-display text-3xl font-bold tracking-tight text-(--ink)">{t.ordersDashboard}</h1>
+								<p class="text-sm text-(--muted)">{t.ordersDashboardDesc}</p>
 							</div>
 							<button
 								onclick={createNewOrder}
-								class="flex items-center gap-2 px-4 py-2.5 rounded bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)] text-sm font-semibold transition cursor-pointer border-0 shadow-sm"
+								class="flex items-center gap-2 px-4 py-2.5 rounded bg-(--brand) text-white hover:bg-(--brand-dark) text-sm font-semibold transition cursor-pointer border-0 shadow-sm"
 							>
 								<i class="ri-add-line text-base"></i>
-								New Purchase Order
+								{t.newPurchaseOrder}
 							</button>
+						</div>
+
+						<!-- Summary Stats Cards -->
+						<div class="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+							<div class="rounded-lg border border-(--line) bg-white p-4 shadow-sm">
+								<p class="text-xs font-semibold text-(--muted) uppercase tracking-wider">{t.needsReview}</p>
+								<div class="mt-3 flex items-end justify-between gap-4">
+									<strong class="font-display text-3xl leading-none">{reviewOrders}</strong>
+									<span class="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">{t.blockerFirst}</span>
+								</div>
+							</div>
+							<div class="rounded-lg border border-(--line) bg-white p-4 shadow-sm">
+								<p class="text-xs font-semibold text-(--muted) uppercase tracking-wider">{t.inProgress}</p>
+								<div class="mt-3 flex items-end justify-between gap-4">
+									<strong class="font-display text-3xl leading-none">{productionOrders}</strong>
+									<span class="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-800">{t.baliTasks}</span>
+								</div>
+							</div>
+							<div class="rounded-lg border border-(--line) bg-white p-4 shadow-sm">
+								<p class="text-xs font-semibold text-(--muted) uppercase tracking-wider">{t.completed}</p>
+								<div class="mt-3 flex items-end justify-between gap-4">
+									<strong class="font-display text-3xl leading-none">{completedOrders}</strong>
+									<span class="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">{t.readyHistory}</span>
+								</div>
+							</div>
 						</div>
 
 						<!-- Kanban Grid -->
 						<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
 							{#each ['Review', 'Production', 'Packing', 'Completed'] as colStatus}
-								<div class="flex flex-col bg-[var(--surface-soft)] rounded-lg p-4 border border-[var(--line)] min-h-[400px]">
-									<div class="flex items-center justify-between mb-4 pb-2 border-b border-[var(--line)]">
+								<div class="flex flex-col bg-(--surface-soft) rounded-lg p-4 border border-(--line) min-h-100">
+									<div class="flex items-center justify-between mb-4 pb-2 border-b border-(--line)">
 										<div class="flex items-center gap-2">
 											<span class={`w-2.5 h-2.5 rounded-full ${
 												colStatus === 'Review' ? 'bg-amber-500' :
 												colStatus === 'Production' ? 'bg-blue-500' :
 												colStatus === 'Packing' ? 'bg-purple-500' : 'bg-emerald-500'
 											}`}></span>
-											<h3 class="font-semibold text-sm text-[var(--ink)]">
-												{colStatus === 'Review' ? 'Review Required' :
-												 colStatus === 'Production' ? 'In Production' :
-												 colStatus === 'Packing' ? 'Fulfillment / Packing' : 'Completed / Shipped'}
+											<h3 class="font-semibold text-sm text-(--ink)">
+												{colStatus === 'Review' ? t.reviewRequired :
+												 colStatus === 'Production' ? t.inProduction :
+												 colStatus === 'Packing' ? t.fulfillmentPacking : t.completedShipped}
 											</h3>
 										</div>
-										<span class="rounded bg-white px-2 py-0.5 text-xs border border-[var(--line)] font-medium text-[var(--muted)]">
+										<span class="rounded bg-white px-2 py-0.5 text-xs border border-(--line) font-medium text-(--muted)">
 											{orders.filter(o => o.status === colStatus).length}
 										</span>
 									</div>
 
-									<div class="flex-1 space-y-4 overflow-y-auto max-h-[600px] pr-1">
+									<div class="flex-1 space-y-4 overflow-y-auto max-h-150 pr-1">
 										{#each orders.filter(o => o.status === colStatus) as order (order.id)}
 											<button
 												onclick={() => selectOrder(order.id)}
-												class="w-full text-left bg-white rounded border border-[var(--line)] hover:border-[var(--brand)] hover:shadow-sm p-4 transition cursor-pointer focus:outline-none flex flex-col gap-3"
+												class="w-full text-left bg-white rounded border border-(--line) hover:border-(--brand) hover:shadow-sm p-4 transition cursor-pointer focus:outline-none flex flex-col gap-3"
 											>
 												<div class="flex items-center justify-between">
-													<span class="text-xs font-mono font-medium text-[var(--muted)]">{order.id}</span>
-													<span class={`px-2 py-0.5 rounded text-[10px] font-semibold leading-none ${
-														order.status === 'Review' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-														order.status === 'Production' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-														order.status === 'Packing' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-														'bg-emerald-50 text-emerald-700 border border-emerald-200'
-													}`}>
-														{order.status === 'Review' ? 'Review' :
-														 order.status === 'Production' ? 'Production' :
-														 order.status === 'Packing' ? 'Packing' : 'Completed'}
-													</span>
+													<span class="text-xs font-mono font-medium text-(--muted)">{order.id}</span>
 												</div>
 
 												<div>
-													<h4 class="font-semibold text-sm text-[var(--ink)] leading-tight">{order.clientName}</h4>
-													<p class="text-[11px] text-[var(--muted)] mt-1">
-														Updated: {new Date(order.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+													<h4 class="font-semibold text-sm text-(--ink) leading-tight">{order.clientName}</h4>
+													<p class="text-[11px] text-(--muted) mt-1">
+														{t.updated}: {new Date(order.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
 													</p>
 												</div>
 
 												<!-- Checklist milestones progress -->
 												<div class="space-y-1">
-													<div class="flex items-center justify-between text-[11px] text-[var(--muted)]">
-														<span>Bali Milestones</span>
+													<div class="flex items-center justify-between text-[11px] text-(--muted)">
+														<span>{t.baliMilestones}</span>
 														<span class="font-medium">{getMilestoneCompletedCount(order.milestones)}/4</span>
 													</div>
 													<div class="w-full h-1.5 bg-gray-100 rounded overflow-hidden">
@@ -1969,8 +1695,8 @@ Heather Benjamin Jewelry`;
 										{/each}
 
 										{#if orders.filter(o => o.status === colStatus).length === 0}
-											<div class="h-20 flex items-center justify-center border border-dashed border-[var(--line)] rounded text-xs text-[var(--muted)] border-gray-200 text-gray-400">
-												No orders
+											<div class="h-20 flex items-center justify-center border border-dashed border-(--line) rounded text-xs text-(--muted) border-gray-200 text-gray-400">
+												{t.noOrders}
 											</div>
 										{/if}
 									</div>
@@ -1981,72 +1707,72 @@ Heather Benjamin Jewelry`;
 				</div>
 			{:else}
 				<!-- Status Milestone Tracker Banner -->
-				<div class="bg-[var(--surface-soft)] border-b border-[var(--line)] px-4 md:px-10 py-3 flex flex-wrap items-center justify-between gap-4 text-xs shadow-sm font-sans shrink-0">
-					<button onclick={() => (activeView = 'dashboard')} class="flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--brand)] transition cursor-pointer border-0 bg-transparent p-0 font-medium">
+				<div class="bg-(--surface-soft) border-b border-(--line) px-4 md:px-10 py-3 flex flex-wrap items-center justify-between gap-4 text-xs shadow-sm font-sans shrink-0">
+					<button onclick={() => (activeView = 'dashboard')} class="flex items-center gap-1.5 text-xs text-(--muted) hover:text-(--brand) transition cursor-pointer border-0 bg-transparent p-0 font-medium">
 						<i class="ri-arrow-left-line"></i>
-						Back to Dashboard
+						{t.backToDashboard}
 					</button>
 
 					<div class="flex items-center gap-3">
-						<span class="text-xs uppercase tracking-wider font-semibold text-[var(--muted)]">Status:</span>
+						<span class="text-xs uppercase tracking-wider font-semibold text-(--muted)">{t.workflow}:</span>
 						<select 
 							bind:value={orderStatus} 
 							onchange={onOrderStatusChange}
-							class="rounded border border-[var(--line)] bg-white px-2 py-0.5 text-xs font-semibold focus:border-[var(--brand)] outline-none cursor-pointer"
+							class="rounded border border-(--line) bg-white px-2 py-0.5 text-xs font-semibold focus:border-(--brand) outline-none cursor-pointer"
 						>
-							<option value="Review">Review Required</option>
-							<option value="Production">In Production</option>
-							<option value="Packing">Fulfillment / Packing</option>
-							<option value="Completed">Completed / Shipped</option>
+							<option value="Review">{t.reviewRequiredOption}</option>
+							<option value="Production">{t.inProductionOption}</option>
+							<option value="Packing">{t.fulfillmentPackingOption}</option>
+							<option value="Completed">{t.completedShippedOption}</option>
 						</select>
 					</div>
 
 					<div class="flex items-center gap-6 flex-wrap">
-						<span class="text-xs uppercase tracking-wider font-semibold text-[var(--muted)]">Bali Milestones:</span>
+						<span class="text-xs uppercase tracking-wider font-semibold text-(--muted)">{t.baliMilestones}:</span>
 						
-						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-[var(--ink)]">
+						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-(--ink)">
 							<input 
 								type="checkbox" 
 								bind:checked={milestones.moldsChecked} 
 								onchange={onMilestoneChange}
-								class="rounded border-[var(--line)] text-[var(--brand)] focus:ring-[var(--brand)] h-3.5 w-3.5"
+								class="rounded border-(--line) text-(--brand) focus:ring-(--brand) h-3.5 w-3.5"
 							/>
-							<span>Molds Verified</span>
+							<span>{t.moldsVerified}</span>
 						</label>
 
-						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-[var(--ink)]">
+						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-(--ink)">
 							<input 
 								type="checkbox" 
 								bind:checked={milestones.silverCast} 
 								onchange={onMilestoneChange}
-								class="rounded border-[var(--line)] text-[var(--brand)] focus:ring-[var(--brand)] h-3.5 w-3.5"
+								class="rounded border-(--line) text-(--brand) focus:ring-(--brand) h-3.5 w-3.5"
 							/>
-							<span>Silver Cast</span>
+							<span>{t.silverCast}</span>
 						</label>
 
-						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-[var(--ink)]">
+						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-(--ink)">
 							<input 
 								type="checkbox" 
 								bind:checked={milestones.qualityChecked} 
 								onchange={onMilestoneChange}
-								class="rounded border-[var(--line)] text-[var(--brand)] focus:ring-[var(--brand)] h-3.5 w-3.5"
+								class="rounded border-(--line) text-(--brand) focus:ring-(--brand) h-3.5 w-3.5"
 							/>
-							<span>QC Passed</span>
+							<span>{t.qcPassed}</span>
 						</label>
 
-						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-[var(--ink)]">
+						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-(--ink)">
 							<input 
 								type="checkbox" 
 								bind:checked={milestones.readyForShipping} 
 								onchange={onMilestoneChange}
-								class="rounded border-[var(--line)] text-[var(--brand)] focus:ring-[var(--brand)] h-3.5 w-3.5"
+								class="rounded border-(--line) text-(--brand) focus:ring-(--brand) h-3.5 w-3.5"
 							/>
-							<span>Ready to Ship</span>
+							<span>{t.readyToShip}</span>
 						</label>
 					</div>
 				</div>
 
-				<div class="step-scroll border-b border-[var(--line)] bg-white px-4 md:px-10">
+				<div class="step-scroll border-b border-(--line) bg-white px-4 md:px-10">
 				<div class="mx-auto flex h-full min-w-max max-w-6xl items-center justify-between gap-3 md:gap-4">
 					{#each steps as step, index (step.id)}
 						<button
@@ -2064,12 +1790,12 @@ Heather Benjamin Jewelry`;
 									{step.id}
 								{/if}
 							</span>
-							<span class={`step-label ${step.id > maxStep ? 'text-[var(--muted)] opacity-60' : 'font-semibold'}`}>
+							<span class={`step-label ${step.id > maxStep ? 'text-(--muted) opacity-60' : 'font-semibold'}`}>
 								{stepLabel(step.id)}
 							</span>
 						</button>
 						{#if index < steps.length - 1}
-							<div class="hidden h-px flex-1 bg-[var(--line)] md:block"></div>
+							<div class="hidden h-px flex-1 bg-(--line) md:block"></div>
 						{/if}
 					{/each}
 				</div>
@@ -2083,10 +1809,10 @@ Heather Benjamin Jewelry`;
 								<h1 class="font-display text-4xl leading-tight md:text-5xl">{t.addWholesaleOrder}</h1>
 								<p class="mt-4 max-w-3xl whitespace-pre-line text-lg leading-8">{t.intakeDesc}</p>
 
-								<div class="mt-8 rounded-lg border border-[var(--line)] bg-white p-6 shadow-sm">
+								<div class="mt-8 rounded-lg border border-(--line) bg-white p-6 shadow-sm">
 									<!-- Unified Intake Composer -->
 									<div 
-										class={`relative border rounded-lg p-1 min-h-[300px] transition-all duration-300 flex flex-col bg-[var(--surface-soft)] ${isDragging ? 'border-[var(--brand)] bg-[var(--brand)]/5 ring-4 ring-[var(--brand)]/10' : 'border-[var(--line)] bg-[var(--surface-soft)] focus-within:border-[var(--brand)] focus-within:bg-white'}`}
+										class={`relative border rounded-lg p-1 min-h-75 transition-all duration-300 flex flex-col bg-(--surface-soft) ${isDragging ? 'border-(--brand) bg-(--brand)/5 ring-4 ring-(--brand)/10' : 'border-(--line) bg-(--surface-soft) focus-within:border-(--brand) focus-within:bg-white'}`}
 										role="region"
 										aria-label="Unified order composer"
 										ondragenter={(e) => { e.preventDefault(); isDragging = true; }}
@@ -2097,27 +1823,27 @@ Heather Benjamin Jewelry`;
 									>
 										<!-- Drop Overlay -->
 										{#if isDragging}
-											<div class="absolute inset-0 bg-[var(--brand)]/10 flex flex-col items-center justify-center pointer-events-none rounded-lg z-20 border-2 border-dashed border-[var(--brand)]">
-												<i class="ri-upload-cloud-2-line text-4xl text-[var(--brand)] animate-bounce"></i>
-												<strong class="text-sm mt-2 text-[var(--brand-dark)]">Drop files anywhere to attach</strong>
+											<div class="absolute inset-0 bg-(--brand)/10 flex flex-col items-center justify-center pointer-events-none rounded-lg z-20 border-2 border-dashed border-(--brand)">
+												<i class="ri-upload-cloud-2-line text-4xl text-(--brand) animate-bounce"></i>
+												<strong class="text-sm mt-2 text-(--brand-dark)">Drop files anywhere to attach</strong>
 											</div>
 										{/if}
 
 										<!-- Textarea -->
 										<textarea
 											id="intake-scratchpad"
-											class="flex-1 w-full min-h-[320px] resize-none p-4 font-mono text-sm leading-6 outline-none bg-transparent border-0"
+											class="flex-1 w-full min-h-80 resize-none p-4 font-mono text-sm leading-6 outline-none bg-transparent border-0"
 											placeholder="Paste purchase order details, email text, DM conversations, spreadsheet rows... or attach files below."
 											value={intakeText}
 											oninput={(event) => updateIntakeText((event.currentTarget as HTMLTextAreaElement).value)}
 										></textarea>
 
 										<!-- Bottom controls bar inside the box -->
-										<div class="flex flex-wrap items-center justify-between border-t border-[var(--line)] p-3 bg-white/50 rounded-b-lg gap-2">
+										<div class="flex flex-wrap items-center justify-between border-t border-(--line) p-3 bg-white/50 rounded-b-lg gap-2">
 											<!-- File Attach controls and active file badges -->
 											<div class="flex flex-wrap items-center gap-2">
 												<!-- Attach Button -->
-												<label class="relative cursor-pointer flex items-center justify-center w-8 h-8 rounded-full hover:bg-[var(--surface-muted)] text-[var(--muted)] hover:text-[var(--ink)] transition">
+												<label class="relative cursor-pointer flex items-center justify-center w-8 h-8 rounded-full hover:bg-(--surface-muted) text-(--muted) hover:text-(--ink) transition">
 													<span class="sr-only">Attach files</span>
 													<i class="ri-attachment-line text-lg"></i>
 													<input 
@@ -2130,11 +1856,11 @@ Heather Benjamin Jewelry`;
 
 												<!-- File Badges -->
 												{#if uploadedFiles.length > 0}
-													<div class="flex flex-wrap gap-1.5 max-w-[400px]">
+													<div class="flex flex-wrap gap-1.5 max-w-100">
 														{#each uploadedFiles as file, index (file + '-' + index)}
 															<div class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-50 border border-emerald-100 text-xs text-emerald-800 font-medium">
 																<i class="ri-file-text-line text-emerald-600"></i>
-																<span class="max-w-[120px] truncate">{file}</span>
+																<span class="max-w-30 truncate">{file}</span>
 																<button 
 																	type="button" 
 																	class="hover:text-red-600 text-emerald-600 transition font-bold" 
@@ -2150,18 +1876,18 @@ Heather Benjamin Jewelry`;
 											</div>
 
 											<!-- Character counter or simple note -->
-											<span class="text-[10px] uppercase tracking-wider font-semibold text-[var(--muted)]">
+											<span class="text-[10px] uppercase tracking-wider font-semibold text-(--muted)">
 												{uploadedFiles.length > 0 ? `${uploadedFiles.length} file(s) attached` : 'Text + files supported'}
 											</span>
 										</div>
 									</div>
 
 									<div class="mt-6 flex flex-wrap items-center justify-between gap-4">
-										<div id="try-sample-container" class="text-xs text-[var(--muted)] flex flex-wrap items-center gap-2 font-medium">
+										<div id="try-sample-container" class="text-xs text-(--muted) flex flex-wrap items-center gap-2 font-medium">
 											<span>{t.trySample}:</span>
 											<button
 												type="button"
-												class="underline hover:text-[var(--brand)] transition cursor-pointer"
+												class="underline hover:text-(--brand) transition cursor-pointer"
 												onclick={() => loadSampleType('sourceEmail')}
 											>
 												{t.sourceEmail}
@@ -2169,7 +1895,7 @@ Heather Benjamin Jewelry`;
 											<span class="opacity-50">·</span>
 											<button
 												type="button"
-												class="underline hover:text-[var(--brand)] transition cursor-pointer"
+												class="underline hover:text-(--brand) transition cursor-pointer"
 												onclick={() => loadSampleType('sourceDm')}
 											>
 												{t.sourceDm}
@@ -2177,7 +1903,7 @@ Heather Benjamin Jewelry`;
 											<span class="opacity-50">·</span>
 											<button
 												type="button"
-												class="underline hover:text-[var(--brand)] transition cursor-pointer"
+												class="underline hover:text-(--brand) transition cursor-pointer"
 												onclick={() => loadSampleType('sourceSpreadsheet')}
 											>
 												{t.sourceSpreadsheet}
@@ -2185,7 +1911,7 @@ Heather Benjamin Jewelry`;
 											<span class="opacity-50">·</span>
 											<button
 												type="button"
-												class="underline hover:text-[var(--brand)] transition cursor-pointer"
+												class="underline hover:text-(--brand) transition cursor-pointer"
 												onclick={() => loadSampleType('sourcePoText')}
 											>
 												{t.sourcePoText}
@@ -2197,19 +1923,19 @@ Heather Benjamin Jewelry`;
 									</div>
 								</div>
 
-								<p class="mt-4 flex items-center gap-2 text-sm text-[var(--muted)]">
-									<i class="ri-shield-check-line text-base text-[var(--brand)]" aria-hidden="true"></i>
+								<p class="mt-4 flex items-center gap-2 text-sm text-(--muted)">
+									<i class="ri-shield-check-line text-base text-(--brand)" aria-hidden="true"></i>
 									{t.safetyNote}
 								</p>
 							</div>
 						</div>
 
 						{#if !rightSidebarCollapsed}
-							<aside class="border-l border-[var(--line)] bg-white px-8 py-10">
+							<aside class="border-l border-(--line) bg-white px-8 py-10">
 								<div class="flex items-center justify-between gap-4 mb-7">
 									<h2 class="font-display text-2xl">{t.whatHappensNext}</h2>
 									<button
-										class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
+										class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-(--surface-soft) text-(--muted) hover:text-(--ink) transition bg-transparent border-0 p-0 cursor-pointer"
 										type="button"
 										aria-label={t.closeRightPanel}
 										onclick={() => (rightSidebarCollapsed = true)}
@@ -2220,7 +1946,7 @@ Heather Benjamin Jewelry`;
 								<div class="mt-7 space-y-5">
 									<!-- Checklist Item 1 -->
 									<div class={`next-card transition-all duration-300 ${step1_item1 ? 'border-emerald-200 bg-emerald-50/20' : ''}`}>
-										<span class={`flex items-center justify-center font-bold text-sm rounded-full w-8 h-8 border ${step1_item1 ? 'bg-emerald-600 text-white border-transparent' : 'border-[var(--line)] bg-[var(--surface-soft)] text-[var(--muted)]'}`}>
+										<span class={`flex items-center justify-center font-bold text-sm rounded-full w-8 h-8 border ${step1_item1 ? 'bg-emerald-600 text-white border-transparent' : 'border-(--line) bg-(--surface-soft) text-(--muted)'}`}>
 											{#if step1_item1}
 												<i class="ri-check-line text-sm font-bold"></i>
 											{:else}
@@ -2228,14 +1954,14 @@ Heather Benjamin Jewelry`;
 											{/if}
 										</span>
 										<div>
-											<h3 class={step1_item1 ? 'text-[var(--ink)] font-semibold' : 'text-sm font-semibold'}>{t.extractTitle}</h3>
-											<p class="text-xs text-[var(--muted)] mt-1">{t.extractDesc}</p>
+											<h3 class={step1_item1 ? 'text-(--ink) font-semibold' : 'text-sm font-semibold'}>{t.extractTitle}</h3>
+											<p class="text-xs text-(--muted) mt-1">{t.extractDesc}</p>
 										</div>
 									</div>
 
 									<!-- Checklist Item 2 -->
 									<div class={`next-card transition-all duration-300 ${step1_item2 ? 'border-emerald-200 bg-emerald-50/20' : ''}`}>
-										<span class={`flex items-center justify-center font-bold text-sm rounded-full w-8 h-8 border ${step1_item2 ? 'bg-emerald-600 text-white border-transparent' : 'border-[var(--line)] bg-[var(--surface-soft)] text-[var(--muted)]'}`}>
+										<span class={`flex items-center justify-center font-bold text-sm rounded-full w-8 h-8 border ${step1_item2 ? 'bg-emerald-600 text-white border-transparent' : 'border-(--line) bg-(--surface-soft) text-(--muted)'}`}>
 											{#if step1_item2}
 												<i class="ri-check-line text-sm font-bold"></i>
 											{:else}
@@ -2243,8 +1969,8 @@ Heather Benjamin Jewelry`;
 											{/if}
 										</span>
 										<div>
-											<h3 class={step1_item2 ? 'text-[var(--ink)] font-semibold' : 'text-sm font-semibold'}>{t.reviewSampleTitle}</h3>
-											<p class="text-xs text-[var(--muted)] mt-1">
+											<h3 class={step1_item2 ? 'text-(--ink) font-semibold' : 'text-sm font-semibold'}>{t.reviewSampleTitle}</h3>
+											<p class="text-xs text-(--muted) mt-1">
 												{t.reviewSampleDesc}
 											</p>
 										</div>
@@ -2252,7 +1978,7 @@ Heather Benjamin Jewelry`;
 
 									<!-- Checklist Item 3 -->
 									<div class={`next-card transition-all duration-300 ${step1_item3 ? 'border-emerald-200 bg-emerald-50/20' : ''}`}>
-										<span class={`flex items-center justify-center font-bold text-sm rounded-full w-8 h-8 border ${step1_item3 ? 'bg-emerald-600 text-white border-transparent' : 'border-[var(--line)] bg-[var(--surface-soft)] text-[var(--muted)]'}`}>
+										<span class={`flex items-center justify-center font-bold text-sm rounded-full w-8 h-8 border ${step1_item3 ? 'bg-emerald-600 text-white border-transparent' : 'border-(--line) bg-(--surface-soft) text-(--muted)'}`}>
 											{#if step1_item3}
 												<i class="ri-check-line text-sm font-bold"></i>
 											{:else}
@@ -2260,8 +1986,8 @@ Heather Benjamin Jewelry`;
 											{/if}
 										</span>
 										<div>
-											<h3 class={step1_item3 ? 'text-[var(--ink)] font-semibold' : 'text-sm font-semibold'}>{t.startProcessingTitle}</h3>
-											<p class="text-xs text-[var(--muted)] mt-1">
+											<h3 class={step1_item3 ? 'text-(--ink) font-semibold' : 'text-sm font-semibold'}>{t.startProcessingTitle}</h3>
+											<p class="text-xs text-(--muted) mt-1">
 												{t.startProcessingDesc}
 											</p>
 										</div>
@@ -2276,23 +2002,23 @@ Heather Benjamin Jewelry`;
 							<div class="mx-auto max-w-5xl">
 								<div class="flex flex-wrap items-start justify-between gap-4">
 									<div>
-										<p class="text-sm uppercase tracking-wide text-[var(--muted)]">
+										<p class="text-sm uppercase tracking-wide text-(--muted)">
 											Order #{orderId}
-											<span class="ml-3 rounded border border-[var(--line)] px-2 py-1 normal-case tracking-normal font-sans"
+											<span class="ml-3 rounded border border-(--line) px-2 py-1 normal-case tracking-normal font-sans"
 												>Wholesale</span
 											>
 											<span class="ml-3 normal-case tracking-normal">Client: {client}</span>
 										</p>
 										<h1 class="mt-5 font-display text-4xl leading-tight md:text-5xl">{t.reviewOrder}</h1>
 										<p class="mt-3 text-lg">{t.foundItems}</p>
-										<p class="mt-1 text-sm text-[var(--muted)]">
+										<p class="mt-1 text-sm text-(--muted)">
 											{#if remainingAnswers > 0}
 												{reviewCountLabel(remainingAnswers)}
 											{:else}
 												{t.allResolved}
 											{/if}
 										</p>
-										<p class="mt-4 text-sm text-[var(--muted)]">
+										<p class="mt-4 text-sm text-(--muted)">
 											{t.sourceEvidence}: {uploadedFiles.length > 0 ? `${t.uploaded} ${uploadedFiles.join(', ')}` : t.pastedText}
 										</p>
 									</div>
@@ -2329,7 +2055,7 @@ Heather Benjamin Jewelry`;
 								<div class="flex items-center justify-between gap-4 mb-2">
 									<h2 class="font-display text-2xl">{t.yourDocs}</h2>
 									<button
-										class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
+										class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-(--surface-soft) text-(--muted) hover:text-(--ink) transition bg-transparent border-0 p-0 cursor-pointer"
 										type="button"
 										aria-label={t.closeRightPanel}
 										onclick={() => (rightSidebarCollapsed = true)}
@@ -2337,7 +2063,7 @@ Heather Benjamin Jewelry`;
 										<i class="ri-close-line text-lg"></i>
 									</button>
 								</div>
-								<p class="text-sm text-[var(--muted)]">
+								<p class="text-sm text-(--muted)">
 									{allAnswered ? t.readyDocs : t.lockedDocs}
 								</p>
 								<div class="mt-6 space-y-4">
@@ -2349,8 +2075,8 @@ Heather Benjamin Jewelry`;
 											<div class="absolute bottom-0 left-0 h-1 bg-emerald-500 transition-all duration-500 ease-out" style="width: {progress}%"></div>
 											
 											<div>
-												<h3 class={isUnlocked ? 'text-[var(--ink)] font-semibold' : ''}>{doc}</h3>
-												<p class="text-xs text-[var(--muted)] mt-1">
+												<h3 class={isUnlocked ? 'text-(--ink) font-semibold' : ''}>{doc}</h3>
+												<p class="text-xs text-(--muted) mt-1">
 													{allAnswered
 														? doc === t.customerUpdate
 															? t.draftIncludesNotes
@@ -2360,7 +2086,7 @@ Heather Benjamin Jewelry`;
 															: t.blockedByProductionSheet}
 												</p>
 											</div>
-											<span aria-hidden="true" class={`text-lg transition-all duration-300 ${isUnlocked ? 'text-emerald-600 scale-110' : 'text-[var(--muted)]'}`}>
+											<span aria-hidden="true" class={`text-lg transition-all duration-300 ${isUnlocked ? 'text-emerald-600 scale-110' : 'text-(--muted)'}`}>
 												{#if isUnlocked}
 													<i class="ri-checkbox-circle-fill animate-scale-in block" aria-hidden="true"></i>
 												{:else}
@@ -2370,7 +2096,7 @@ Heather Benjamin Jewelry`;
 										</div>
 									{/each}
 								</div>
-								<div class="mt-6 rounded-md border border-[var(--info-line)] bg-[var(--info)] p-4 text-sm leading-relaxed text-blue-900 flex gap-2">
+								<div class="mt-6 rounded-md border border-(--info-line) bg-(--info) p-4 text-sm leading-relaxed text-blue-900 flex gap-2">
 									<i class="ri-information-line text-lg text-blue-600 shrink-0" aria-hidden="true"></i>
 									<span>{t.infoNote}</span>
 								</div>
@@ -2380,25 +2106,25 @@ Heather Benjamin Jewelry`;
 				{:else if currentStep === 3}
 					<section class="px-4 py-6 md:px-8 md:py-8">
 						<div class="mx-auto max-w-7xl">
-							<div class="flex flex-wrap items-start justify-between gap-5 border-b border-[var(--line)] pb-6">
+							<div class="flex flex-wrap items-start justify-between gap-5 border-b border-(--line) pb-6">
 								<div>
-									<p class="text-sm uppercase tracking-wide text-[var(--muted)]">
+									<p class="text-sm uppercase tracking-wide text-(--muted)">
 										Order #{orderId}
-										<span class="ml-3 rounded border border-[var(--line)] px-2 py-1 normal-case tracking-normal font-sans"
+										<span class="ml-3 rounded border border-(--line) px-2 py-1 normal-case tracking-normal font-sans"
 											>Wholesale</span
 										>
 										<span class="ml-3 normal-case tracking-normal">Client: {client}</span>
 									</p>
 									<h1 class="mt-5 font-display text-4xl leading-tight md:text-5xl">{t.sheets}</h1>
 									<p class="mt-3">{t.sheetsDesc}</p>
-									<p class="mt-5 inline-flex items-center gap-1.5 rounded-md border border-[var(--ready)] bg-[var(--ready-bg)] px-3 py-2 text-sm text-[var(--ready-ink)] font-semibold">
+									<p class="mt-5 inline-flex items-center gap-1.5 rounded-md border border-(--ready) bg-(--ready-bg) px-3 py-2 text-sm text-(--ready-ink) font-semibold">
 										<i class="ri-checkbox-circle-line text-base" aria-hidden="true"></i>
 										{t.answersComplete}
 									</p>
 								</div>
 							</div>
 
-							<div id="sheets-tabs" class="mt-9 flex gap-8 border-b border-[var(--line)]">
+							<div id="sheets-tabs" class="mt-9 flex gap-8 border-b border-(--line)">
 								{#each [
 									['production', t.productionSheet],
 									['packing', t.packingChecklist],
@@ -2441,23 +2167,23 @@ Heather Benjamin Jewelry`;
 										/>
 									{:else}
 										<h2 class="font-display text-2xl">{t.customerUpdateDraft}</h2>
-										<p class="mt-1 text-sm text-[var(--muted)]">{t.editDraftDirectly}</p>
+										<p class="mt-1 text-sm text-(--muted)">{t.editDraftDirectly}</p>
 										<CustomerUpdateEditor
 											label={t.message}
 											value={customerUpdate}
 											onInput={updateCustomerUpdate}
-											textareaClass="mt-5 h-[420px] w-full resize-none rounded-md border border-[var(--line)] bg-[var(--surface-soft)] p-4 leading-7 outline-none focus:border-[var(--brand)] focus:bg-white"
+											textareaClass="mt-5 h-[420px] w-full resize-none rounded-md border border-(--line) bg-(--surface-soft) p-4 leading-7 outline-none focus:border-(--brand) focus:bg-white"
 										/>
 									{/if}
 								</div>
 
 								{#if !rightSidebarCollapsed}
 									<aside class="output-side shadow-sm">
-										<div class="mb-5 border-b border-[var(--line)] pb-4">
+										<div class="mb-5 border-b border-(--line) pb-4">
 											<div class="flex items-center justify-between gap-4 mb-3">
-												<h2 class="font-display text-lg font-bold text-[var(--brand-dark)]">{t.orderSummary}</h2>
+												<h2 class="font-display text-lg font-bold text-(--brand-dark)">{t.orderSummary}</h2>
 												<button
-													class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition bg-transparent border-0 p-0 cursor-pointer"
+													class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-(--surface-soft) text-(--muted) hover:text-(--ink) transition bg-transparent border-0 p-0 cursor-pointer"
 													type="button"
 													style="margin-right: -6px;"
 													aria-label={t.closeRightPanel}
@@ -2468,24 +2194,24 @@ Heather Benjamin Jewelry`;
 											</div>
 											<div class="space-y-2.5 text-xs">
 												<div class="flex justify-between">
-													<span class="text-[var(--muted)]">{t.lineItems}</span>
+													<span class="text-(--muted)">{t.lineItems}</span>
 													<strong class="font-semibold">{lineItems.length}</strong>
 												</div>
 												<div class="flex justify-between">
-													<span class="text-[var(--muted)]">{t.totalQuantity}</span>
+													<span class="text-(--muted)">{t.totalQuantity}</span>
 													<strong class="font-semibold">{totalQty}</strong>
 												</div>
 												<div class="flex flex-col">
-													<span class="text-[var(--muted)] mb-0.5">{t.finishes}</span>
+													<span class="text-(--muted) mb-0.5">{t.finishes}</span>
 													<strong class="font-semibold leading-normal">{finishSummary}</strong>
 												</div>
 												{#if activeTab === 'packing'}
-													<div class="mt-3 border-t border-[var(--line)] pt-3">
+													<div class="mt-3 border-t border-(--line) pt-3">
 														<div class="flex justify-between items-center mb-1">
-															<span class="text-[var(--muted)]">{t.packed}</span>
+															<span class="text-(--muted)">{t.packed}</span>
 															<strong class="font-bold text-emerald-700">{packedCount} / {lineItems.length}</strong>
 														</div>
-														<div class="h-1.5 w-full bg-[var(--surface-soft)] rounded-full overflow-hidden border border-[var(--line)]">
+														<div class="h-1.5 w-full bg-(--surface-soft) rounded-full overflow-hidden border border-(--line)">
 															<div class="h-full bg-emerald-600 rounded-full transition-all duration-300" style="width: {(packedCount / lineItems.length) * 100}%"></div>
 														</div>
 													</div>
@@ -2494,30 +2220,30 @@ Heather Benjamin Jewelry`;
 										</div>
 
 										<div>
-											<h2 class="font-display text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-3">{t.readyNext}</h2>
+											<h2 class="font-display text-xs font-bold text-(--muted) uppercase tracking-wider mb-3">{t.readyNext}</h2>
 											{#if activeTab === 'production'}
-												<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-[var(--brand)] text-left cursor-pointer border border-[var(--line)] rounded-lg p-4" type="button" onclick={() => downloadCsv('production')}>
+												<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadCsv('production')}>
 													<div>
-														<strong class="block font-bold text-sm text-[var(--ink)]">{t.downloadProductionSheet}</strong>
-														<span class="block text-[10px] text-[var(--muted)] mt-0.5">{t.csvFormat}</span>
+														<strong class="block font-bold text-sm text-(--ink)">{t.downloadProductionSheet}</strong>
+														<span class="block text-[10px] text-(--muted) mt-0.5">{t.csvFormat}</span>
 													</div>
-													<i class="ri-download-2-line text-lg text-[var(--brand)]" aria-hidden="true"></i>
+													<i class="ri-download-2-line text-lg text-(--brand)" aria-hidden="true"></i>
 												</button>
 											{:else if activeTab === 'packing'}
-												<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-[var(--brand)] text-left cursor-pointer border border-[var(--line)] rounded-lg p-4" type="button" onclick={() => downloadCsv('packing')}>
+												<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadCsv('packing')}>
 													<div>
-														<strong class="block font-bold text-sm text-[var(--ink)]">{t.downloadPackingChecklist}</strong>
-														<span class="block text-[10px] text-[var(--muted)] mt-0.5">{t.csvFormat}</span>
+														<strong class="block font-bold text-sm text-(--ink)">{t.downloadPackingChecklist}</strong>
+														<span class="block text-[10px] text-(--muted) mt-0.5">{t.csvFormat}</span>
 													</div>
-													<i class="ri-download-2-line text-lg text-[var(--brand)]" aria-hidden="true"></i>
+													<i class="ri-download-2-line text-lg text-(--brand)" aria-hidden="true"></i>
 												</button>
 											{:else}
-												<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-[var(--brand)] text-left cursor-pointer border border-[var(--line)] rounded-lg p-4" type="button" onclick={copyCustomerUpdate}>
+												<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={copyCustomerUpdate}>
 													<div>
-														<strong class="block font-bold text-sm text-[var(--ink)]">{t.copyUpdate}</strong>
-														<span class="block text-[10px] text-[var(--muted)] mt-0.5">{t.plainText}</span>
+														<strong class="block font-bold text-sm text-(--ink)">{t.copyUpdate}</strong>
+														<span class="block text-[10px] text-(--muted) mt-0.5">{t.plainText}</span>
 													</div>
-													<i class="ri-file-copy-2-line text-lg text-[var(--brand)]" aria-hidden="true"></i>
+													<i class="ri-file-copy-2-line text-lg text-(--brand)" aria-hidden="true"></i>
 												</button>
 											{/if}
 										</div>
@@ -2530,9 +2256,9 @@ Heather Benjamin Jewelry`;
 					<section class="px-4 py-6 md:px-10 md:py-9">
 						<div>
 							<div class="mx-auto max-w-5xl">
-								<p class="text-sm uppercase tracking-wide text-[var(--muted)]">
+								<p class="text-sm uppercase tracking-wide text-(--muted)">
 									Order #{orderId}
-									<span class="ml-3 rounded border border-[var(--line)] px-2 py-1 normal-case tracking-normal font-sans"
+									<span class="ml-3 rounded border border-(--line) px-2 py-1 normal-case tracking-normal font-sans"
 										>Wholesale</span
 									>
 									<span class="ml-3 normal-case tracking-normal font-sans">Client: {client}</span>
@@ -2557,7 +2283,7 @@ Heather Benjamin Jewelry`;
 										label={t.message}
 										value={customerUpdate}
 										onInput={updateCustomerUpdate}
-										labelClass="text-sm font-semibold text-[var(--muted)]"
+										labelClass="text-sm font-semibold text-(--muted)"
 									/>
 								</div>
 							</div>
@@ -2571,7 +2297,7 @@ Heather Benjamin Jewelry`;
 				<footer class="action-footer">
 					<div class="action-footer-inner">
 						<div class="footer-status">
-							<span class={`status-dot border-2 flex items-center justify-center rounded-full w-9 h-9 ${remainingAnswers && currentStep === 2 ? 'status-warn border-[var(--warning)] text-[var(--warning)]' : 'border-[var(--ready-ink)] text-[var(--ready-ink)]'}`}>
+							<span class={`status-dot border-2 flex items-center justify-center rounded-full w-9 h-9 ${remainingAnswers && currentStep === 2 ? 'status-warn border-(--warning) text-(--warning)' : 'border-(--ready-ink) text-(--ready-ink)'}`}>
 								{#if currentStep === 2 && remainingAnswers}
 									<i class="ri-question-mark font-bold text-sm" aria-hidden="true"></i>
 								{:else}
@@ -2589,7 +2315,7 @@ Heather Benjamin Jewelry`;
 									{/if}
 								</p>
 								{#if currentStep === 4}
-									<p class="text-sm text-[var(--muted)]">{t.noRealEmail}</p>
+									<p class="text-sm text-(--muted)">{t.noRealEmail}</p>
 								{/if}
 							</div>
 						</div>
@@ -2634,8 +2360,7 @@ Heather Benjamin Jewelry`;
 				</footer>
 			{/if}
 			{/if}
-		</section>
-	</div>
+	</AppShell>
 
 	{#if showOriginalDrawer}
 		<OriginalOrderDrawer
@@ -2647,18 +2372,18 @@ Heather Benjamin Jewelry`;
 	{/if}
 
 	{#if toast}
-		<div class="fixed bottom-28 left-1/2 -translate-x-1/2 rounded-full bg-[var(--ink)] px-5 py-3 text-sm text-white shadow-xl animate-fade-in" aria-live="polite">
+		<div class="fixed bottom-28 left-1/2 -translate-x-1/2 rounded-full bg-(--ink) px-5 py-3 text-sm text-white shadow-xl animate-fade-in" aria-live="polite">
 			{toast}
 		</div>
 	{/if}
 	{#if showWelcomeModal}
 		<div transition:fade={{ duration: 200 }} class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
 			<!-- Modal Container -->
-			<div transition:scale={{ duration: 250, start: 0.95 }} class="relative bg-white rounded-lg border border-[var(--line)] shadow-2xl max-w-lg w-full mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+			<div transition:scale={{ duration: 250, start: 0.95 }} class="relative bg-white rounded-lg border border-(--line) shadow-2xl max-w-lg w-full mx-4 overflow-hidden flex flex-col max-h-[90vh]">
 				<!-- Top Close button -->
 				<button 
 					type="button" 
-					class="absolute right-4 top-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink)] transition border-0 cursor-pointer p-0"
+					class="absolute right-4 top-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-(--surface-soft) text-(--muted) hover:text-(--ink) transition border-0 cursor-pointer p-0"
 					aria-label={t.closeDrawer}
 					onclick={closeWelcomeModal}
 				>
@@ -2670,79 +2395,79 @@ Heather Benjamin Jewelry`;
 					<!-- Header Section (Side-by-Side) -->
 					<div class="flex items-start gap-4 mb-6">
 						<!-- Icon Box -->
-						<div class="flex items-center justify-center w-14 h-14 rounded-xl bg-[var(--surface-soft)] text-[var(--brand)] shadow-sm border border-[var(--line)] shrink-0">
+						<div class="flex items-center justify-center w-14 h-14 rounded-xl bg-(--surface-soft) text-(--brand) shadow-sm border border-(--line) shrink-0">
 							<i class="ri-sparkling-2-line text-2xl"></i>
 						</div>
 						
 						<!-- Header Text -->
 						<div class="flex-1 min-w-0">
-							<div class="flex items-center gap-2 mb-1.5 text-[10px] text-[var(--muted)] font-semibold">
-								<span class="px-2 py-0.5 rounded bg-[var(--brand)]/10 text-[var(--brand)] font-semibold tracking-wide">
+							<div class="flex items-center gap-2 mb-1.5 text-[10px] text-(--muted) font-semibold">
+								<span class="px-2 py-0.5 rounded bg-(--brand)/10 text-(--brand) font-semibold tracking-wide">
 									What's new
 								</span>
 								<span>
 									{t.welcomeSubtitle}
 								</span>
 							</div>
-							<h2 class="font-display text-xl md:text-2xl tracking-tight text-[var(--ink)] leading-snug">
+							<h2 class="font-display text-xl md:text-2xl tracking-tight text-(--ink) leading-snug">
 								{t.welcomeHeading}
 							</h2>
 						</div>
 					</div>
 
-					<p class="text-sm text-[var(--muted)] leading-relaxed">
+					<p class="text-sm text-(--muted) leading-relaxed">
 						{t.welcomeSubheading}
 					</p>
 
 					<!-- Features list -->
 					<ul class="mt-6 space-y-4">
-						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-[var(--ink)]">
+						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-(--ink)">
 							<span class="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
 								<i class="ri-check-line text-xs font-bold"></i>
 							</span>
 							<div>
-								<strong class="font-semibold text-[var(--brand-dark)]">{t.welcomeLabel1}</strong> · {t.welcomeFeature1}
+								<strong class="font-semibold text-(--brand-dark)">{t.welcomeLabel1}</strong> · {t.welcomeFeature1}
 							</div>
 						</li>
-						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-[var(--ink)]">
+						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-(--ink)">
 							<span class="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
 								<i class="ri-check-line text-xs font-bold"></i>
 							</span>
 							<div>
-								<strong class="font-semibold text-[var(--brand-dark)]">{t.welcomeLabel2}</strong> · {t.welcomeFeature2}
+								<strong class="font-semibold text-(--brand-dark)">{t.welcomeLabel2}</strong> · {t.welcomeFeature2}
 							</div>
 						</li>
-						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-[var(--ink)]">
+						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-(--ink)">
 							<span class="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
 								<i class="ri-check-line text-xs font-bold"></i>
 							</span>
 							<div>
-								<strong class="font-semibold text-[var(--brand-dark)]">{t.welcomeLabel3}</strong> · {t.welcomeFeature3}
+								<strong class="font-semibold text-(--brand-dark)">{t.welcomeLabel3}</strong> · {t.welcomeFeature3}
 							</div>
 						</li>
-						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-[var(--ink)]">
+						<li class="flex gap-3.5 items-start text-[13px] leading-relaxed text-(--ink)">
 							<span class="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
 								<i class="ri-check-line text-xs font-bold"></i>
 							</span>
 							<div>
-								<strong class="font-semibold text-[var(--brand-dark)]">{t.welcomeLabel4}</strong> · {t.welcomeFeature4}
+								<strong class="font-semibold text-(--brand-dark)">{t.welcomeLabel4}</strong> · {t.welcomeFeature4}
 							</div>
 						</li>
 					</ul>
 				</div>
 
 				<!-- Modal Footer -->
-				<div class="border-t border-[var(--line)] bg-[var(--surface-soft)] p-4 flex items-center justify-between gap-3 shrink-0">
+				<div class="border-t border-(--line) bg-(--surface-soft) p-4 flex items-center justify-between gap-3 shrink-0">
 					<button 
 						type="button" 
-						class="text-xs text-[var(--muted)] hover:text-[var(--ink)] font-semibold transition cursor-pointer px-4 py-2.5 rounded hover:bg-[var(--surface-muted)] bg-transparent border-0"
+						class="text-xs text-(--muted) hover:text-(--ink) font-semibold transition cursor-pointer px-4 py-2.5 rounded hover:bg-(--surface-muted) bg-transparent border-0"
 						onclick={closeWelcomeModal}
 					>
 						{t.skipGuide}
 					</button>
 					<button 
 						type="button" 
-						class="bg-[var(--brand)] hover:bg-[var(--brand-dark)] text-white text-xs font-bold py-2.5 px-6 rounded shadow transition duration-150 flex items-center gap-1.5 cursor-pointer border-0"
+						class="bg-(--brand) hover:bg-(--brand-dark) text-white text-xs font-bold py-2.5 px-6 rounded shadow transition duration-150 flex items-center gap-1.5 cursor-pointer border-0"
 						onclick={handleLetsGo}
 					>
 						{t.letsGo} <i class="ri-arrow-right-line"></i>
@@ -2752,3 +2477,5 @@ Heather Benjamin Jewelry`;
 		</div>
 	{/if}
 </main>
+
+
