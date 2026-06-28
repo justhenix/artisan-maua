@@ -2,6 +2,9 @@
 	import { page } from '$app/state';
 	import { enhance } from '$app/forms';
 	import { fade } from 'svelte/transition';
+	import { onMount } from 'svelte';
+	import { driver } from 'driver.js';
+	import 'driver.js/dist/driver.css';
 	import AppShell from '$lib/components/artisan/AppShell.svelte';
 	import { fallbackCatalog, type CatalogItem } from '$lib/data/fallbackCatalog';
 	import enMessages from '../../../messages/en.json';
@@ -157,6 +160,70 @@
 		collectionFilter = 'all';
 	}
 
+	function startCatalogTour() {
+		const d = driver({
+			showProgress: true,
+			nextBtnText: t.tourNext || 'Next',
+			prevBtnText: t.tourBack || 'Back',
+			doneBtnText: t.tourDone || 'Done',
+			animate: true,
+			steps: [
+				{
+					element: '#catalog-title',
+					popover: {
+						title: t.tourCatalogWelcomeTitle,
+						description: t.tourCatalogWelcomeDesc,
+						side: 'bottom',
+						align: 'start'
+					}
+				},
+				{
+					element: '#catalog-filters',
+					popover: {
+						title: t.tourCatalogSearchTitle,
+						description: t.tourCatalogSearchDesc,
+						side: 'bottom'
+					}
+				},
+				{
+					element: '#add-product-btn',
+					popover: {
+						title: t.tourCatalogAddTitle,
+						description: t.tourCatalogAddDesc,
+						side: 'bottom'
+					}
+				},
+				{
+					element: '#view-mode-toggle',
+					popover: {
+						title: t.tourCatalogViewTitle,
+						description: t.tourCatalogViewDesc,
+						side: 'bottom'
+					}
+				},
+				{
+					element: '#catalog-list',
+					popover: {
+						title: t.tourCatalogItemTitle,
+						description: t.tourCatalogItemDesc,
+						side: 'top'
+					}
+				}
+			]
+		});
+		d.drive();
+	}
+
+	onMount(() => {
+		const onboarded = localStorage.getItem('artisan-catalog-onboarded');
+		if (!onboarded) {
+			localStorage.setItem('artisan-catalog-onboarded', 'true');
+			setTimeout(() => {
+				startCatalogTour();
+			}, 500);
+		}
+	});
+
 	// Image drag and drop / upload / compression helpers
 	function triggerFileSelect() {
 		if (fileInput) {
@@ -305,20 +372,21 @@
 	{currentLocale}
 	currentPath={page.url.pathname}
 	mainClass="app-main-dashboard"
+	onReplayTour={startCatalogTour}
 >
 	<div class="flex-1 overflow-y-auto p-6 md:p-10 font-sans">
 		<div class="mx-auto max-w-6xl">
 			<!-- Header -->
 			<header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
 				<div>
-					<h1 class="font-display text-3xl md:text-4xl font-bold tracking-tight text-(--ink)">
+					<h1 id="catalog-title" class="font-display text-3xl md:text-4xl font-bold tracking-tight text-(--ink)">
 						{t.catalogTitle}
 					</h1>
 					<p class="mt-2 text-sm text-(--muted)">{t.catalogDesc}</p>
 				</div>
 				<div class="flex items-center gap-3">
 					<!-- Grid vs List View toggle -->
-					<div class="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md border border-(--line) shrink-0 shadow-xs">
+					<div id="view-mode-toggle" class="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md border border-(--line) shrink-0 shadow-xs">
 						<button
 							type="button"
 							onclick={() => viewMode = 'grid'}
@@ -340,6 +408,7 @@
 					</div>
 
 					<button
+						id="add-product-btn"
 						onclick={openCreateModal}
 						class="flex items-center gap-2 px-4 py-2.5 bg-(--brand) hover:bg-(--brand-dark) text-white font-medium rounded text-sm transition shadow-sm cursor-pointer"
 					>
@@ -349,7 +418,7 @@
 			</header>
 
 			<!-- Search & Filters -->
-			<div class="mb-8 space-y-4 bg-white p-5 rounded-lg border border-(--line) shadow-sm">
+			<div id="catalog-filters" class="mb-8 space-y-4 bg-white p-5 rounded-lg border border-(--line) shadow-sm">
 				<div class="relative">
 					<input
 						type="search"
@@ -405,7 +474,8 @@
 			{/if}
 
 			<!-- Catalog Views -->
-			{#if filtered.length === 0}
+			<div id="catalog-list">
+				{#if filtered.length === 0}
 				<div class="flex flex-col items-center justify-center rounded-lg border border-(--line) bg-white px-6 py-16 text-center shadow-sm">
 					<div class="w-14 h-14 rounded-full bg-slate-50 flex items-center justify-center text-(--muted) mb-4 border border-(--line)">
 						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -613,6 +683,7 @@
 					</table>
 				</div>
 			{/if}
+			</div>
 		</div>
 	</div>
 </AppShell>
