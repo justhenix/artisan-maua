@@ -2196,7 +2196,7 @@ Heather Benjamin Jewelry`;
 											<span class="ml-3 normal-case tracking-normal">Client: {client}</span>
 										</p>
 										<h1 class="mt-5 font-display text-4xl leading-tight md:text-5xl">{t.reviewOrder}</h1>
-										<p class="mt-3 text-lg">{t.foundItems}</p>
+										<p class="mt-3 text-lg">{formatMessage(t.foundItems, { count: lineItems.length })}</p>
 										<p class="mt-1 text-sm text-(--muted)">
 											{#if remainingAnswers > 0}
 												{reviewCountLabel(remainingAnswers)}
