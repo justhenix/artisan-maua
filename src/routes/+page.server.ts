@@ -1,10 +1,16 @@
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
+import { getCachedCatalog } from '$lib/server/catalogCache';
 
 export const load: PageServerLoad = async () => {
 	try {
-		// 1. Fetch all purchase orders
-		const poRes = await db.execute('SELECT * FROM purchase_orders ORDER BY updated_at DESC');
+		const [poRes, itemsRes, blockersRes, catalogItems] = await Promise.all([
+			db.execute('SELECT * FROM purchase_orders ORDER BY updated_at DESC'),
+			db.execute('SELECT * FROM order_items'),
+			db.execute('SELECT * FROM blockers'),
+			getCachedCatalog()
+		]);
+
 		const orders = poRes.rows.map((row: any) => ({
 			id: row.id as string,
 			poNumber: row.po_number as string,
@@ -18,8 +24,6 @@ export const load: PageServerLoad = async () => {
 			updatedAt: row.updated_at as number
 		}));
 
-		// 2. Fetch all order items
-		const itemsRes = await db.execute('SELECT * FROM order_items');
 		const allItems = itemsRes.rows.map((row: any) => ({
 			poId: row.po_id as string,
 			id: String(row.id).startsWith(`${row.po_id}:`)
@@ -35,8 +39,6 @@ export const load: PageServerLoad = async () => {
 			source: row.source as string
 		}));
 
-		// 3. Fetch all blockers
-		const blockersRes = await db.execute('SELECT * FROM blockers');
 		const allBlockers = blockersRes.rows.map((row: any) => {
 			const id = String(row.id).startsWith(`${row.po_id}:`)
 				? String(row.id).slice(String(row.po_id).length + 1)
@@ -56,21 +58,6 @@ export const load: PageServerLoad = async () => {
 				answer: (row.answer as string) || ''
 			};
 		});
-
-		// 4. Fetch catalog items
-		const catalogRes = await db.execute('SELECT * FROM catalog_items');
-		const catalogItems = catalogRes.rows.map((row: any) => ({
-			styleCode: row.style_code as string,
-			creativeTitle: row.title as string,
-			baseLabor: row.base_labor as number,
-			silverWeight: row.silver_weight as number,
-			stoneCost: row.stone_cost as number,
-			category: row.category as string,
-			material: row.material as string,
-			notes_en: row.notes_en as string,
-			notes_id: row.notes_id as string,
-			imageUrl: row.image_url as string
-		}));
 
 		return {
 			orders,
@@ -101,12 +88,12 @@ export const actions: Actions = {
 			const activePoIds = activeOrdersRes.rows.map((row: any) => row.id);
 
 			if (activePoIds.length > 0) {
-				const catalogRes = await db.execute("SELECT * FROM catalog_items");
+				const catalog = await getCachedCatalog();
 				const catalogMap = new Map();
-				for (const row of catalogRes.rows) {
-					catalogMap.set(row.style_code, {
-						baseLabor: row.base_labor as number,
-						silverWeight: row.silver_weight as number
+				for (const item of catalog) {
+					catalogMap.set(item.styleCode, {
+						baseLabor: item.baseLabor,
+						silverWeight: item.silverWeight
 					});
 				}
 

@@ -1506,7 +1506,6 @@ Heather Benjamin Jewelry`;
 	// Onboarding Tour logic
 	function startTour() {
 		activeView = 'workbench';
-		// Reset page step and demo answers before tour starts
 		setStep(1);
 		resetDemoState();
 		intakeText = samples.sourceEmail;

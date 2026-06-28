@@ -1,1 +1,2 @@
-export const ssr = false;
+// SSR is enabled by default
+

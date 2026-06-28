@@ -1,24 +1,10 @@
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
+import { getCachedCatalog, invalidateCatalogCache } from '$lib/server/catalogCache';
 
 export const load: PageServerLoad = async () => {
 	try {
-		const catalogRes = await db.execute('SELECT * FROM catalog_items ORDER BY style_code');
-		const catalogItems = catalogRes.rows.map((row: any) => ({
-			styleCode: row.style_code as string,
-			creativeTitle: row.title as string,
-			baseLabor: row.base_labor as number,
-			silverWeight: row.silver_weight as number,
-			stoneCost: row.stone_cost as number,
-			department: (row.department as string) || 'Others',
-			category: (row.category as string) || 'Others',
-			collection: (row.collection as string) || 'Others',
-			material: row.material as string,
-			notes_en: row.notes_en as string,
-			notes_id: row.notes_id as string,
-			imageUrl: row.image_url as string
-		}));
-
+		const catalogItems = await getCachedCatalog();
 		return { catalogItems };
 	} catch (err) {
 		console.error('Failed to load catalog data:', err);
@@ -53,6 +39,7 @@ export const actions: Actions = {
 					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				args: [styleCode, title, baseLabor, silverWeight, stoneCost, department, category, collection, material, notes_en, notes_id, imageUrl]
 			});
+			invalidateCatalogCache();
 			return { success: true };
 		} catch (err: any) {
 			console.error('Failed to create catalog item:', err);
@@ -89,6 +76,7 @@ export const actions: Actions = {
 					WHERE style_code = ?`,
 				args: [styleCode, title, baseLabor, silverWeight, stoneCost, department, category, collection, material, notes_en, notes_id, imageUrl, originalStyleCode]
 			});
+			invalidateCatalogCache();
 			return { success: true };
 		} catch (err: any) {
 			console.error('Failed to update catalog item:', err);
@@ -109,6 +97,7 @@ export const actions: Actions = {
 				sql: 'DELETE FROM catalog_items WHERE style_code = ?',
 				args: [styleCode]
 			});
+			invalidateCatalogCache();
 			return { success: true };
 		} catch (err: any) {
 			console.error('Failed to delete catalog item:', err);
