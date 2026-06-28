@@ -1402,6 +1402,26 @@ Line  Item Code      Description                  Qty  Unit Price
 		}
 	}
 
+	async function deleteOrder(orderId: string, event: MouseEvent) {
+		event.stopPropagation();
+		if (!confirm(`Delete order ${orderId}? This cannot be undone.`)) return;
+		orders = orders.filter(o => o.id !== orderId);
+		// If the deleted order is currently open, navigate back to the dashboard
+		if (selectedOrderId === orderId) {
+			selectedOrderId = '';
+			setStep(1);
+		}
+		try {
+			await fetch('/api/order-sync', {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ orderId })
+			});
+		} catch {
+			console.error('Failed to delete order from database.');
+		}
+	}
+
 	function selectOrder(orderId: string) {
 		const order = orders.find(o => o.id === orderId);
 		if (!order) return;
@@ -2241,39 +2261,51 @@ Line  Item Code      Description                  Qty  Unit Price
 
 									<div class="flex-1 space-y-4 overflow-y-auto max-h-150 pr-1">
 										{#each orders.filter(o => o.status === colStatus) as order (order.id)}
-											<button
-												onclick={() => selectOrder(order.id)}
-												class="w-full text-left bg-white rounded border border-(--line) hover:border-(--brand) hover:shadow-sm p-4 transition cursor-pointer focus:outline-none flex flex-col gap-3"
-											>
-												<div class="flex items-center justify-between">
-													<span class="text-xs font-mono font-medium text-(--muted)">{order.id}</span>
-												</div>
-
-												<div>
-													<h4 class="font-semibold text-sm text-(--ink) leading-tight">{order.clientName}</h4>
-													<p class="text-[11px] text-(--muted) mt-1">
-														{t.updated}: {new Date(order.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-													</p>
-												</div>
-
-												<!-- Checklist milestones progress -->
-												<div class="space-y-1">
-													<div class="flex items-center justify-between text-[11px] text-(--muted)">
-														<span>{t.baliMilestones}</span>
-														<span class="font-medium">{getMilestoneCompletedCount(order.milestones)}/4</span>
+											<div class="relative group">
+												<button
+													onclick={() => selectOrder(order.id)}
+													class="w-full text-left bg-white rounded border border-(--line) hover:border-(--brand) hover:shadow-sm p-4 transition cursor-pointer focus:outline-none flex flex-col gap-3"
+												>
+													<div class="flex items-center justify-between">
+														<span class="text-xs font-mono font-medium text-(--muted)">{order.id}</span>
 													</div>
-													<div class="w-full h-1.5 bg-gray-100 rounded overflow-hidden">
-														<div
-															class={`h-full transition-all ${
-																order.status === 'Review' ? 'bg-amber-400' :
-																order.status === 'Production' ? 'bg-blue-500' :
-																order.status === 'Packing' ? 'bg-purple-500' : 'bg-emerald-500'
-															}`}
-															style={`width: ${(getMilestoneCompletedCount(order.milestones) / 4) * 100}%`}
-														></div>
+
+													<div>
+														<h4 class="font-semibold text-sm text-(--ink) leading-tight">{order.clientName}</h4>
+														<p class="text-[11px] text-(--muted) mt-1">
+															{t.updated}: {new Date(order.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+														</p>
 													</div>
-												</div>
-											</button>
+
+													<!-- Checklist milestones progress -->
+													<div class="space-y-1">
+														<div class="flex items-center justify-between text-[11px] text-(--muted)">
+															<span>{t.baliMilestones}</span>
+															<span class="font-medium">{getMilestoneCompletedCount(order.milestones)}/4</span>
+														</div>
+														<div class="w-full h-1.5 bg-gray-100 rounded overflow-hidden">
+															<div
+																class={`h-full transition-all ${
+																	order.status === 'Review' ? 'bg-amber-400' :
+																	order.status === 'Production' ? 'bg-blue-500' :
+																	order.status === 'Packing' ? 'bg-purple-500' : 'bg-emerald-500'
+																}`}
+																style={`width: ${(getMilestoneCompletedCount(order.milestones) / 4) * 100}%`}
+															></div>
+														</div>
+													</div>
+												</button>
+												<!-- Delete button, visible on hover -->
+												<button
+													type="button"
+													onclick={(e) => deleteOrder(order.id, e)}
+													class="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition bg-white border border-(--line) hover:border-red-300 hover:bg-red-50 text-(--muted) hover:text-red-600 cursor-pointer"
+													aria-label="Delete order"
+													title="Delete order"
+												>
+													<i class="ri-delete-bin-line text-xs" aria-hidden="true"></i>
+												</button>
+											</div>
 										{/each}
 
 										{#if orders.filter(o => o.status === colStatus).length === 0}

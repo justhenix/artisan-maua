@@ -2,6 +2,22 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
 
+export const DELETE: RequestHandler = async ({ request }) => {
+	try {
+		const { orderId } = await request.json();
+		if (!orderId) {
+			return json({ success: false, error: 'orderId is required' }, { status: 400 });
+		}
+		await db.execute({ sql: 'DELETE FROM order_items WHERE po_id = ?', args: [orderId] });
+		await db.execute({ sql: 'DELETE FROM blockers WHERE po_id = ?', args: [orderId] });
+		await db.execute({ sql: 'DELETE FROM purchase_orders WHERE id = ?', args: [orderId] });
+		return json({ success: true });
+	} catch (err: any) {
+		console.error('Error deleting order.');
+		return json({ success: false, error: 'Unable to delete order' }, { status: 500 });
+	}
+};
+
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json();
