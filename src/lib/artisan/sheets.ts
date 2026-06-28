@@ -32,9 +32,9 @@ function warningRows(blockers: ReviewBlocker[], labels: SheetLabels, width: numb
 
 function getExportStatus(item: SheetLineItem, labels: SheetLabels): string {
 	const state = confidenceStateFor(item);
-	if (state === 'resolved') return labels.resolved || 'Matched';
-	if (state === 'needs_review') return labels.needsReview || 'Needs Review';
-	return labels.unresolved || 'Unresolved';
+	if (state === 'resolved') return labels.resolved || 'Ready';
+	if (state === 'needs_review') return labels.needsReview || 'Check note';
+	return labels.unresolved || 'Needs answer';
 }
 
 export function buildProductionRows({

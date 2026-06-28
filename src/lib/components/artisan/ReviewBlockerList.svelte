@@ -4,11 +4,11 @@
 		impact: 'High impact' | 'Medium impact';
 		impactKey: 'highImpact' | 'mediumImpact';
 		question: string;
-		questionKey: 'starBirdQuestion' | 'birdOfPreyQuestion';
+		questionKey?: string;
 		evidence: string;
 		source: string;
 		risk: string;
-		riskKey: 'starBirdRisk' | 'birdOfPreyRisk';
+		riskKey?: string;
 		options: string[];
 		answer: string;
 	};
@@ -28,6 +28,10 @@
 		getOptionDetail: (blockerId: string, option: string) => string;
 		onAnswer: (blockerId: string, answer: string) => void;
 	} = $props();
+
+	function keyedCopy(key: string | undefined, fallback: string) {
+		return key ? (t[key] || fallback) : fallback;
+	}
 </script>
 
 <h2 class="mt-8 text-sm font-semibold text-[var(--muted)]">
@@ -53,7 +57,7 @@
 							</span>
 						{/if}
 					</div>
-					<h3 class="mt-3 text-lg font-semibold text-(--ink)">{t[blocker.questionKey] || blocker.question}</h3>
+					<h3 class="mt-3 text-lg font-semibold text-(--ink)">{keyedCopy(blocker.questionKey, blocker.question)}</h3>
 					
 					<div class="mt-3 flex flex-col gap-1 text-xs text-(--muted)">
 						<span class="font-semibold text-(--muted) uppercase tracking-wider text-[9px]">{t.found}:</span>
@@ -99,7 +103,7 @@
 					<strong class="mb-0.5 block text-[10px] font-semibold text-[var(--brand-dark)]">
 						{t.productionRisk}:
 					</strong>
-					{t[blocker.riskKey] || blocker.risk}
+					{keyedCopy(blocker.riskKey, blocker.risk)}
 				</div>
 			</div>
 		</article>

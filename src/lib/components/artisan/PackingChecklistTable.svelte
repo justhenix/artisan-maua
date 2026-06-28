@@ -59,7 +59,7 @@
 				<th class="w-20 px-3 py-3 text-center text-xs font-bold text-[var(--muted)]">{t.qty}</th>
 				<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.packagingSpecifics}</th>
 				<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.fulfillmentFlags}</th>
-				<th class="w-32 px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.confidence || 'Confidence'}</th>
+				<th class="w-32 px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.confidence || 'Status'}</th>
 				<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.orderNotes}</th>
 			</tr>
 		</thead>
@@ -124,7 +124,7 @@
 								state === 'resolved'
 									? 'border-emerald-200 bg-emerald-50 text-emerald-800'
 									: state === 'needs_review'
-										? 'border-amber-200 bg-amber-50 text-amber-800'
+										? 'border-[var(--warning)] bg-[var(--warning-bg)] text-[var(--warning-ink)]'
 										: 'border-red-200 bg-red-50 text-red-700'
 							}`}>
 								{t[state] || state}

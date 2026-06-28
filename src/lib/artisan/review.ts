@@ -28,14 +28,27 @@ export function unresolvedWarnings(item: Pick<SheetLineItem, 'styleCode' | 'qty'
 		warnings.add('finish/material');
 	} else {
 		warnings.delete('finish/material');
+		warnings.delete('material/finish');
 		warnings.delete('finish');
 	}
 	return Array.from(warnings);
 }
 
+function hasRequiredProductionWarning(warnings: string[]) {
+	return (
+		warnings.includes('style code') ||
+		warnings.includes('quantity') ||
+		warnings.includes('finish/material') ||
+		warnings.includes('material/finish') ||
+		warnings.includes('finish')
+	);
+}
+
 export function confidenceStateFor(item: SheetLineItem): ConfidenceState {
-	if (item.confidenceState) return item.confidenceState;
-	return unresolvedWarnings(item).length > 0 ? 'unresolved' : 'resolved';
+	const warnings = unresolvedWarnings(item);
+	if (hasRequiredProductionWarning(warnings)) return 'unresolved';
+	if (warnings.length > 0 || item.confidenceState === 'needs_review') return 'needs_review';
+	return 'resolved';
 }
 
 export function allRequiredFieldsResolved(items: SheetLineItem[], blockers: ReviewBlocker[]) {
@@ -43,14 +56,7 @@ export function allRequiredFieldsResolved(items: SheetLineItem[], blockers: Revi
 		return false;
 	}
 	for (const item of items) {
-		const warnings = unresolvedWarnings(item);
-		if (
-			warnings.includes('style code') ||
-			warnings.includes('quantity') ||
-			warnings.includes('finish/material') ||
-			warnings.includes('finish') ||
-			warnings.includes('material/finish')
-		) {
+		if (hasRequiredProductionWarning(unresolvedWarnings(item))) {
 			return false;
 		}
 	}
@@ -88,5 +94,4 @@ export function getBlockingMessage(item: SheetLineItem): string | null {
 
 	return `${item.item}: ${msg}`;
 }
-
 

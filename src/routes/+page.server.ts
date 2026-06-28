@@ -56,11 +56,11 @@ export const load: PageServerLoad = async () => {
 				impact: row.impact as string,
 				impactKey: row.impact === 'High impact' ? 'highImpact' : 'mediumImpact',
 				question: row.question as string,
-				questionKey: id === 'star-bird-finish' ? 'starBirdQuestion' : 'birdOfPreyQuestion',
+				questionKey: id === 'star-bird-finish' ? 'starBirdQuestion' : id === 'bird-of-prey-size' ? 'birdOfPreyQuestion' : undefined,
 				evidence: row.evidence as string,
 				source: row.source as string,
 				risk: row.risk as string,
-				riskKey: id === 'star-bird-finish' ? 'starBirdRisk' : 'birdOfPreyRisk',
+				riskKey: id === 'star-bird-finish' ? 'starBirdRisk' : id === 'bird-of-prey-size' ? 'birdOfPreyRisk' : undefined,
 				options: JSON.parse((row.options as string) || '[]'),
 				answer: (row.answer as string) || ''
 			};

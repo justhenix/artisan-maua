@@ -30,7 +30,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			args: [
 				orderId,
 				orderId,
-				client || 'La Jolla Artisan Boutique',
+				client || 'Unresolved',
 				status || 'Review',
 				sourceText || '',
 				JSON.stringify(uploadedFiles || []),

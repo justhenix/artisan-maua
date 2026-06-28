@@ -19,7 +19,7 @@
 	import idMessages from '../../messages/id.json';
 	import AppShell from '$lib/components/artisan/AppShell.svelte';
 	import { fallbackCatalog, type CatalogItem } from '$lib/data/fallbackCatalog';
-	import { buildBaliHandoffPdfRows, buildBaliHandoffText, canCreateBaliHandoff } from '$lib/artisan/baliHandoff';
+	import { buildBaliHandoffPdfRows, buildBaliHandoffText } from '$lib/artisan/baliHandoff';
 	import { fixtureBlockers, fixtureLineItems } from '$lib/artisan/fixtures';
 	import { generateCustomerUpdate } from '$lib/artisan/customerUpdate';
 	import { rowsToCopyTable, rowsToCsv } from '$lib/artisan/exports';
@@ -429,6 +429,8 @@ Line  Item Code      Description                  Qty  Unit Price
 		intakeText = samples[source];
 		uploadedFiles = [];
 		sampleUsed = true;
+		client = 'La Jolla Artisan Boutique';
+		selectedOrderId = 'HB-259689';
 		resetDemoState();
 		markAutoSaved();
 		showToast(t.sampleOrderLoaded);
@@ -436,7 +438,8 @@ Line  Item Code      Description                  Qty  Unit Price
 
 	function removeUploadedFile(index: number) {
 		uploadedFiles = uploadedFiles.filter((_, i) => i !== index);
-		resetDemoState();
+		sampleUsed = false;
+		clearExtractionState(uploadedFiles.length > 0 ? 'Uploaded file kept as source metadata.' : '');
 		markAutoSaved();
 	}
 
@@ -542,6 +545,7 @@ Line  Item Code      Description                  Qty  Unit Price
 	let readyItemsExpanded = $state(false);
 	let handoffCreated = $state(false);
 	let handoffShared = $state(false);
+	let extractionNotice = $state('');
 	const step1_item1 = $derived(intakeText.trim().length > 0 || uploadedFiles.length > 0);
 	const step1_item2 = $derived(sampleUsed);
 	const step1_item3 = $derived(processClicked);
@@ -626,12 +630,13 @@ Line  Item Code      Description                  Qty  Unit Price
 	// Dynamic Blocker & Ready Tracking
 	const remainingAnswers = $derived(unresolvedRequiredCount(blockers));
 	const allAnswered = $derived(canCreateSheets(blockers));
-	const handoffReady = $derived(allAnswered);
-	const allRequiredResolved = $derived(allRequiredFieldsResolved(lineItems, blockers));
+	const canContinueToSheets = $derived(lineItems.length > 0 && allAnswered);
+	const allRequiredResolved = $derived(lineItems.length > 0 && allRequiredFieldsResolved(lineItems, blockers));
+	const handoffReady = $derived(allRequiredResolved);
 
-	const prodProgress = $derived(blockers.length === 0 ? 100 : (blockers.filter(b => b.answer).length / blockers.length) * 100);
-	const packingProgress = $derived(allAnswered ? 100 : 0);
-	const customerProgress = $derived(allAnswered ? 100 : 0);
+	const prodProgress = $derived(lineItems.length === 0 ? 0 : blockers.length === 0 ? 100 : (blockers.filter(b => b.answer).length / blockers.length) * 100);
+	const packingProgress = $derived(canContinueToSheets ? 100 : 0);
+	const customerProgress = $derived(canContinueToSheets ? 100 : 0);
 
 	const readyItems = $derived(
 		lineItems.filter(item => {
@@ -670,26 +675,63 @@ Line  Item Code      Description                  Qty  Unit Price
 	const productionOrders = $derived(orders.filter(o => o.status === 'Production' || o.status === 'Packing').length);
 	const completedOrders = $derived(orders.filter(o => o.status === 'Completed').length);
 
-	const maxStep = $derived(allAnswered ? Math.max(completedSteps, 3) as Step : completedSteps as Step);
+	const maxStep = $derived(canContinueToSheets ? Math.max(completedSteps, 3) as Step : completedSteps as Step);
 
-	// Display-only workflow status — reflects current UI step, not just DB orderStatus
+	function hasRequiredRowBlocker(item: LineItem) {
+		const warnings = unresolvedWarnings(item);
+		return (
+			warnings.includes('style code') ||
+			warnings.includes('quantity') ||
+			warnings.includes('finish/material') ||
+			warnings.includes('material/finish') ||
+			warnings.includes('finish')
+		);
+	}
+
+	// Display-only workflow status — reflects current UI step + actual readiness
 	const displayWorkflowStatus = $derived(
-		(currentStep >= 4 || sent) ? 'Customer update ready'
-		: currentStep === 3
-			? (handoffCreated && handoffShared ? 'Bali handoff ready' : 'Sheets ready')
-			: (currentStep === 2 && allAnswered) ? 'Sheets ready'
-			: remainingAnswers > 0 ? 'Review required'
-			: t.reviewRequiredOption
+		sent
+			? 'Completed'
+			: currentStep === 4
+				? (allRequiredResolved ? 'Customer update ready' : 'Review required')
+				: currentStep === 3
+					? (!allRequiredResolved
+						? 'Review required'
+						: handoffShared || handoffCreated
+							? 'Bali handoff ready'
+							: 'Sheets ready')
+					: currentStep === 2
+						? (allRequiredResolved ? 'Sheets ready' : 'Review required')
+						: allRequiredResolved
+							? 'Sheets ready'
+							: (remainingAnswers > 0 ? 'Review required' : t.reviewRequiredOption)
+	);
+
+	const blockingLineCount = $derived(
+		lineItems.filter((item) => hasRequiredRowBlocker(item)).length
+	);
+	const blockingItemsList = $derived(
+		lineItems
+			.filter((item) => hasRequiredRowBlocker(item))
+			.map((item) => {
+				const warnings = unresolvedWarnings(item);
+				const fields = [
+					warnings.includes('style code') ? 'style code' : '',
+					warnings.includes('quantity') ? 'quantity' : '',
+					(warnings.includes('finish/material') || warnings.includes('material/finish') || warnings.includes('finish')) ? 'material/finish' : ''
+				].filter(Boolean);
+				return `${item.item} (${fields.join(', ')})`;
+			})
 	);
 
 	// Order progress checklist states
 	const progressOrderReviewed = $derived(currentStep >= 3 || allAnswered);
-	const progressProductionSheet = $derived(currentStep >= 3);
-	const progressPackingChecklist = $derived(currentStep >= 3 && (activeTab === 'packing' || packedCount > 0));
-	const progressBaliHandoff = $derived(handoffCreated && handoffShared);
+	const progressProductionSheet = $derived(currentStep >= 3 && allRequiredResolved);
+	const progressPackingChecklist = $derived(currentStep >= 3 && allRequiredResolved && (activeTab === 'packing' || packedCount > 0));
+	const progressBaliHandoff = $derived(allRequiredResolved && handoffCreated && handoffShared);
 	const progressQualityCheck = $derived(milestones.qualityChecked);
 	const progressPackingComplete = $derived(packedCount > 0 && packedCount >= lineItems.length);
-	const progressCustomerUpdate = $derived(sent || currentStep >= 4);
+	const progressCustomerUpdate = $derived(sent);
 
 	// Session Restoration
 	function restoreSession(orderId: string) {
@@ -719,6 +761,7 @@ Line  Item Code      Description                  Qty  Unit Price
 				processClicked = parsed.processClicked ?? false;
 				handoffCreated = parsed.handoffCreated ?? false;
 				handoffShared = parsed.handoffShared ?? false;
+				extractionNotice = parsed.extractionNotice ?? '';
 			} catch {
 				sessionStorage.removeItem(`${storageKey}-${orderId}`);
 			}
@@ -750,7 +793,8 @@ Line  Item Code      Description                  Qty  Unit Price
 				sampleUsed,
 				processClicked,
 				handoffCreated,
-				handoffShared
+				handoffShared,
+				extractionNotice
 			})
 		);
 	});
@@ -781,6 +825,7 @@ Line  Item Code      Description                  Qty  Unit Price
 	function resetDemoState() {
 		blockers = initialBlockers();
 		lineItems = initialLineItems();
+		extractionNotice = '';
 		sent = false;
 		sheetDirty = false;
 		activeTab = 'production';
@@ -792,10 +837,27 @@ Line  Item Code      Description                  Qty  Unit Price
 		handoffShared = false;
 	}
 
+	function clearExtractionState(notice = '') {
+		blockers = [];
+		lineItems = [];
+		extractionNotice = notice;
+		sent = false;
+		sheetDirty = false;
+		activeTab = 'production';
+		customerUpdate = '';
+		showOriginalDrawer = false;
+		packedItems = {};
+		readyItemsExpanded = false;
+		handoffCreated = false;
+		handoffShared = false;
+	}
+
 	function useSampleOrder() {
 		intakeText = samples[selectedSource];
 		uploadedFiles = [];
 		sampleUsed = true;
+		client = 'La Jolla Artisan Boutique';
+		selectedOrderId = 'HB-259689';
 		resetDemoState();
 		markAutoSaved();
 		showToast(t.sampleOrderLoaded);
@@ -807,7 +869,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			const files = acceptedUploadFiles(Array.from(target.files));
 			if (files.length === 0) return;
 			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
-			resetDemoState();
+			sampleUsed = false;
+			clearExtractionState('Uploaded file kept as source metadata.');
 			markAutoSaved();
 			showToast(`${files.length} ${t.fileUploaded}`);
 		}
@@ -825,7 +888,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			return file.name || `Clipboard image ${uploadedFiles.length + index + 1}.${extension}`;
 		});
 		uploadedFiles = [...uploadedFiles, ...imageNames];
-		resetDemoState();
+		sampleUsed = false;
+		clearExtractionState('Image/PDF extraction needs live AI/OCR. Paste the PO text or use sample order. Uploaded file kept as source metadata.');
 		markAutoSaved();
 		showToast(`${files.length} ${t.clipboardImageAttached}`);
 	}
@@ -837,7 +901,8 @@ Line  Item Code      Description                  Qty  Unit Price
 			const files = acceptedUploadFiles(Array.from(event.dataTransfer.files));
 			if (files.length === 0) return;
 			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
-			resetDemoState();
+			sampleUsed = false;
+			clearExtractionState('Uploaded file kept as source metadata.');
 			markAutoSaved();
 			showToast(`${files.length} ${t.fileUploaded}`);
 		}
@@ -847,11 +912,20 @@ Line  Item Code      Description                  Qty  Unit Price
 			return;
 		}
 		processClicked = true;
-		resetDemoState();
 
 		const isDefaultSample = Object.values(samples).some(s => s.trim() === intakeText.trim()) && !uploadedFiles.length;
 
 		if (!isDefaultSample) {
+			client = 'Unresolved';
+			selectedOrderId = 'Unresolved';
+			clearExtractionState('');
+			if (!intakeText.trim() && uploadedFiles.length > 0) {
+				extractionNotice = 'Image/PDF extraction needs live AI/OCR. Paste the PO text or use sample order. Uploaded file kept as source metadata.';
+				markAutoSaved();
+				setStep(2);
+				return;
+			}
+
 			isProcessing = true;
 			let apiSuccess = false;
 			try {
@@ -862,38 +936,39 @@ Line  Item Code      Description                  Qty  Unit Price
 				});
 				const data = await res.json();
 				if (data.success) {
-					lineItems = data.lineItems;
-					blockers = data.blockers.map((b: any) => ({
+					lineItems = Array.isArray(data.lineItems) ? data.lineItems : [];
+					blockers = Array.isArray(data.blockers) ? data.blockers.map((b: any) => ({
 						id: b.id,
 						impact: b.impact || 'Medium impact',
 						impactKey: b.impact === 'High impact' ? 'highImpact' : 'mediumImpact',
 						question: b.question,
-						questionKey: b.questionKey || (b.id === 'star-bird-finish' ? 'starBirdQuestion' : 'birdOfPreyQuestion'),
+						questionKey: b.questionKey,
 						evidence: b.evidence || '',
 						source: b.source || 'Source',
 						risk: b.risk || '',
-						riskKey: b.riskKey || (b.id === 'star-bird-finish' ? 'starBirdRisk' : 'birdOfPreyRisk'),
+						riskKey: b.riskKey,
 						options: b.options || [],
 						answer: b.answer || '',
 						required: b.required ?? true,
 						field: b.field
-					}));
-
+					})) : [];
+					if (data.client && data.client !== 'Unresolved') client = data.client;
+					if (data.poNumber) selectedOrderId = data.poNumber;
+					extractionNotice = data.helperMessage || (lineItems.length === 0 ? 'Artisan could not read line items from this source. Paste the PO text or use the sample order for the demo.' : '');
 					customerUpdate = generateCustomerUpdate({
-						client,
+						client: client || 'Unresolved',
 						lineItems,
 						unresolvedCount: unresolvedRequiredCount(blockers)
 					});
 					apiSuccess = true;
 				}
-			} catch (err) {
+			} catch {
 				console.warn('Order processing API fell back to local heuristics.');
 			} finally {
 				isProcessing = false;
 			}
 
 			if (!apiSuccess) {
-				// Local Heuristic Fallback
 				const parsed = parseMessyInput(intakeText);
 				if (parsed.length > 0) {
 					parsed.forEach((item) => {
@@ -905,60 +980,20 @@ Line  Item Code      Description                  Qty  Unit Price
 						}
 					});
 					lineItems = parsed;
-
-					const activeBlockers: Blocker[] = [];
-					const hasStarBirdUnresolved = parsed.some(item => !item.styleCode && (item.item.toLowerCase().includes('star') || item.item.toLowerCase().includes('dangle')));
-					const hasBirdUnresolved = parsed.some(item => !item.styleCode && item.item.toLowerCase().includes('bird'));
-
-					if (hasStarBirdUnresolved) {
-						activeBlockers.push({
-							id: 'star-bird-finish',
-							impact: 'High impact',
-							impactKey: 'highImpact',
-							question: 'Which Black Lip Star with Bird of Prey Dangle finish should Bali make?',
-							questionKey: 'starBirdQuestion',
-							evidence: parsed.find(item => (item.item.toLowerCase().includes('star') || item.item.toLowerCase().includes('dangle')))?.notes || 'star bird dangle',
-							source: parsed.find(item => (item.item.toLowerCase().includes('star') || item.item.toLowerCase().includes('dangle')))?.source || 'Source',
-							risk: 'Finish changes the metal casting, material cost, and production scheduling.',
-							riskKey: 'starBirdRisk',
-							options: ['Golden', 'Recycled Sterling Silver'],
-							answer: '',
-							required: true,
-							field: 'finish'
-						});
-					}
-
-					if (hasBirdUnresolved) {
-						activeBlockers.push({
-							id: 'bird-of-prey-size',
-							impact: 'Medium impact',
-							impactKey: 'mediumImpact',
-							question: 'Which Golden Bird of Prey Hat Stud size is this?',
-							questionKey: 'birdOfPreyQuestion',
-							evidence: parsed.find(item => item.item.toLowerCase().includes('bird'))?.notes || 'new smaller golden bird of prey',
-							source: parsed.find(item => item.item.toLowerCase().includes('bird'))?.source || 'Source',
-							risk: 'Size changes the bone carving template, casting mold, and unit price.',
-							riskKey: 'birdOfPreyRisk',
-							options: ['Mini', 'Medium'],
-							answer: '',
-							required: true,
-							field: 'size'
-						});
-					}
-
-					blockers = activeBlockers;
+					blockers = [];
 					customerUpdate = generateCustomerUpdate({
-						client,
+						client: client || 'Unresolved',
 						lineItems: parsed,
-						unresolvedCount: unresolvedRequiredCount(activeBlockers)
+						unresolvedCount: 0
 					});
+				} else {
+					extractionNotice = 'Artisan could not read line items from this source. Paste the PO text or use the sample order for the demo.';
 				}
 			}
 		} else {
-			if (lineItems.length === 0) {
-				lineItems = initialLineItems();
-				blockers = initialBlockers();
-			}
+			client = 'La Jolla Artisan Boutique';
+			selectedOrderId = 'HB-259689';
+			resetDemoState();
 			lineItems.forEach((item) => {
 				if (item.styleCode) {
 					const cat = catalog.find(c => c.styleCode === item.styleCode);
@@ -1033,9 +1068,17 @@ Line  Item Code      Description                  Qty  Unit Price
 	}
 
 	function continueToSheets() {
-		if (!allAnswered) return;
+		if (!canContinueToSheets) return;
 		setStep(3);
 		activeTab = 'production';
+	}
+
+	function continueToCustomerUpdate() {
+		if (!allRequiredResolved) {
+			showToast(t.reviewNeededHelp || 'Resolve required production fields first.');
+			return;
+		}
+		setStep(4);
 	}
 
 	// Grouping Helpers for Step 3 Production tab
@@ -1140,7 +1183,7 @@ Line  Item Code      Description                  Qty  Unit Price
 		const newOrder = {
 			id: newId,
 			poNumber: newId,
-			clientName: 'Marin Coastal Goods',
+			clientName: 'Unresolved',
 			status: 'Review',
 			sourceText: '',
 			customerUpdate: '',
@@ -1241,6 +1284,44 @@ Line  Item Code      Description                  Qty  Unit Price
 		markAutoSaved();
 	}
 
+	function onDisplayWorkflowChange(event: Event) {
+		const value = (event.currentTarget as HTMLSelectElement).value;
+		if (value === 'Completed') {
+			sent = true;
+			orderStatus = 'Completed';
+			setStep(4);
+		} else if (value === 'Customer update ready') {
+			if (!allRequiredResolved) {
+				showToast(t.reviewNeededHelp || 'Resolve required production fields first.');
+				return;
+			}
+			sent = false;
+			orderStatus = 'Packing';
+			setStep(4);
+		} else if (value === 'Bali handoff ready') {
+			if (!allRequiredResolved) {
+				showToast(t.reviewNeededHelp || 'Resolve required production fields first.');
+				return;
+			}
+			orderStatus = 'Production';
+			setStep(3);
+		} else if (value === 'Sheets ready') {
+			if (!canContinueToSheets) {
+				showToast(t.resolveToContinue);
+				return;
+			}
+			sent = false;
+			orderStatus = 'Production';
+			setStep(3);
+		} else {
+			sent = false;
+			orderStatus = 'Review';
+			setStep(2);
+		}
+		markDirty();
+		markAutoSaved();
+	}
+
 	function markDirty() {
 		sheetDirty = true;
 	}
@@ -1278,6 +1359,8 @@ Line  Item Code      Description                  Qty  Unit Price
 
 	function updateIntakeText(value: string) {
 		intakeText = value;
+		sampleUsed = Object.values(samples).some(s => s.trim() === value.trim());
+		if (!sampleUsed) extractionNotice = '';
 		markAutoSaved();
 	}
 
@@ -1297,7 +1380,7 @@ Line  Item Code      Description                  Qty  Unit Price
 			styleCode: t.styleCode,
 			qty: t.qty,
 			materialFinish: t.materialFinish,
-			confidence: t.confidence || 'Confidence',
+			confidence: t.confidence || 'Status',
 			unresolvedWarnings: t.unresolvedWarnings || 'Unresolved warnings',
 			sourceEvidence: t.sourceEvidence,
 			technicalInstructions: t.technicalInstructions,
@@ -1309,9 +1392,9 @@ Line  Item Code      Description                  Qty  Unit Price
 			directShip: t.directShip,
 			backorder: t.backorder,
 			splitShipAfterCasting: t.splitShipAfterCasting,
-			resolved: t.resolved || 'Matched',
-			needsReview: t.needsReview || 'Needs Review',
-			unresolved: t.unresolved || 'Unresolved'
+			resolved: t.resolved || 'Ready',
+			needsReview: t.needsReview || 'Check note',
+			unresolved: t.unresolved || 'Needs answer'
 		};
 	}
 
@@ -1359,7 +1442,7 @@ Line  Item Code      Description                  Qty  Unit Price
 
 	function createBaliHandoff() {
 		if (!handoffReady) {
-			showToast(t.resolveToContinue);
+			showToast(t.reviewNeededHelp || t.resolveToContinue);
 			return;
 		}
 		handoffCreated = true;
@@ -2015,17 +2098,18 @@ Line  Item Code      Description                  Qty  Unit Price
 											? 'border-emerald-200 bg-emerald-50 text-emerald-800'
 											: 'border-(--line) bg-white text-(--ink)'
 						}`} aria-live="polite">{displayWorkflowStatus}</span>
-						<select 
-							bind:value={orderStatus} 
-							onchange={onOrderStatusChange}
+						<select
+							value={displayWorkflowStatus}
+							onchange={onDisplayWorkflowChange}
 							class="rounded border border-(--line) bg-white px-2 py-0.5 text-[10px] font-semibold focus:border-(--brand) outline-none cursor-pointer text-(--muted)"
-							aria-label="Manual workflow override (demo)"
-							title="Manual stage override for demo"
+							aria-label="Workflow status"
+							title={t.workflowHelp}
 						>
-							<option value="Review">{t.reviewRequiredOption}</option>
-							<option value="Production">{t.inProductionOption}</option>
-							<option value="Packing">{t.fulfillmentPackingOption}</option>
-							<option value="Completed">{t.completedShippedOption}</option>
+							<option value="Review required">Review required</option>
+							<option value="Sheets ready">Sheets ready</option>
+							<option value="Bali handoff ready">Bali handoff ready</option>
+							<option value="Customer update ready">Customer update ready</option>
+							<option value="Completed">Completed</option>
 						</select>
 					</div>
 				</div>
@@ -2276,15 +2360,17 @@ Line  Item Code      Description                  Qty  Unit Price
 											<span class="ml-3 rounded border border-(--line) px-2 py-1 normal-case tracking-normal font-sans"
 												>Wholesale</span
 											>
-											<span class="ml-3 normal-case tracking-normal">Client: {client}</span>
+											<span class="ml-3 normal-case tracking-normal">Client: {client || 'Unresolved'}</span>
 										</p>
 										<h1 class="mt-5 font-display text-4xl leading-tight md:text-5xl">{t.reviewOrder}</h1>
 										<p class="mt-3 text-lg">{formatMessage(t.foundItems, { count: lineItems.length })}</p>
 										<p class="mt-1 text-sm text-(--muted)">
 											{#if remainingAnswers > 0}
 												{reviewCountLabel(remainingAnswers)}
-											{:else}
+											{:else if lineItems.length > 0}
 												{t.allResolved}
+											{:else}
+												{extractionNotice || 'Artisan could not read line items from this source. Paste the PO text or use the sample order for the demo.'}
 											{/if}
 										</p>
 										<p class="mt-4 text-sm text-(--muted)">
@@ -2297,25 +2383,35 @@ Line  Item Code      Description                  Qty  Unit Price
 									</div>
 								</div>
 
-								<div id="blockers-section">
-									<ReviewBlockerList
-										{blockers}
-										{remainingAnswers}
-										{t}
-										{getOptionDetail}
-										onAnswer={chooseAnswer}
-									/>
-								</div>
+								{#if lineItems.length === 0}
+									<section class="mt-8 rounded-md border border-[var(--line)] bg-white px-4 py-5 text-sm text-[var(--muted)]">
+										<p class="font-semibold text-[var(--ink)]">Artisan could not read line items from this source.</p>
+										<p class="mt-1">Paste the PO text or use the sample order for the demo.</p>
+										{#if uploadedFiles.length > 0}
+											<p class="mt-1">Uploaded file kept as source metadata.</p>
+										{/if}
+									</section>
+								{:else}
+									<div id="blockers-section">
+										<ReviewBlockerList
+											{blockers}
+											{remainingAnswers}
+											{t}
+											{getOptionDetail}
+											onAnswer={chooseAnswer}
+										/>
+									</div>
 
-								<div id="ready-checklist-section">
-									<ReadyChecklist
-										items={readyItems}
-										expanded={readyItemsExpanded}
-										summary={formatMessage(t.readySummary, { count: readyItems.length })}
-										{t}
-										onToggle={(expanded) => (readyItemsExpanded = expanded)}
-									/>
-								</div>
+									<div id="ready-checklist-section">
+										<ReadyChecklist
+											items={readyItems}
+											expanded={readyItemsExpanded}
+											summary={formatMessage(t.readySummary, { count: readyItems.length })}
+											{t}
+											onToggle={(expanded) => (readyItemsExpanded = expanded)}
+										/>
+									</div>
+								{/if}
 							</div>
 						</div>
 
@@ -2386,10 +2482,25 @@ Line  Item Code      Description                  Qty  Unit Price
 									</p>
 									<h1 class="mt-5 font-display text-4xl leading-tight md:text-5xl">{t.sheets}</h1>
 									<p class="mt-3">{t.sheetsDesc}</p>
-									<p class="mt-5 inline-flex items-center gap-1.5 rounded-md border border-(--ready) bg-(--ready-bg) px-3 py-2 text-sm text-(--ready-ink) font-semibold">
-										<i class="ri-checkbox-circle-line text-base" aria-hidden="true"></i>
-										{t.answersComplete}
-									</p>
+									{#if allRequiredResolved}
+										<p class="mt-5 inline-flex items-center gap-1.5 rounded-md border border-(--ready) bg-(--ready-bg) px-3 py-2 text-sm text-(--ready-ink) font-semibold">
+											<i class="ri-checkbox-circle-line text-base" aria-hidden="true"></i>
+											{t.answersComplete}
+										</p>
+									{:else}
+										<div class="mt-5 inline-flex items-start gap-2 rounded-md border border-(--warning) bg-(--warning-bg) px-3 py-2 text-sm text-(--warning-ink) font-semibold max-w-2xl">
+											<i class="ri-error-warning-line text-base mt-0.5 shrink-0" aria-hidden="true"></i>
+											<div>
+												<strong class="block">{t.sheetsReviewNeeded || 'Review needed before production'}</strong>
+												{#if remainingAnswers > 0}
+													<span class="block text-xs font-medium mt-0.5">{answerCountLabel(remainingAnswers)} still required.</span>
+												{/if}
+												{#if blockingLineCount > 0}
+													<span class="block text-xs font-medium mt-0.5">{t.sheetsBlockingRows || 'Blocking rows'}: {blockingItemsList.join(', ')}</span>
+												{/if}
+											</div>
+										</div>
+									{/if}
 								</div>
 							</div>
 
@@ -2491,7 +2602,7 @@ Line  Item Code      Description                  Qty  Unit Price
 
 											<!-- Order progress checklist -->
 											<div class="mb-4 border-b border-(--line) pb-4">
-												<h3 class="text-xs font-bold text-(--muted) uppercase tracking-wider mb-2.5">{t.orderProgress}</h3>
+												<h3 class="text-sm font-bold text-(--ink) mb-2.5">{t.orderProgress}</h3>
 												<ul class="space-y-1.5" aria-label="Order progress">
 													{#each [
 														{ label: t.progressOrderReviewed, done: progressOrderReviewed },
@@ -2611,7 +2722,10 @@ Line  Item Code      Description                  Qty  Unit Price
 									<button
 										class="primary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
 										type="button"
-										disabled={!handoffReady}
+										disabled={!handoffReady || !allRequiredResolved}
+										aria-disabled={!handoffReady || !allRequiredResolved}
+										aria-describedby={!handoffReady ? 'handoff-blocked-reason' : undefined}
+										title={!allRequiredResolved ? (t.reviewNeededHelp || '') : ''}
 										onclick={createBaliHandoff}
 									>
 										<i class="ri-file-list-3-line" aria-hidden="true"></i> {t.createBaliHandoff}
@@ -2625,7 +2739,9 @@ Line  Item Code      Description                  Qty  Unit Price
 							</div>
 
 							{#if !handoffReady}
-								<p class="mt-3 text-sm text-(--warning-ink)">{t.handoffBlocked}</p>
+								<p id="handoff-blocked-reason" class="mt-3 text-sm font-semibold text-(--warning-ink)">
+									{!allRequiredResolved ? (t.reviewNeededHelp || 'Resolve required production fields first.') : t.handoffBlocked}
+								</p>
 							{/if}
 
 							{#if handoffCreated}
@@ -2637,7 +2753,7 @@ Line  Item Code      Description                  Qty  Unit Price
 												{t.handoffReadyStatus || 'Ready for Bali handoff'}
 											</span>
 										{:else}
-											<span class="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
+											<span class="text-xs font-semibold text-(--warning-ink) bg-(--warning-bg) border border-(--warning) rounded px-2 py-0.5">
 												{t.handoffReviewStatus || 'Review needed before Bali handoff'}
 											</span>
 										{/if}
@@ -2670,6 +2786,7 @@ Line  Item Code      Description                  Qty  Unit Price
 												class="secondary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
 												type="button"
 												disabled={!handoffCreated || !allRequiredResolved}
+												aria-describedby={!allRequiredResolved ? 'handoff-blocked-reason' : undefined}
 												onclick={markBaliHandoffShared}
 											>
 												<i class="ri-checkbox-circle-line" aria-hidden="true"></i> {t.markAsShared}
@@ -2736,8 +2853,8 @@ Line  Item Code      Description                  Qty  Unit Price
 				<footer class="action-footer">
 					<div class="action-footer-inner">
 						<div class="footer-status">
-							<span class={`status-dot border-2 flex items-center justify-center rounded-full w-9 h-9 ${remainingAnswers && currentStep === 2 ? 'status-warn border-(--warning) text-(--warning)' : 'border-(--ready-ink) text-(--ready-ink)'}`}>
-								{#if currentStep === 2 && remainingAnswers}
+							<span class={`status-dot border-2 flex items-center justify-center rounded-full w-9 h-9 ${(!allRequiredResolved && (currentStep === 2 || currentStep === 3)) ? 'status-warn border-(--warning) text-(--warning-ink)' : 'border-(--ready-ink) text-(--ready-ink)'}`}>
+								{#if !allRequiredResolved && (currentStep === 2 || currentStep === 3)}
 									<i class="ri-question-mark font-bold text-sm" aria-hidden="true"></i>
 								{:else}
 									<i class="ri-check-line font-bold text-base" aria-hidden="true"></i>
@@ -2746,13 +2863,20 @@ Line  Item Code      Description                  Qty  Unit Price
 							<div>
 								<p class="font-semibold">
 									{#if currentStep === 2}
-										{answerCountLabel(remainingAnswers)}
+										{#if lineItems.length === 0}
+											Artisan could not read line items from this source.
+										{:else}
+											{answerCountLabel(remainingAnswers)}
+										{/if}
 									{:else if currentStep === 3}
-										{t.readyToProduction}
+										{allRequiredResolved ? t.readyToProduction : (t.sheetsReviewNeeded || 'Review needed before production')}
 									{:else}
-										{sent ? t.markedAsSent : t.readyToCopy}
+										{allRequiredResolved ? (sent ? t.markedAsSent : t.readyToCopy) : (t.sheetsReviewNeeded || 'Review needed before production')}
 									{/if}
 								</p>
+								{#if (currentStep === 3 || currentStep === 4) && !allRequiredResolved}
+									<p id="footer-required-warning" class="text-sm text-(--warning-ink)">{t.reviewNeededHelp || 'Resolve required blockers and missing production fields.'}</p>
+								{/if}
 								{#if currentStep === 4}
 									<p class="text-sm text-(--muted)">{t.noRealEmail}</p>
 								{/if}
@@ -2767,17 +2891,17 @@ Line  Item Code      Description                  Qty  Unit Price
 							{/if}
 							{#if currentStep === 2}
 								<div class="continue-action">
-									{#if remainingAnswers > 0}
+									{#if remainingAnswers > 0 || lineItems.length === 0}
 										<span id="continue-warning" class="footer-warning-bubble" role="status">
-											{t.resolveToContinue}
+											{lineItems.length === 0 ? 'Paste PO text or use the sample order.' : t.resolveToContinue}
 										</span>
 									{/if}
 									<button
 										id="continue-to-sheets-btn"
 										class="primary-button flex items-center justify-center font-bold"
 										type="button"
-										disabled={!allAnswered}
-										aria-describedby={remainingAnswers > 0 ? 'continue-warning' : undefined}
+										disabled={!canContinueToSheets}
+										aria-describedby={remainingAnswers > 0 || lineItems.length === 0 ? 'continue-warning' : undefined}
 										onclick={continueToSheets}
 									>
 										{t.continueToSheets} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
@@ -2785,11 +2909,32 @@ Line  Item Code      Description                  Qty  Unit Price
 								</div>
 							{:else}
 								{#if currentStep === 3}
-									<button id="continue-to-update-btn" class="primary-button flex items-center justify-center font-bold" type="button" onclick={() => setStep(4)}>
-										{t.continueToCustomerUpdate} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
-									</button>
+									<div class="continue-action">
+										{#if !allRequiredResolved}
+											<span id="continue-update-warning" class="footer-warning-bubble" role="status">
+												{t.reviewNeededHelp || 'Resolve required production fields first.'}
+											</span>
+										{/if}
+										<button
+											id="continue-to-update-btn"
+											class="primary-button flex items-center justify-center font-bold"
+											type="button"
+											disabled={!allRequiredResolved}
+											aria-describedby={!allRequiredResolved ? 'continue-update-warning' : undefined}
+											onclick={continueToCustomerUpdate}
+										>
+											{t.continueToCustomerUpdate} <i class="ri-arrow-right-line ml-1" aria-hidden="true"></i>
+										</button>
+									</div>
 								{:else}
-									<button id="mark-sent-btn" class="primary-button flex items-center justify-center gap-1.5 font-bold" type="button" onclick={markSent}>
+									<button
+										id="mark-sent-btn"
+										class="primary-button flex items-center justify-center gap-1.5 font-bold"
+										type="button"
+										disabled={!allRequiredResolved}
+										aria-describedby={!allRequiredResolved ? 'footer-required-warning' : undefined}
+										onclick={markSent}
+									>
 										<i class="ri-send-plane-line" aria-hidden="true"></i> {t.markSent}
 									</button>
 								{/if}

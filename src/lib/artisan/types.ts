@@ -5,11 +5,11 @@ export type ReviewBlocker = {
 	impact: 'High impact' | 'Medium impact';
 	impactKey: 'highImpact' | 'mediumImpact';
 	question: string;
-	questionKey: 'starBirdQuestion' | 'birdOfPreyQuestion';
+	questionKey?: 'starBirdQuestion' | 'birdOfPreyQuestion' | string;
 	evidence: string;
 	source: string;
 	risk: string;
-	riskKey: 'starBirdRisk' | 'birdOfPreyRisk';
+	riskKey?: 'starBirdRisk' | 'birdOfPreyRisk' | string;
 	options: string[];
 	answer: string;
 	required?: boolean;

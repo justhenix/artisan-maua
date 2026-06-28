@@ -6,9 +6,9 @@ import { extractOrder } from '$lib/server/orderExtraction';
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
-		const { text, client } = await request.json();
+		const { text, client, fixtureMode } = await request.json();
 
-		if (!text || typeof text !== 'string') {
+		if (fixtureMode !== true && (!text || typeof text !== 'string')) {
 			return json({ success: false, error: 'Input text is required' }, { status: 400 });
 		}
 
@@ -24,10 +24,11 @@ export const POST: RequestHandler = async ({ request }) => {
 		}));
 
 		const result = await extractOrder({
-			text,
+			text: typeof text === 'string' ? text : '',
 			client: typeof client === 'string' ? client : '',
 			catalog,
-			env
+			env,
+			fixtureMode: fixtureMode === true
 		});
 
 		return json(result);

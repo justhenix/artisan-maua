@@ -67,8 +67,12 @@
 
 	function statusLabel(state: string): string {
 		if (state === 'resolved') return 'Ready';
-		if (state === 'needs_review') return 'Needs review';
+		if (state === 'needs_review') return 'Check note';
 		return 'Needs answer';
+	}
+
+	function notePreview(item: LineItem, catalogItem: CatalogItem | null): string {
+		return catalogItem?.notes_en || item.notes || '';
 	}
 </script>
 
@@ -105,22 +109,23 @@
 				<div class="border-b border-[var(--line)] bg-[var(--surface-muted)] px-4 py-2">
 					<h3 class="text-sm font-bold text-[var(--brand-dark)]">{group.name}</h3>
 				</div>
-				<table class="w-full text-left text-sm">
+				<div class="overflow-x-auto">
+				<table class="min-w-[940px] w-full table-fixed text-left text-sm">
 					<thead class="border-b border-[var(--line)] bg-[var(--surface-soft)]">
 						<tr>
-							<th class="w-36 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.styleCode}</th>
-							<th class="w-10 px-2 py-2 text-xs font-bold text-[var(--muted)]">Img</th>
-							<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.itemDescription}</th>
+							<th class="w-[8.5rem] px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.styleCode}</th>
+							<th class="w-16 px-2 py-2 text-xs font-bold text-[var(--muted)]">{t.preview}</th>
+							<th class="w-48 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.itemDescription}</th>
 							<th class="w-16 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.qty}</th>
-							<th class="w-36 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.materialFinish}</th>
-							<th class="w-28 px-3 py-2 text-xs font-bold text-[var(--muted)]">Status</th>
-							<th class="w-28 px-3 py-2 text-xs font-bold text-[var(--muted)]">Notes</th>
+							<th class="w-40 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.materialFinish}</th>
+							<th class="w-[7.5rem] px-3 py-2 text-xs font-bold text-[var(--muted)]">Status</th>
+							<th class="w-64 px-3 py-2 text-xs font-bold text-[var(--muted)]">Notes</th>
 						</tr>
 					</thead>
 					<tbody>
 						{#each group.items as item (item.id)}
 							{@const state = confidenceStateFor(item)}
-							{@const cat = item.styleCode ? catalog.find((entry) => entry.styleCode === item.styleCode) : null}
+							{@const cat = item.styleCode ? (catalog.find((entry) => entry.styleCode === item.styleCode) ?? null) : null}
 							{@const hasNote = !!cat}
 							{@const noteExpanded = !!expandedNotes[item.id]}
 							<tr
@@ -147,7 +152,7 @@
 									{/if}
 								</td>
 								<!-- Item name -->
-								<td class="px-3 py-1.5 font-medium leading-snug max-w-[180px]">
+								<td class="px-3 py-1.5 font-medium leading-snug">
 									<span class="block truncate" title={item.item}>{item.item}</span>
 								</td>
 								<!-- Qty -->
@@ -183,7 +188,7 @@
 										<span class={`inline-flex items-center rounded border px-2 py-1 text-[10px] font-bold ${
 											state === 'resolved'
 												? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-												: 'border-amber-200 bg-amber-50 text-amber-800'
+												: 'border-[var(--warning)] bg-[var(--warning-bg)] text-[var(--warning-ink)]'
 										}`}>
 											{statusLabel(state)}
 										</span>
@@ -192,6 +197,11 @@
 								<!-- Notes + view note -->
 								<td class="px-2 py-1.5">
 									<div class="flex flex-col gap-1">
+										{#if notePreview(item, cat)}
+											<p class="note-preview text-[11px] leading-snug text-[var(--muted)]" title={notePreview(item, cat)}>
+												{notePreview(item, cat)}
+											</p>
+										{/if}
 										{#if hasNote}
 											<button
 												type="button"
@@ -222,11 +232,11 @@
 									<td colspan="7" class="px-4 py-3">
 										<div class="flex items-start gap-6 text-xs">
 											<div class="flex-1">
-												<p class="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wide mb-1">Production note (EN)</p>
+												<p class="text-[11px] font-semibold text-[var(--muted)] mb-1">Production note (EN)</p>
 												<p class="text-[var(--ink)] leading-relaxed">{cat.notes_en}</p>
 											</div>
 											<div class="flex-1 border-l border-[var(--line)] pl-4">
-												<p class="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wide mb-1">Catatan produksi (ID)</p>
+												<p class="text-[11px] font-semibold text-[var(--muted)] mb-1">Catatan produksi (ID)</p>
 												<p class="text-[var(--muted)] italic leading-relaxed">{cat.notes_id}</p>
 											</div>
 										</div>
@@ -236,6 +246,7 @@
 						{/each}
 					</tbody>
 				</table>
+				</div>
 			</div>
 		{/if}
 	{/each}
