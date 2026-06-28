@@ -1776,7 +1776,7 @@ Heather Benjamin Jewelry`;
 </script>
 
 <svelte:head>
-	<title>Artisan · Order-to-Production Assistant</title>
+	<title>Artisan</title>
 	<meta
 		name="description"
 		content="Internal order-to-production assistant for Heather Benjamin Jewelry"
