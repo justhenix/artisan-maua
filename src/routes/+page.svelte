@@ -1928,50 +1928,6 @@ Heather Benjamin Jewelry`;
 							<option value="Completed">{t.completedShippedOption}</option>
 						</select>
 					</div>
-
-					<div class="flex items-center gap-6 flex-wrap">
-						<span class="text-xs uppercase tracking-wider font-semibold text-(--muted)">{t.baliMilestones}:</span>
-						
-						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-(--ink)">
-							<input 
-								type="checkbox" 
-								bind:checked={milestones.moldsChecked} 
-								onchange={onMilestoneChange}
-								class="rounded border-(--line) text-(--brand) focus:ring-(--brand) h-3.5 w-3.5"
-							/>
-							<span>{t.moldsVerified}</span>
-						</label>
-
-						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-(--ink)">
-							<input 
-								type="checkbox" 
-								bind:checked={milestones.silverCast} 
-								onchange={onMilestoneChange}
-								class="rounded border-(--line) text-(--brand) focus:ring-(--brand) h-3.5 w-3.5"
-							/>
-							<span>{t.silverCast}</span>
-						</label>
-
-						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-(--ink)">
-							<input 
-								type="checkbox" 
-								bind:checked={milestones.qualityChecked} 
-								onchange={onMilestoneChange}
-								class="rounded border-(--line) text-(--brand) focus:ring-(--brand) h-3.5 w-3.5"
-							/>
-							<span>{t.qcPassed}</span>
-						</label>
-
-						<label class="flex items-center gap-2 cursor-pointer font-medium select-none text-xs text-(--ink)">
-							<input 
-								type="checkbox" 
-								bind:checked={milestones.readyForShipping} 
-								onchange={onMilestoneChange}
-								class="rounded border-(--line) text-(--brand) focus:ring-(--brand) h-3.5 w-3.5"
-							/>
-							<span>{t.readyToShip}</span>
-						</label>
-					</div>
 				</div>
 
 				<div class="step-scroll border-b border-(--line) bg-white px-4 md:px-10">
