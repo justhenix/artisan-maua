@@ -2269,6 +2269,8 @@ Line  Item Code      Description                  Qty  Unit Price
 										</div>
 									</div>
 
+									<p class="mt-3 text-xs text-(--muted)">{t.intakeFileNote}</p>
+
 									<div class="mt-6 flex flex-wrap items-center justify-between gap-4">
 										<div id="try-sample-container" class="text-xs text-(--muted) flex flex-wrap items-center gap-2 font-medium">
 											<span>{t.trySample}:</span>
@@ -2487,13 +2489,13 @@ Line  Item Code      Description                  Qty  Unit Price
 											<div>
 												<h3 class={isUnlocked ? 'text-(--ink) font-semibold' : ''}>{doc}</h3>
 												<p class="text-xs text-(--muted) mt-1">
-													{allAnswered
-														? doc === t.customerUpdate
-															? t.draftIncludesNotes
-															: t.readyAfterReview
-														: doc === t.productionSheet
-															? formatMessage(t.blockedByAnswers, { count: remainingAnswers })
-															: t.blockedByProductionSheet}
+													{#if lineItems.length === 0}
+														{doc === t.customerUpdate ? t.needsOrderDetails : t.needsLineItems}
+													{:else if allAnswered}
+														{doc === t.customerUpdate ? t.draftIncludesNotes : t.readyAfterReview}
+													{:else}
+														{doc === t.productionSheet ? formatMessage(t.blockedByAnswers, { count: remainingAnswers }) : t.blockedByProductionSheet}
+													{/if}
 												</p>
 											</div>
 											<span aria-hidden="true" class={`text-lg transition-all duration-300 ${isUnlocked ? 'text-emerald-600 scale-110' : 'text-(--muted)'}`}>
@@ -2938,7 +2940,7 @@ Line  Item Code      Description                  Qty  Unit Price
 								<div class="continue-action">
 									{#if remainingAnswers > 0 || lineItems.length === 0}
 										<span id="continue-warning" class="footer-warning-bubble" role="status">
-											{lineItems.length === 0 ? 'Paste PO text or use the sample order.' : t.resolveToContinue}
+											{lineItems.length === 0 ? 'Paste PO text or use sample order to continue.' : t.resolveToContinue}
 										</span>
 									{/if}
 									<button
