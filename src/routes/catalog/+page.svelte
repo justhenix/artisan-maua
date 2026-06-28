@@ -33,6 +33,7 @@
 	let categoryFilter = $state<string>('all');
 	let collectionFilter = $state<string>('all');
 	let viewMode = $state<'grid' | 'list'>('grid');
+	let spotRate = $state(1.25); // Default silver spot rate ($/g)
 
 	// Extract unique categories and collections for filtering
 	const departments = $derived(
@@ -467,6 +468,31 @@
 								<option value={col}>{col === 'all' ? 'All collections' : col}</option>
 							{/each}
 						</select>
+					</div>
+				</div>
+
+				<!-- Silver Spot Price Calculator Row -->
+				<div class="mt-4 border-t border-(--line) pt-4 flex flex-wrap items-center justify-between gap-4">
+					<div class="flex items-center gap-2 text-slate-700">
+						<i class="ri-funds-box-line text-base text-(--brand)"></i>
+						<div>
+							<h3 class="text-xs font-bold text-(--ink)">{t.spotRateCalculator}</h3>
+							<p class="text-[10px] text-(--muted) mt-0.5">{t.spotRateDesc}</p>
+						</div>
+					</div>
+					<div class="flex items-center gap-2">
+						<label class="text-xs font-semibold text-(--ink)" for="spot-rate-input">{t.spotPrice}:</label>
+						<div class="relative flex items-center">
+							<span class="absolute left-2.5 text-xs text-(--muted) font-mono">$</span>
+							<input 
+								id="spot-rate-input"
+								type="number" 
+								step="0.05" 
+								min="0"
+								class="w-24 rounded border border-(--line) bg-(--surface-soft) pl-5 pr-2.5 py-1.5 text-right font-mono text-xs font-semibold focus:border-(--brand) focus:bg-white outline-hidden" 
+								bind:value={spotRate} 
+							/>
+						</div>
 					</div>
 				</div>
 			</div>

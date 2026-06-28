@@ -1,6 +1,8 @@
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
 import { getCachedCatalog, invalidateCatalogCache } from '$lib/server/catalogCache';
+import fs from 'node:fs';
+import path from 'node:path';
 
 export const load: PageServerLoad = async () => {
 	try {
@@ -26,10 +28,30 @@ export const actions: Actions = {
 		const material = data.get('material') as string || 'Silver';
 		const notes_en = (data.get('notes_en') as string || '').trim();
 		const notes_id = (data.get('notes_id') as string || '').trim();
-		const imageUrl = (data.get('imageUrl') as string || '').trim();
+		let imageUrl = (data.get('imageUrl') as string || '').trim();
 
 		if (!styleCode || !title) {
 			return { success: false, error: 'Style code and title are required' };
+		}
+
+		// Write base64 image data to local filesystem to prevent DB bloating
+		if (imageUrl.startsWith('data:image/')) {
+			try {
+				const matches = imageUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+				if (matches && matches.length === 3) {
+					const buffer = Buffer.from(matches[2], 'base64');
+					const ext = matches[1].split('/')[1] || 'png';
+					const dir = path.join(process.cwd(), 'static', 'uploads');
+					if (!fs.existsSync(dir)) {
+						fs.mkdirSync(dir, { recursive: true });
+					}
+					const filename = `${styleCode.replace(/[^a-zA-Z0-9-_]/g, '_')}.${ext}`;
+					fs.writeFileSync(path.join(dir, filename), buffer);
+					imageUrl = `/uploads/${filename}`;
+				}
+			} catch (err) {
+				console.error('Failed to save uploaded image locally.');
+			}
 		}
 
 		try {
@@ -61,10 +83,30 @@ export const actions: Actions = {
 		const material = data.get('material') as string || 'Silver';
 		const notes_en = (data.get('notes_en') as string || '').trim();
 		const notes_id = (data.get('notes_id') as string || '').trim();
-		const imageUrl = (data.get('imageUrl') as string || '').trim();
+		let imageUrl = (data.get('imageUrl') as string || '').trim();
 
 		if (!originalStyleCode || !styleCode || !title) {
 			return { success: false, error: 'Original style code, style code, and title are required' };
+		}
+
+		// Write base64 image data to local filesystem to prevent DB bloating
+		if (imageUrl.startsWith('data:image/')) {
+			try {
+				const matches = imageUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+				if (matches && matches.length === 3) {
+					const buffer = Buffer.from(matches[2], 'base64');
+					const ext = matches[1].split('/')[1] || 'png';
+					const dir = path.join(process.cwd(), 'static', 'uploads');
+					if (!fs.existsSync(dir)) {
+						fs.mkdirSync(dir, { recursive: true });
+					}
+					const filename = `${styleCode.replace(/[^a-zA-Z0-9-_]/g, '_')}.${ext}`;
+					fs.writeFileSync(path.join(dir, filename), buffer);
+					imageUrl = `/uploads/${filename}`;
+				}
+			} catch (err) {
+				console.error('Failed to save uploaded image locally.');
+			}
 		}
 
 		try {

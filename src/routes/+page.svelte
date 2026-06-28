@@ -6,6 +6,7 @@
 	import 'driver.js/dist/driver.css';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import { localizeHref } from '$lib/paraglide/runtime';
 	import type { Pathname } from '$app/types';
 	import CustomerUpdateEditor from '$lib/components/artisan/CustomerUpdateEditor.svelte';
@@ -329,49 +330,86 @@ Line  Item Code      Description                  Qty  Unit Price
 					item.styleCode = exactMatch.styleCode;
 					item.item = exactMatch.creativeTitle;
 				} else {
-					if (name.includes('horse') && name.includes('pin')) {
-						if (name.includes('medium')) {
-							item.styleCode = 'HB-HORSE-M';
-							item.item = 'Horse Pin Medium';
-						} else if (name.includes('small')) {
-							item.styleCode = 'HB-HORSE-S';
-							item.item = 'Horse Pin Small';
-						} else if (name.includes('large')) {
-							item.styleCode = 'HB-HORSE-L';
-							item.item = 'Horse Pin Large';
-						} else {
-							item.styleCode = '';
-							item.item = 'Horse Pin (Size Unresolved)';
+					// Dynamic matching fallback: find items in catalog sharing keywords
+					const inputWords = name.split(/[\s,.\-_/]+/).filter(w => w.length > 2 && !['and', 'with', 'for', 'the', 'pin', 'stud', 'pendant', 'ring', 'cuff', 'chain', 'size', 'medium', 'small', 'large', 'mini', 'golden', 'silver'].includes(w));
+					
+					let bestMatch: CatalogItem | undefined;
+					let maxMatchedWords = 0;
+					
+					for (const cat of catalog) {
+						const catTitle = cat.creativeTitle.toLowerCase();
+						const catCode = cat.styleCode.toLowerCase();
+						
+						let matches = 0;
+						for (const word of inputWords) {
+							if (catTitle.includes(word) || catCode.includes(word)) {
+								matches++;
+							}
 						}
-					} else if (name.includes('starburst')) {
-						if (name.includes('mini')) {
-							item.styleCode = 'HB-SB-MINI';
-							item.item = 'Bali Starburst Mini';
-						} else if (name.includes('small')) {
-							item.styleCode = 'HB-SB-SMALL';
-							item.item = 'Bali Starburst Small';
-						} else if (name.includes('large')) {
-							item.styleCode = 'HB-SB-LARGE';
-							item.item = 'Bali Starburst Large';
-						} else if (name.includes('stud')) {
-							item.styleCode = 'HB-SB-STUD';
-							item.item = 'Starburst Studs';
-						} else {
-							item.styleCode = '';
-							item.item = 'Bali Starburst (Size Unresolved)';
+						
+						if (matches > maxMatchedWords) {
+							maxMatchedWords = matches;
+							bestMatch = cat;
 						}
-					} else if (name.includes('mountain')) {
-						item.styleCode = 'HB-MTN-P';
-						item.item = 'Mountain Pendant';
-					} else if (name.includes('wave') && name.includes('cuff')) {
-						item.styleCode = 'HB-WAVE-C';
-						item.item = 'Wave Cuff';
-					} else if (name.includes('stacking') && name.includes('ring')) {
-						item.styleCode = 'HB-TSR-2';
-						item.item = 'Thin Stacking Ring';
-					} else if (name.includes('cable') && name.includes('chain')) {
-						item.styleCode = 'HB-CC-18';
-						item.item = 'Cable Chain 18"';
+					}
+					
+					if (bestMatch && maxMatchedWords > 0) {
+						// Size variant matching
+						let resolvedStyle = bestMatch.styleCode;
+						let resolvedTitle = bestMatch.creativeTitle;
+						
+						if (name.includes('horse') && name.includes('pin')) {
+							if (name.includes('medium')) {
+								resolvedStyle = 'HB-HORSE-M';
+								resolvedTitle = 'Horse Pin Medium';
+							} else if (name.includes('small')) {
+								resolvedStyle = 'HB-HORSE-S';
+								resolvedTitle = 'Horse Pin Small';
+							} else if (name.includes('large')) {
+								resolvedStyle = 'HB-HORSE-L';
+								resolvedTitle = 'Horse Pin Large';
+							} else {
+								resolvedStyle = '';
+								resolvedTitle = 'Horse Pin (Size Unresolved)';
+							}
+						} else if (name.includes('starburst')) {
+							if (name.includes('mini')) {
+								resolvedStyle = 'HB-SB-MINI';
+								resolvedTitle = 'Bali Starburst Mini';
+							} else if (name.includes('small')) {
+								resolvedStyle = 'HB-SB-SMALL';
+								resolvedTitle = 'Bali Starburst Small';
+							} else if (name.includes('large')) {
+								resolvedStyle = 'HB-SB-LARGE';
+								resolvedTitle = 'Bali Starburst Large';
+							} else if (name.includes('stud')) {
+								resolvedStyle = 'HB-SB-STUD';
+								resolvedTitle = 'Starburst Studs';
+							} else {
+								resolvedStyle = '';
+								resolvedTitle = 'Bali Starburst (Size Unresolved)';
+							}
+						} else {
+							// Search for size variants in catalog
+							const searchKey = bestMatch.creativeTitle.split(' ')[0].toLowerCase();
+							const variants = catalog.filter(c => c.creativeTitle.toLowerCase().includes(searchKey));
+							if (variants.length > 1) {
+								const matchedVariant = variants.find(v => {
+									const vTitle = v.creativeTitle.toLowerCase();
+									return (name.includes('mini') && vTitle.includes('mini')) ||
+									       (name.includes('small') && vTitle.includes('small')) ||
+									       (name.includes('medium') && vTitle.includes('medium')) ||
+									       (name.includes('large') && vTitle.includes('large'));
+								});
+								if (matchedVariant) {
+									resolvedStyle = matchedVariant.styleCode;
+									resolvedTitle = matchedVariant.creativeTitle;
+								}
+							}
+						}
+						
+						item.styleCode = resolvedStyle;
+						item.item = resolvedTitle;
 					}
 				}
 			}
@@ -447,8 +485,10 @@ Line  Item Code      Description                  Qty  Unit Price
 		if (!dbLoaded && data.orders && data.orders.length > 0) {
 			orders = data.orders;
 			
-			// Load the default selected order
-			const defaultOrder = data.orders.find((o: any) => o.id === selectedOrderId) || data.orders[0];
+			// Load from URL or default selected order
+			const urlOrderId = page.url.searchParams.get('orderId');
+			const targetOrderId = urlOrderId && data.orders.some((o: any) => o.id === urlOrderId) ? urlOrderId : selectedOrderId;
+			const defaultOrder = data.orders.find((o: any) => o.id === targetOrderId) || data.orders[0];
 			if (defaultOrder) {
 				selectedOrderId = defaultOrder.id;
 				client = defaultOrder.clientName;
@@ -461,9 +501,30 @@ Line  Item Code      Description                  Qty  Unit Price
 				lineItems = data.allItems.filter((item: any) => item.poId === selectedOrderId);
 				blockers = data.allBlockers.filter((bl: any) => bl.poId === selectedOrderId);
 				restoreSession(selectedOrderId);
+
+				// Override step from URL if present
+				const urlStep = page.url.searchParams.get('step');
+				if (urlStep) {
+					const s = parseInt(urlStep, 10);
+					if (s >= 1 && s <= 4) {
+						currentStep = s as Step;
+					}
+				}
 			}
 			
 			dbLoaded = true;
+		}
+	});
+
+	$effect(() => {
+		if (!browser) return;
+		if (!dbLoaded) return;
+		
+		const url = new URL(window.location.href);
+		if (url.searchParams.get('step') !== String(currentStep) || url.searchParams.get('orderId') !== selectedOrderId) {
+			url.searchParams.set('step', String(currentStep));
+			url.searchParams.set('orderId', selectedOrderId);
+			goto(url.pathname + url.search, { replaceState: true, noScroll: true, keepFocus: true });
 		}
 	});
 
@@ -1353,6 +1414,13 @@ Line  Item Code      Description                  Qty  Unit Price
 	async function copyCustomerUpdate() {
 		await navigator.clipboard.writeText(customerUpdate);
 		showToast(t.customerUpdateCopied);
+	}
+
+	function openEmailClient() {
+		const subject = encodeURIComponent(`Update on Heather Benjamin Jewelry Order - PO ${orderId}`);
+		const body = encodeURIComponent(customerUpdate);
+		window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+		showToast(t.emailDraftOpened);
 	}
 
 	function saveCustomerDraft() {
@@ -2454,13 +2522,22 @@ Line  Item Code      Description                  Qty  Unit Price
 													</button>
 												</div>
 											{:else}
-												<button id="export-dropdown-btn" class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={copyCustomerUpdate}>
-													<div>
-														<strong class="block font-bold text-sm text-(--ink)">{t.copyUpdate}</strong>
-														<span class="block text-[10px] text-(--muted) mt-0.5">{t.plainText}</span>
-													</div>
-													<i class="ri-file-copy-2-line text-lg text-(--brand)" aria-hidden="true"></i>
-												</button>
+												<div class="space-y-3">
+													<button id="export-dropdown-btn" class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={copyCustomerUpdate}>
+														<div>
+															<strong class="block font-bold text-sm text-(--ink)">{t.copyUpdate}</strong>
+															<span class="block text-[10px] text-(--muted) mt-0.5">{t.plainText}</span>
+														</div>
+														<i class="ri-file-copy-2-line text-lg text-(--brand)" aria-hidden="true"></i>
+													</button>
+													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={openEmailClient}>
+														<div>
+															<strong class="block font-bold text-sm text-(--ink)">{t.openEmail}</strong>
+															<span class="block text-[10px] text-(--muted) mt-0.5">Mailto Link</span>
+														</div>
+														<i class="ri-mail-line text-lg text-(--brand)" aria-hidden="true"></i>
+													</button>
+												</div>
 											{/if}
 										</div>
 									</aside>
@@ -2573,6 +2650,9 @@ Line  Item Code      Description                  Qty  Unit Price
 									<div class="flex items-center gap-3">
 										<button class="secondary-button flex items-center justify-center gap-1.5" type="button" onclick={copyCustomerUpdate}>
 											<i class="ri-file-copy-line" aria-hidden="true"></i> {t.copyUpdate}
+										</button>
+										<button class="secondary-button flex items-center justify-center gap-1.5" type="button" onclick={openEmailClient}>
+											<i class="ri-mail-line" aria-hidden="true"></i> {t.openEmail}
 										</button>
 										<button class="secondary-button flex items-center justify-center gap-1.5" type="button" onclick={saveCustomerDraft}>
 											<i class="ri-save-3-line" aria-hidden="true"></i> {t.saveDraft}
