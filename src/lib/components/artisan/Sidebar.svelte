@@ -7,6 +7,7 @@
 
 	let {
 		t,
+		currentLocale,
 		activePath,
 		sidebarCollapsed = $bindable(false),
 		mobileSidebarOpen = $bindable(false),
@@ -15,6 +16,7 @@
 		onReplayTour
 	}: {
 		t: Messages;
+		currentLocale: 'en' | 'id';
 		activePath: string;
 		sidebarCollapsed: boolean;
 		mobileSidebarOpen: boolean;
@@ -32,8 +34,8 @@
 		return path === '/catalog' || path === '/id/catalog' || path.startsWith('/catalog/') || path.startsWith('/id/catalog/');
 	}
 
-	const ordersHref = $derived(resolve(localizeHref('/') as Pathname));
-	const catalogHref = $derived(resolve(localizeHref('/catalog') as Pathname));
+	const ordersHref = $derived(resolve(localizeHref('/', { locale: currentLocale }) as Pathname));
+	const catalogHref = $derived(resolve(localizeHref('/catalog', { locale: currentLocale }) as Pathname));
 </script>
 
 {#if mobileSidebarOpen}
@@ -52,14 +54,8 @@
 		{#if !sidebarCollapsed}
 			<!-- Open State Header -->
 			<div class="flex w-full items-center justify-between">
-				<div class="sidebar-title flex items-center gap-2">
-					<div class="w-8 h-8 rounded-full bg-(--surface-muted) flex items-center justify-center text-(--brand)">
-						<i class="ri-sparkling-fill text-lg"></i>
-					</div>
-					<div>
-						<p class="font-display text-xl leading-tight">Artisan</p>
-						<p class="text-[10px] text-(--muted)">Order-to-Production</p>
-					</div>
+				<div class="sidebar-title flex items-center">
+					<img src="/logo.webp" alt="Artisan" class="h-9 w-auto object-contain" />
 				</div>
 				<div class="relative group">
 					<button
@@ -78,8 +74,8 @@
 		{:else}
 			<!-- Collapsed State Header -->
 			<div class="relative w-10 h-10 flex items-center justify-center mx-auto group">
-				<div class="w-8 h-8 rounded-full bg-(--surface-muted) flex items-center justify-center text-(--brand) transition-opacity duration-150 group-hover:opacity-0">
-					<i class="ri-sparkling-fill text-lg"></i>
+				<div class="w-8 h-8 flex items-center justify-center transition-opacity duration-150 group-hover:opacity-0">
+					<img src="/icon.webp" alt="Artisan" class="w-8 h-8 object-contain" />
 				</div>
 				<button
 					class="absolute inset-0 w-10 h-10 flex items-center justify-center rounded-full hover:bg-(--surface-muted) text-(--muted) hover:text-(--ink) opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-transparent border-0 p-0 cursor-pointer"
