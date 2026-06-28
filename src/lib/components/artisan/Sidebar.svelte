@@ -14,7 +14,10 @@
 		onToggleSidebar,
 		onCloseMobileSidebar,
 		onReplayTour,
-		onClickLogo
+		onClickLogo,
+		activeView = 'dashboard',
+		onClickDashboard,
+		onClickWorkbench
 	}: {
 		t: Messages;
 		currentLocale: 'en' | 'id';
@@ -25,6 +28,9 @@
 		onCloseMobileSidebar: () => void;
 		onReplayTour?: () => void;
 		onClickLogo?: () => void;
+		activeView?: 'dashboard' | 'workbench';
+		onClickDashboard?: (e: MouseEvent) => void;
+		onClickWorkbench?: (e: MouseEvent) => void;
 	} = $props();
 
 	function isOrdersActive(path: string): boolean {
@@ -112,18 +118,47 @@
 		<div class="relative group">
 			<a
 				href={ordersHref}
+				onclick={(e) => {
+					if (onClickDashboard) {
+						onClickDashboard(e);
+					}
+				}}
 				class={`flex w-full items-center gap-3 rounded-md px-4 py-3 text-left transition border-0 no-underline ${
-					isOrdersActive(activePath)
+					isOrdersActive(activePath) && activeView === 'dashboard'
+						? 'bg-(--nav-active) font-semibold text-(--ink) shadow-sm'
+						: 'text-(--ink) hover:bg-(--surface-soft) bg-transparent'
+				}`}
+			>
+				<i class="ri-dashboard-line text-lg" aria-hidden="true"></i>
+				<span class="sidebar-label">{t.dashboard || 'Dashboard'}</span>
+			</a>
+			{#if sidebarCollapsed}
+				<div class="absolute left-14 top-1/2 -translate-y-1/2 ml-2 bg-(--surface-muted) text-(--ink) text-[10px] font-semibold px-2 py-1 rounded shadow border border-(--line) whitespace-nowrap z-50 hidden group-hover:block">
+					{t.dashboard || 'Dashboard'}
+				</div>
+			{/if}
+		</div>
+
+		<div class="relative group">
+			<a
+				href={ordersHref}
+				onclick={(e) => {
+					if (onClickWorkbench) {
+						onClickWorkbench(e);
+					}
+				}}
+				class={`flex w-full items-center gap-3 rounded-md px-4 py-3 text-left transition border-0 no-underline ${
+					isOrdersActive(activePath) && activeView === 'workbench'
 						? 'bg-(--nav-active) font-semibold text-(--ink) shadow-sm'
 						: 'text-(--ink) hover:bg-(--surface-soft) bg-transparent'
 				}`}
 			>
 				<i class="ri-file-list-3-line text-lg" aria-hidden="true"></i>
-				<span class="sidebar-label">{t.orders}</span>
+				<span class="sidebar-label">{t.workbench || 'Workbench'}</span>
 			</a>
 			{#if sidebarCollapsed}
 				<div class="absolute left-14 top-1/2 -translate-y-1/2 ml-2 bg-(--surface-muted) text-(--ink) text-[10px] font-semibold px-2 py-1 rounded shadow border border-(--line) whitespace-nowrap z-50 hidden group-hover:block">
-					{t.orders}
+					{t.workbench || 'Workbench'}
 				</div>
 			{/if}
 		</div>

@@ -15,6 +15,9 @@
 		onReplayTour,
 		onClickLogo,
 		mainClass = '',
+		activeView = 'dashboard',
+		onClickDashboard,
+		onClickWorkbench,
 		children
 	}: {
 		t: Messages;
@@ -26,6 +29,9 @@
 		onReplayTour?: () => void;
 		onClickLogo?: () => void;
 		mainClass?: string;
+		activeView?: 'dashboard' | 'workbench';
+		onClickDashboard?: (e: MouseEvent) => void;
+		onClickWorkbench?: (e: MouseEvent) => void;
 		children: Snippet;
 	} = $props();
 
@@ -91,6 +97,9 @@
 		onCloseMobileSidebar={closeMobileSidebar}
 		{onReplayTour}
 		{onClickLogo}
+		{activeView}
+		{onClickDashboard}
+		{onClickWorkbench}
 	/>
 
 	<section class={`app-main ${mainClass}`}>

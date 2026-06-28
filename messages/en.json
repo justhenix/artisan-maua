@@ -253,6 +253,8 @@
 	"letsGo": "Let's Go!",
 	"skipGuide": "Skip guide",
 	"ordersDashboard": "Orders Dashboard",
+	"dashboard": "Dashboard",
+	"workbench": "Workbench",
 	"ordersDashboardDesc": "Review incoming orders, track Bali work, and finish customer handoff.",
 	"newPurchaseOrder": "New Purchase Order",
 	"needsReview": "Needs review",

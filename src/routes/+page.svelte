@@ -433,7 +433,7 @@ Line  Item Code      Description                  Qty  Unit Price
 	let showWelcomeModal = $state(false);
 
 	let orders = $state<any[]>([]);
-	let activeView = $state<'dashboard' | 'workbench'>('workbench');
+	let activeView = $state<'dashboard' | 'workbench'>('dashboard');
 	let orderStatus = $state('Review');
 	let milestones = $state({
 		moldsChecked: false,
@@ -1378,6 +1378,7 @@ Line  Item Code      Description                  Qty  Unit Price
 	// Onboarding Tour logic
 	function startTour() {
 		activeView = 'workbench';
+		rightSidebarCollapsed = false;
 		setStep(1);
 		resetDemoState();
 		intakeText = samples.sourceEmail;
@@ -1473,6 +1474,7 @@ Line  Item Code      Description                  Qty  Unit Price
 							description: t.tourContinueToSheetsDesc,
 							side: 'top',
 							onNextClick: () => {
+								rightSidebarCollapsed = false;
 								continueToSheets();
 								waitForElement('#sheets-tabs', () => {
 									d.moveNext();
@@ -1527,6 +1529,7 @@ Line  Item Code      Description                  Qty  Unit Price
 								});
 							},
 							onPrevClick: () => {
+								rightSidebarCollapsed = false;
 								d.movePrevious();
 							}
 						}
@@ -1734,6 +1737,28 @@ Line  Item Code      Description                  Qty  Unit Price
 		headerOnToggleRightSidebar={activeView === 'workbench' ? () => (rightSidebarCollapsed = !rightSidebarCollapsed) : undefined}
 		onReplayTour={handleReplayTour}
 		onClickLogo={() => (activeView = 'dashboard')}
+		{activeView}
+		onClickDashboard={() => (activeView = 'dashboard')}
+		onClickWorkbench={() => {
+			activeView = 'workbench';
+			if (lineItems.length === 0) {
+				currentStep = 1;
+			} else {
+				if (orderStatus === 'Review') {
+					currentStep = 2;
+				} else if (orderStatus === 'Production') {
+					currentStep = 3;
+					activeTab = 'production';
+				} else if (orderStatus === 'Packing') {
+					currentStep = 3;
+					activeTab = 'packing';
+				} else if (orderStatus === 'Completed') {
+					currentStep = 4;
+				} else {
+					currentStep = 1;
+				}
+			}
+		}}
 		mainClass={`${activeView === 'dashboard' ? 'app-main-dashboard' : ''} ${activeView === 'workbench' ? 'app-main-workbench-status' : ''}`}
 	>
 		{#if activeView === 'dashboard'}
