@@ -116,8 +116,8 @@ Wave Ring                                 4    Silver              standard size
 		expect(result.blockers[0].evidence).toBe('buyer wrote "small starburst hat stud" - exact hat stud variant unclear');
 		expect(result.blockers[1].evidence).toBe('handwritten note says "new mountain" but no style code or finish');
 		expect(result.blockers.every((blocker) => result.lineItems.some((item) => item.id === blocker.itemId))).toBe(true);
-		expect(result.blockers[0].options).toEqual(['Type exact style']);
-		expect(result.blockers[1].options).toEqual(['Type material/finish']);
+		expect(result.blockers[0].options).toEqual(['Bali Starburst Mini', 'Bali Starburst Small', 'Starburst Studs', 'Bali Starburst Large']);
+		expect(result.blockers[1].options).toEqual(['Sterling Silver', 'Gold Vermeil', 'Brass']);
 		expect(JSON.stringify(result)).not.toContain('Which Golden Bird of Prey Hat Stud size is this?');
 		expect(JSON.stringify(result)).not.toContain('HB-MOTHER-OF-PEARL');
 	});

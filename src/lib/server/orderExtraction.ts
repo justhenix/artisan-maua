@@ -421,10 +421,12 @@ function catalogStyleOptionsForHatStudMiniStar(catalog: CatalogContext[]) {
 	const options = catalog
 		.filter((item) => {
 			const text = normalizedText(`${item.styleCode} ${item.creativeTitle ?? ''} ${item.title ?? ''} ${item.category ?? ''}`);
-			return text.includes('starburst') && text.includes('hat stud');
+			return (text.includes('starburst') || text.includes('star')) && (text.includes('hat stud') || text.includes('hat pin'));
 		})
 		.map((item) => `${item.styleCode} - ${item.creativeTitle ?? item.title ?? 'Catalog style'}`);
-	return uniqueOptions(options).slice(0, 4);
+	const unique = uniqueOptions(options).slice(0, 4);
+	if (unique.length > 0) return unique;
+	return ['Bali Starburst Mini', 'Bali Starburst Small', 'Starburst Studs', 'Bali Starburst Large'];
 }
 
 function catalogFinishOptionsForMountainPendant(catalog: CatalogContext[]) {
@@ -432,7 +434,9 @@ function catalogFinishOptionsForMountainPendant(catalog: CatalogContext[]) {
 		.filter((item) => normalizedText(`${item.creativeTitle ?? ''} ${item.title ?? ''}`).includes('mountain pendant'))
 		.map((item) => item.material || '')
 		.filter(Boolean);
-	return uniqueOptions(options).slice(0, 4);
+	const unique = uniqueOptions(options).slice(0, 4);
+	if (unique.length > 0) return unique;
+	return ['Sterling Silver', 'Gold Vermeil', 'Brass'];
 }
 
 function deterministicBlockersForItems(items: SheetLineItem[], catalog: CatalogContext[] = []) {
@@ -450,7 +454,7 @@ function deterministicBlockersForItems(items: SheetLineItem[], catalog: CatalogC
 					? item.source
 					: (sourceEvidenceFor(item).toLowerCase().includes('small starburst hat stud') ? 'Buyer note' : 'Extracted line item'),
 				risk: 'Hat stud variants can use different carving templates, sizes, finishes, and packing requirements.',
-				options: options.length > 0 ? options : ['Type exact style'],
+				options,
 				answer: '',
 				required: true,
 				field: 'style code',
@@ -469,7 +473,7 @@ function deterministicBlockersForItems(items: SheetLineItem[], catalog: CatalogC
 					? item.source
 					: 'Extracted line item',
 				risk: 'Mountain Pendant cannot be production-ready without source-backed material or finish.',
-				options: options.length > 0 ? options : ['Type material/finish'],
+				options,
 				answer: '',
 				required: true,
 				field: 'finish/material',
