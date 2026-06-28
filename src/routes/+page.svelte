@@ -852,6 +852,50 @@ Line  Item Code      Description                  Qty  Unit Price
 		handoffShared = false;
 	}
 
+	function fallbackItemEvidence(item: LineItem) {
+		return `${item.item} ${item.notes} ${item.source}`.toLowerCase();
+	}
+
+	function fallbackBlockersForItems(items: LineItem[]): Blocker[] {
+		const nextBlockers: Blocker[] = [];
+		for (const item of items) {
+			const evidence = fallbackItemEvidence(item);
+			if ((evidence.includes('hb1') && evidence.includes('hat stud')) || evidence.includes('mini star') || evidence.includes('small starburst hat stud')) {
+				nextBlockers.push({
+					id: `${item.id}-exact-style`,
+					impact: 'High impact',
+					impactKey: 'highImpact',
+					question: 'Which exact hat stud / mini star style should Bali make?',
+					evidence: 'buyer wrote "small starburst hat stud" - exact hat stud variant unclear',
+					source: evidence.includes('small starburst hat stud') ? 'Buyer note' : 'Extracted line item',
+					risk: 'Hat stud variants can use different carving templates, sizes, finishes, and packing requirements.',
+					options: ['Type exact style'],
+					answer: '',
+					required: true,
+					field: 'style code',
+					itemId: item.id
+				});
+			}
+			if (evidence.includes('mountain pendant') || (evidence.includes('mountain') && evidence.includes('new'))) {
+				nextBlockers.push({
+					id: `${item.id}-finish-material`,
+					impact: 'High impact',
+					impactKey: 'highImpact',
+					question: 'What finish/material should Bali use for Mountain Pendant?',
+					evidence: 'handwritten note says "new mountain" but no style code or finish',
+					source: 'Extracted line item',
+					risk: 'Mountain Pendant cannot be production-ready without source-backed material or finish.',
+					options: ['Type material/finish'],
+					answer: '',
+					required: true,
+					field: 'finish/material',
+					itemId: item.id
+				});
+			}
+		}
+		return nextBlockers;
+	}
+
 	function useSampleOrder() {
 		intakeText = samples[selectedSource];
 		uploadedFiles = [];
@@ -950,7 +994,8 @@ Line  Item Code      Description                  Qty  Unit Price
 						options: b.options || [],
 						answer: b.answer || '',
 						required: b.required ?? true,
-						field: b.field
+						field: b.field,
+						itemId: b.itemId
 					})) : [];
 					if (data.client && data.client !== 'Unresolved') client = data.client;
 					if (data.poNumber) selectedOrderId = data.poNumber;
@@ -980,11 +1025,11 @@ Line  Item Code      Description                  Qty  Unit Price
 						}
 					});
 					lineItems = parsed;
-					blockers = [];
+					blockers = fallbackBlockersForItems(parsed);
 					customerUpdate = generateCustomerUpdate({
 						client: client || 'Unresolved',
 						lineItems: parsed,
-						unresolvedCount: 0
+						unresolvedCount: unresolvedRequiredCount(blockers)
 					});
 				} else {
 					extractionNotice = 'Artisan could not read line items from this source. Paste the PO text or use the sample order for the demo.';

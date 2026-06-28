@@ -14,6 +14,7 @@ export type ReviewBlocker = {
 	answer: string;
 	required?: boolean;
 	field?: string;
+	itemId?: string;
 };
 
 export type SheetLineItem = {

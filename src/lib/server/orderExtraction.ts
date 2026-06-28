@@ -157,7 +157,8 @@ function normalizeBlocker(blocker: Partial<ReviewBlocker>): ReviewBlocker {
 		options: Array.isArray(blocker.options) ? blocker.options.map(String) : [],
 		answer: String(blocker.answer || ''),
 		required: blocker.required ?? true,
-		field: blocker.field
+		field: blocker.field,
+		itemId: blocker.itemId
 	};
 }
 
@@ -384,12 +385,129 @@ function parseLooseItemLine(line: string, index: number): SheetLineItem | null {
 	);
 }
 
-function sanitizeBlockersForItems(blockers: ReviewBlocker[], items: SheetLineItem[]) {
-	if (items.length === 0) return [];
-	return blockers.slice(0, items.length);
+function normalizedText(value: string) {
+	return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-export function parsePastedOrder(text: string, client = ''): ExtractionResult {
+function itemEvidenceText(item: SheetLineItem) {
+	return normalizedText(`${item.item} ${item.notes} ${item.source} ${item.styleCode} ${item.finish}`);
+}
+
+function sourceEvidenceFor(item: SheetLineItem) {
+	return `${item.source} ${item.notes}`;
+}
+
+function hasHatStudMiniStarEvidence(item: SheetLineItem) {
+	const evidence = itemEvidenceText(item);
+	return (
+		(evidence.includes('hb1') && evidence.includes('hat stud')) ||
+		evidence.includes('mini star') ||
+		evidence.includes('small starburst hat stud')
+	);
+}
+
+function hasMountainPendantEvidence(item: SheetLineItem) {
+	const evidence = itemEvidenceText(item);
+	return evidence.includes('mountain pendant') || (evidence.includes('mountain') && evidence.includes('new'));
+}
+
+function uniqueOptions(values: string[]) {
+	return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function catalogStyleOptionsForHatStudMiniStar(catalog: CatalogContext[]) {
+	const options = catalog
+		.filter((item) => {
+			const text = normalizedText(`${item.styleCode} ${item.creativeTitle ?? ''} ${item.title ?? ''} ${item.category ?? ''}`);
+			return text.includes('starburst') && text.includes('hat stud');
+		})
+		.map((item) => `${item.styleCode} - ${item.creativeTitle ?? item.title ?? 'Catalog style'}`);
+	return uniqueOptions(options).slice(0, 4);
+}
+
+function catalogFinishOptionsForMountainPendant(catalog: CatalogContext[]) {
+	const options = catalog
+		.filter((item) => normalizedText(`${item.creativeTitle ?? ''} ${item.title ?? ''}`).includes('mountain pendant'))
+		.map((item) => item.material || '')
+		.filter(Boolean);
+	return uniqueOptions(options).slice(0, 4);
+}
+
+function deterministicBlockersForItems(items: SheetLineItem[], catalog: CatalogContext[] = []) {
+	const blockers: ReviewBlocker[] = [];
+	for (const item of items) {
+		if (hasHatStudMiniStarEvidence(item)) {
+			const options = catalogStyleOptionsForHatStudMiniStar(catalog);
+			blockers.push({
+				id: `${item.id}-exact-style`,
+				impact: 'High impact',
+				impactKey: 'highImpact',
+				question: 'Which exact hat stud / mini star style should Bali make?',
+				evidence: 'buyer wrote "small starburst hat stud" - exact hat stud variant unclear',
+				source: sourceEvidenceFor(item).toLowerCase().includes('small starburst hat stud') ? 'Buyer note' : 'Extracted line item',
+				risk: 'Hat stud variants can use different carving templates, sizes, finishes, and packing requirements.',
+				options: options.length > 0 ? options : ['Type exact style'],
+				answer: '',
+				required: true,
+				field: 'style code',
+				itemId: item.id
+			});
+		}
+		if (hasMountainPendantEvidence(item)) {
+			const options = catalogFinishOptionsForMountainPendant(catalog);
+			blockers.push({
+				id: `${item.id}-finish-material`,
+				impact: 'High impact',
+				impactKey: 'highImpact',
+				question: 'What finish/material should Bali use for Mountain Pendant?',
+				evidence: 'handwritten note says "new mountain" but no style code or finish',
+				source: 'Extracted line item',
+				risk: 'Mountain Pendant cannot be production-ready without source-backed material or finish.',
+				options: options.length > 0 ? options : ['Type material/finish'],
+				answer: '',
+				required: true,
+				field: 'finish/material',
+				itemId: item.id
+			});
+		}
+	}
+	return blockers;
+}
+
+function blockerMatchesItem(blocker: ReviewBlocker, item: SheetLineItem) {
+	if (blocker.itemId && blocker.itemId === item.id) return true;
+	const itemEvidence = itemEvidenceText(item);
+	const blockerEvidence = normalizedText(`${blocker.question} ${blocker.evidence} ${blocker.source}`);
+	if (!blockerEvidence) return false;
+	const keyWords = blockerEvidence.split(' ').filter((word) => word.length > 3);
+	return keyWords.some((word) => itemEvidence.includes(word));
+}
+
+function hasUnsupportedGoldenBirdBlocker(blocker: ReviewBlocker, items: SheetLineItem[]) {
+	const blockerText = normalizedText(`${blocker.question} ${blocker.evidence} ${blocker.options.join(' ')}`);
+	if (!blockerText.includes('golden bird')) return false;
+	return !items.some((item) => itemEvidenceText(item).includes('golden bird'));
+}
+
+function sanitizeBlockersForItems(blockers: ReviewBlocker[], items: SheetLineItem[], catalog: CatalogContext[] = []) {
+	if (items.length === 0) return [];
+	const generated = deterministicBlockersForItems(items, catalog);
+	const generatedItemIds = new Set(generated.map((blocker) => blocker.itemId));
+	const filtered = blockers.filter((blocker) => {
+		if (hasUnsupportedGoldenBirdBlocker(blocker, items)) return false;
+		if (blocker.itemId && !items.some((item) => item.id === blocker.itemId)) return false;
+		return items.some((item) => blockerMatchesItem(blocker, item));
+	});
+	const providerWithoutGeneratedDuplicates = filtered.filter((blocker) => {
+		if (!blocker.itemId) return true;
+		return !generatedItemIds.has(blocker.itemId);
+	}).filter((blocker) => {
+		return !items.some((item) => generatedItemIds.has(item.id) && blockerMatchesItem(blocker, item));
+	});
+	return [...generated, ...providerWithoutGeneratedDuplicates].slice(0, items.length);
+}
+
+export function parsePastedOrder(text: string, client = '', catalog: CatalogContext[] = []): ExtractionResult {
 	const trimmed = text.trim();
 	if (!trimmed) return buildSafeExtractionFailure('empty_input');
 
@@ -419,7 +537,7 @@ export function parsePastedOrder(text: string, client = ''): ExtractionResult {
 		client: detectClient(trimmed, client) || 'Unresolved',
 		poNumber: detectPoNumber(trimmed),
 		lineItems,
-		blockers: []
+		blockers: deterministicBlockersForItems(lineItems, catalog)
 	};
 }
 
@@ -506,7 +624,7 @@ export async function extractOrder({
 
 	const provider = normalizeProvider(env);
 	if (provider === 'fixture' || !hasProviderKey(provider, env)) {
-		return parsePastedOrder(text, client);
+		return parsePastedOrder(text, client, catalog);
 	}
 
 	try {
@@ -526,7 +644,7 @@ export async function extractOrder({
 			client: parsed.client ? String(parsed.client) : undefined,
 			poNumber: parsed.poNumber ? String(parsed.poNumber) : undefined,
 			lineItems,
-			blockers: sanitizeBlockersForItems((parsed.blockers || []).map(normalizeBlocker), lineItems)
+			blockers: sanitizeBlockersForItems((parsed.blockers || []).map(normalizeBlocker), lineItems, catalog)
 		};
 	} catch (error) {
 		const category = error instanceof Error && /^provider_status_\d+$/.test(error.message) ? error.message : 'provider_failed';

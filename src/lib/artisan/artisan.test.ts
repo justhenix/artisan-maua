@@ -93,6 +93,35 @@ Wolf Pendant Necklace,4,Silver,18 inch chain`, '');
 		expect(result.lineItems[0].source).toContain('Feather Necklace');
 	});
 
+	test('uploaded HB-260314 source binds source identity and item blockers', () => {
+		const result = parsePastedOrder(`Client: North Shore Studio
+PO: HB-260314
+
+Item                                      Qty   Finish             Notes
+---------------------------------------------------------------------------
+Medium Silver Elephant Pin               12    Sterling Silver    Match approved sample card
+hb1 hat stud / mini star                  24                       Buyer wrote "small starburst hat stud"
+Mountain Pendant                          8                        handwritten note says "new mountain"
+Feather Necklace                          6    Sterling Silver     standard pouch
+Wave Ring                                 4    Silver              standard size`, '');
+
+		expect(result.mode).toBe('deterministic');
+		expect(result.client).toBe('North Shore Studio');
+		expect(result.poNumber).toBe('HB-260314');
+		expect(result.lineItems).toHaveLength(5);
+		expect(result.blockers.map((blocker) => blocker.question)).toEqual([
+			'Which exact hat stud / mini star style should Bali make?',
+			'What finish/material should Bali use for Mountain Pendant?'
+		]);
+		expect(result.blockers[0].evidence).toBe('buyer wrote "small starburst hat stud" - exact hat stud variant unclear');
+		expect(result.blockers[1].evidence).toBe('handwritten note says "new mountain" but no style code or finish');
+		expect(result.blockers.every((blocker) => result.lineItems.some((item) => item.id === blocker.itemId))).toBe(true);
+		expect(result.blockers[0].options).toEqual(['Type exact style']);
+		expect(result.blockers[1].options).toEqual(['Type material/finish']);
+		expect(JSON.stringify(result)).not.toContain('Which Golden Bird of Prey Hat Stud size is this?');
+		expect(JSON.stringify(result)).not.toContain('HB-MOTHER-OF-PEARL');
+	});
+
 	test('blockers never exceed extracted item context', async () => {
 		const result = await extractOrder({
 			text: 'From: Shop\nPO HB-1\n- 2x Feather Necklace - silver',
@@ -119,6 +148,43 @@ Wolf Pendant Necklace,4,Silver,18 inch chain`, '');
 
 		expect(result.lineItems).toHaveLength(1);
 		expect(result.blockers.length).toBeLessThanOrEqual(result.lineItems.length);
+	});
+
+	test('live extraction drops Golden Bird blocker when source has no Golden Bird item', async () => {
+		const result = await extractOrder({
+			text: 'Client: North Shore Studio\nPO: HB-260314\n- 24x hb1 hat stud / mini star - buyer wrote "small starburst hat stud"\n- 8x Mountain Pendant - handwritten note says "new mountain"',
+			client: '',
+			catalog: [],
+			env: { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'test' },
+			fetchImpl: (async () =>
+				new Response(JSON.stringify({
+					candidates: [{
+						content: {
+							parts: [{
+								text: JSON.stringify({
+									client: 'North Shore Studio',
+									poNumber: 'HB-260314',
+									lineItems: [
+										{ id: 'star', item: 'hb1 hat stud / mini star', qty: 24, source: 'buyer wrote "small starburst hat stud"', confidenceState: 'unresolved', unresolvedFields: ['style code'] },
+										{ id: 'mountain', item: 'Mountain Pendant', qty: 8, source: 'handwritten note says "new mountain"', confidenceState: 'unresolved', unresolvedFields: ['style code', 'finish/material'] }
+									],
+									blockers: [
+										{ id: 'bird-of-prey-size', question: 'Which Golden Bird of Prey Hat Stud size is this?', evidence: 'new smaller golden bird of prey', source: 'Buyer note', options: ['Mini', 'Medium'] }
+									]
+								})
+							}]
+						}
+					}]
+				}), { status: 200 })) as typeof fetch
+		});
+
+		expect(result.client).toBe('North Shore Studio');
+		expect(result.poNumber).toBe('HB-260314');
+		expect(result.blockers.map((blocker) => blocker.question)).toEqual([
+			'Which exact hat stud / mini star style should Bali make?',
+			'What finish/material should Bali use for Mountain Pendant?'
+		]);
+		expect(JSON.stringify(result)).not.toContain('Golden Bird');
 	});
 
 	test('unresolved required blockers block sheet creation', () => {
