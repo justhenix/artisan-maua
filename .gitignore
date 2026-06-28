@@ -3,6 +3,9 @@ node_modules
 .pnp
 .pnp.*
 
+# IDE / editor
+.vscode/
+
 # CommandCode agent state
 .commandcode/
 
