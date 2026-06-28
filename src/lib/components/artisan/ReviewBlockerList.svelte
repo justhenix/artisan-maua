@@ -37,7 +37,7 @@
 <div class="mt-3 space-y-4">
 	{#each blockers as blocker (blocker.id)}
 		<article class={`blocker-card ${blocker.answer ? 'blocker-card-done' : ''}`}>
-			<div class="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-center">
+			<div class="p-4 space-y-4">
 				<div>
 					<div class="flex flex-wrap items-center gap-3">
 						<span
@@ -58,7 +58,7 @@
 						{t.found}: "{blocker.evidence}" ({blocker.source})
 					</p>
 				</div>
-				<div class="flex w-full flex-wrap gap-3 md:w-auto">
+				<div class="flex flex-wrap gap-3">
 					{#each blocker.options as option (option)}
 						<button
 							class={`choice-card flex min-w-[130px] flex-1 cursor-pointer flex-col items-start rounded-lg border p-3 text-left transition md:flex-none ${blocker.answer === option ? 'border-[var(--brand)] bg-[var(--surface-soft)] ring-2 ring-[var(--brand)]/10' : 'border-[var(--line)] bg-white hover:border-[var(--brand)] hover:bg-[var(--surface-soft)]'}`}
