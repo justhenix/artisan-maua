@@ -69,6 +69,7 @@
 	let showModal = $state(false);
 	let modalMode = $state<'create' | 'edit'>('create');
 	let originalStyleCode = $state('');
+	let styleCodeToDelete = $state<string | null>(null);
 	
 	// Form bind states
 	let formStyleCode = $state('');
@@ -489,24 +490,14 @@
 									Edit Profile
 								</button>
 								
-								<form method="POST" action="?/delete" class="w-full flex" use:enhance={() => {
-									return async ({ result }) => {
-										if (result.type === 'success') {
-											showToast(t.productDeleted);
-										}
-									};
-								}}>
-									<input type="hidden" name="styleCode" value={item.styleCode} />
-									<button
-										type="submit"
-										onclick={(e) => {
-											if (!confirm(t.confirmDelete)) e.preventDefault();
-										}}
-										class="w-full py-2.5 text-center text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50/50 transition cursor-pointer bg-transparent border-0"
-									>
-										Delete Asset
-									</button>
-								</form>
+								<button
+									onclick={() => {
+										styleCodeToDelete = item.styleCode;
+									}}
+									class="w-full py-2.5 text-center text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50/50 transition cursor-pointer bg-transparent border-0"
+								>
+									Delete Asset
+								</button>
 							</div>
 						</article>
 					{/each}
@@ -602,25 +593,16 @@
 													>
 														Edit Profile
 													</button>
-													<form method="POST" action="?/delete" use:enhance={() => {
-														return async ({ result }) => {
-															if (result.type === 'success') {
-																showToast(t.productDeleted);
-															}
-														};
-													}}>
-														<input type="hidden" name="styleCode" value={item.styleCode} />
-														<button
-															type="submit"
-															onclick={(e) => {
-																if (!confirm(t.confirmDelete)) e.preventDefault();
-																else activeDropdownId = null;
-															}}
-															class="w-full text-left px-3 py-1.5 hover:bg-rose-50 hover:text-rose-600 text-rose-600 text-xs transition cursor-pointer"
-														>
-															Delete Asset
-														</button>
-													</form>
+													<button
+														type="button"
+														onclick={() => {
+															styleCodeToDelete = item.styleCode;
+															activeDropdownId = null;
+														}}
+														class="w-full text-left px-3 py-1.5 hover:bg-rose-50 hover:text-rose-600 text-rose-600 text-xs transition cursor-pointer"
+													>
+														Delete Asset
+													</button>
 												</div>
 											{/if}
 										</div>
@@ -917,6 +899,58 @@
 					</button>
 				</div>
 			</form>
+		</div>
+	</div>
+{/if}
+<!-- Hidden delete form -->
+<form id="delete-form" method="POST" action="?/delete" class="hidden" use:enhance={() => {
+	return async ({ result }) => {
+		if (result.type === 'success') {
+			showToast(t.productDeleted);
+		} else {
+			showToast('Error deleting product');
+		}
+	};
+}}>
+	<input type="hidden" name="styleCode" value={styleCodeToDelete} />
+</form>
+
+<!-- Delete Confirmation Modal -->
+{#if styleCodeToDelete}
+	<button type="button" class="modal-backdrop border-0 outline-hidden" aria-label="Cancel delete" onclick={() => styleCodeToDelete = null}></button>
+	<div class="modal max-w-md w-full p-6 text-center" transition:fade={{ duration: 150 }} style="width: min(90vw, 440px); max-height: auto;">
+		<div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-amber-50 border border-amber-200 text-amber-600 mb-4">
+			<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+			</svg>
+		</div>
+		
+		<h3 class="font-display text-lg font-bold text-(--ink) mb-2">Delete product asset</h3>
+		<p class="text-xs text-(--muted) mb-6 leading-relaxed">
+			Are you sure you want to delete <span class="font-semibold text-(--ink)">{styleCodeToDelete}</span>? This action cannot be undone and will remove the item from the catalog reference.
+		</p>
+		
+		<div class="flex items-center justify-center gap-3">
+			<button
+				type="button"
+				onclick={() => styleCodeToDelete = null}
+				class="px-4 py-2 border border-(--line) hover:bg-slate-50 text-xs font-semibold rounded transition cursor-pointer"
+			>
+				Cancel
+			</button>
+			<button
+				type="button"
+				onclick={() => {
+					const formEl = document.getElementById('delete-form') as HTMLFormElement;
+					if (formEl) {
+						formEl.requestSubmit();
+					}
+					styleCodeToDelete = null;
+				}}
+				class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded text-xs transition shadow-sm cursor-pointer border-0"
+			>
+				Delete Asset
+			</button>
 		</div>
 	</div>
 {/if}
