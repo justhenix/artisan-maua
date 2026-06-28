@@ -48,13 +48,14 @@ export const POST: RequestHandler = async ({ request }) => {
 		});
 
 		for (const item of lineItems || []) {
+			const itemId = item.id || `item-${Math.random().toString(36).substr(2, 9)}`;
 			await db.execute({
 				sql: `
 					INSERT INTO order_items (id, po_id, item_name, style_code, qty, finish, notes, unit_price, image_url, source)
 					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 				`,
 				args: [
-					item.id || `item-${Math.random().toString(36).substr(2, 9)}`,
+					itemId.startsWith(`${orderId}:`) ? itemId : `${orderId}:${itemId}`,
 					orderId,
 					item.item || '',
 					item.styleCode || '',
@@ -75,13 +76,14 @@ export const POST: RequestHandler = async ({ request }) => {
 		});
 
 		for (const blocker of blockers || []) {
+			const blockerId = blocker.id || `blocker-${Math.random().toString(36).substr(2, 9)}`;
 			await db.execute({
 				sql: `
 					INSERT INTO blockers (id, po_id, impact, question, evidence, source, risk, options, answer)
 					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 				`,
 				args: [
-					blocker.id,
+					blockerId.startsWith(`${orderId}:`) ? blockerId : `${orderId}:${blockerId}`,
 					orderId,
 					blocker.impact || '',
 					blocker.question || '',

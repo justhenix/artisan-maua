@@ -1,4 +1,4 @@
-import type { PageServerLoad } from './$types';
+import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
 
 export const load: PageServerLoad = async () => {
@@ -21,8 +21,10 @@ export const load: PageServerLoad = async () => {
 		// 2. Fetch all order items
 		const itemsRes = await db.execute('SELECT * FROM order_items');
 		const allItems = itemsRes.rows.map((row: any) => ({
-			id: row.id as string,
 			poId: row.po_id as string,
+			id: String(row.id).startsWith(`${row.po_id}:`)
+				? String(row.id).slice(String(row.po_id).length + 1)
+				: (row.id as string),
 			item: row.item_name as string,
 			styleCode: row.style_code as string,
 			qty: row.qty as number,
@@ -35,20 +37,25 @@ export const load: PageServerLoad = async () => {
 
 		// 3. Fetch all blockers
 		const blockersRes = await db.execute('SELECT * FROM blockers');
-		const allBlockers = blockersRes.rows.map((row: any) => ({
-			id: row.id as string,
-			poId: row.po_id as string,
-			impact: row.impact as string,
-			impactKey: row.impact === 'High impact' ? 'highImpact' : 'mediumImpact',
-			question: row.question as string,
-			questionKey: row.id === 'starburst-size' ? 'starburstQuestion' : 'horseQuestion',
-			evidence: row.evidence as string,
-			source: row.source as string,
-			risk: row.risk as string,
-			riskKey: row.id === 'starburst-size' ? 'starburstRisk' : 'horseRisk',
-			options: JSON.parse((row.options as string) || '[]'),
-			answer: (row.answer as string) || ''
-		}));
+		const allBlockers = blockersRes.rows.map((row: any) => {
+			const id = String(row.id).startsWith(`${row.po_id}:`)
+				? String(row.id).slice(String(row.po_id).length + 1)
+				: (row.id as string);
+			return {
+				poId: row.po_id as string,
+				id,
+				impact: row.impact as string,
+				impactKey: row.impact === 'High impact' ? 'highImpact' : 'mediumImpact',
+				question: row.question as string,
+				questionKey: id === 'star-bird-finish' ? 'starBirdQuestion' : 'birdOfPreyQuestion',
+				evidence: row.evidence as string,
+				source: row.source as string,
+				risk: row.risk as string,
+				riskKey: id === 'star-bird-finish' ? 'starBirdRisk' : 'birdOfPreyRisk',
+				options: JSON.parse((row.options as string) || '[]'),
+				answer: (row.answer as string) || ''
+			};
+		});
 
 		// 4. Fetch catalog items
 		const catalogRes = await db.execute('SELECT * FROM catalog_items');
@@ -79,5 +86,59 @@ export const load: PageServerLoad = async () => {
 			allBlockers: [],
 			catalogItems: []
 		};
+	}
+};
+
+export const actions: Actions = {
+	recalculate: async ({ request }) => {
+		const data = await request.formData();
+		const spotRate = parseFloat(data.get('silverSpotRate') as string) || 1.00;
+
+		try {
+			const activeOrdersRes = await db.execute(
+				"SELECT id FROM purchase_orders WHERE status IN ('Review', 'Production', 'Packing')"
+			);
+			const activePoIds = activeOrdersRes.rows.map((row: any) => row.id);
+
+			if (activePoIds.length > 0) {
+				const catalogRes = await db.execute("SELECT * FROM catalog_items");
+				const catalogMap = new Map();
+				for (const row of catalogRes.rows) {
+					catalogMap.set(row.style_code, {
+						baseLabor: row.base_labor as number,
+						silverWeight: row.silver_weight as number
+					});
+				}
+
+				const placeholders = activePoIds.map(() => '?').join(',');
+				const itemsRes = await db.execute({
+					sql: `SELECT id, po_id, style_code FROM order_items WHERE po_id IN (${placeholders})`,
+					args: activePoIds
+				});
+
+				for (const row of itemsRes.rows) {
+					const poId = row.po_id as string;
+					const itemId = row.id as string;
+					const styleCode = row.style_code as string;
+					const catalogItem = catalogMap.get(styleCode);
+
+					if (catalogItem) {
+						const artisanLabor = catalogItem.baseLabor || 0;
+						const silverMass = catalogItem.silverWeight || 0;
+						const markupMargin = 2.0;
+						const newPrice = Math.round((artisanLabor + (silverMass * spotRate) * markupMargin) * 100) / 100;
+
+						await db.execute({
+							sql: "UPDATE order_items SET unit_price = ? WHERE id = ? AND po_id = ?",
+							args: [newPrice, itemId, poId]
+						});
+					}
+				}
+			}
+			return { success: true, spotRate };
+		} catch (err) {
+			console.error("Recalculation action failed:", err);
+			return { success: false, error: 'Failed to update cost parameters' };
+		}
 	}
 };

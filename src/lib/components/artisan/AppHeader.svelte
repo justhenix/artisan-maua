@@ -45,19 +45,72 @@
 		<div class="flex items-center gap-1 border border-(--line) rounded bg-(--surface-soft) p-0.5 text-xs shadow-sm">
 			<a
 				href={enHref}
-				class={`px-2.5 py-1 rounded font-semibold text-xs leading-none transition-all no-underline ${currentLocale === 'en' ? 'bg-(--brand) text-white shadow-sm' : 'text-(--muted) hover:text-(--ink)'}`}
+				class={`flex items-center justify-center p-1.5 rounded transition-all no-underline ${currentLocale === 'en' ? 'bg-(--brand) shadow-sm' : 'hover:bg-slate-150/50'}`}
 				aria-label="English US"
 				title="English US"
 			>
-				US
+				<svg viewBox="0 0 19 10" class="w-5 h-3 rounded-2xs overflow-hidden shadow-2xs border border-slate-200/40">
+					<rect width="19" height="10" fill="#B22234"/>
+					<path d="M0,0.77h19M0,2.31h19M0,3.85h19M0,5.38h19M0,6.92h19M0,8.46h19" stroke="#fff" stroke-width="0.77"/>
+					<rect width="7.6" height="5.38" fill="#3C3B6E"/>
+					<g fill="#fff">
+						<circle cx="0.8" cy="0.6" r="0.2"/>
+						<circle cx="2.0" cy="0.6" r="0.2"/>
+						<circle cx="3.2" cy="0.6" r="0.2"/>
+						<circle cx="4.4" cy="0.6" r="0.2"/>
+						<circle cx="5.6" cy="0.6" r="0.2"/>
+						<circle cx="6.8" cy="0.6" r="0.2"/>
+						<circle cx="1.4" cy="1.2" r="0.2"/>
+						<circle cx="2.6" cy="1.2" r="0.2"/>
+						<circle cx="3.8" cy="1.2" r="0.2"/>
+						<circle cx="5.0" cy="1.2" r="0.2"/>
+						<circle cx="6.2" cy="1.2" r="0.2"/>
+						<circle cx="0.8" cy="1.8" r="0.2"/>
+						<circle cx="2.0" cy="1.8" r="0.2"/>
+						<circle cx="3.2" cy="1.8" r="0.2"/>
+						<circle cx="4.4" cy="1.8" r="0.2"/>
+						<circle cx="5.6" cy="1.8" r="0.2"/>
+						<circle cx="6.8" cy="1.8" r="0.2"/>
+						<circle cx="1.4" cy="2.4" r="0.2"/>
+						<circle cx="2.6" cy="2.4" r="0.2"/>
+						<circle cx="3.8" cy="2.4" r="0.2"/>
+						<circle cx="5.0" cy="2.4" r="0.2"/>
+						<circle cx="6.2" cy="2.4" r="0.2"/>
+						<circle cx="0.8" cy="3.0" r="0.2"/>
+						<circle cx="2.0" cy="3.0" r="0.2"/>
+						<circle cx="3.2" cy="3.0" r="0.2"/>
+						<circle cx="4.4" cy="3.0" r="0.2"/>
+						<circle cx="5.6" cy="3.0" r="0.2"/>
+						<circle cx="6.8" cy="3.0" r="0.2"/>
+						<circle cx="1.4" cy="3.6" r="0.2"/>
+						<circle cx="2.6" cy="3.6" r="0.2"/>
+						<circle cx="3.8" cy="3.6" r="0.2"/>
+						<circle cx="5.0" cy="3.6" r="0.2"/>
+						<circle cx="6.2" cy="3.6" r="0.2"/>
+						<circle cx="0.8" cy="4.2" r="0.2"/>
+						<circle cx="2.0" cy="4.2" r="0.2"/>
+						<circle cx="3.2" cy="4.2" r="0.2"/>
+						<circle cx="4.4" cy="4.2" r="0.2"/>
+						<circle cx="5.6" cy="4.2" r="0.2"/>
+						<circle cx="6.8" cy="4.2" r="0.2"/>
+						<circle cx="1.4" cy="4.8" r="0.2"/>
+						<circle cx="2.6" cy="4.8" r="0.2"/>
+						<circle cx="3.8" cy="4.8" r="0.2"/>
+						<circle cx="5.0" cy="4.8" r="0.2"/>
+						<circle cx="6.2" cy="4.8" r="0.2"/>
+					</g>
+				</svg>
 			</a>
 			<a
 				href={idHref}
-				class={`px-2.5 py-1 rounded font-semibold text-xs leading-none transition-all no-underline ${currentLocale === 'id' ? 'bg-(--brand) text-white shadow-sm' : 'text-(--muted) hover:text-(--ink)'}`}
+				class={`flex items-center justify-center p-1.5 rounded transition-all no-underline ${currentLocale === 'id' ? 'bg-(--brand) shadow-sm' : 'hover:bg-slate-150/50'}`}
 				aria-label="Indonesia ID"
 				title="Indonesia ID"
 			>
-				ID
+				<svg viewBox="0 0 3 2" class="w-5 h-3 rounded-2xs overflow-hidden shadow-2xs border border-slate-200/40">
+					<rect width="3" height="1" fill="#E70011" />
+					<rect y="1" width="3" height="1" fill="#FFFFFF" />
+				</svg>
 			</a>
 		</div>
 
@@ -65,6 +118,7 @@
 			<!-- Right Sidebar Toggle Button -->
 			<div class="relative group">
 				<button
+					id="control-panel-btn"
 					class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-(--surface-soft) text-(--muted) hover:text-(--ink) transition bg-transparent border-0 p-0 cursor-pointer"
 					type="button"
 					aria-label={rightSidebarCollapsed ? t.openRightPanel : t.closeRightPanel}

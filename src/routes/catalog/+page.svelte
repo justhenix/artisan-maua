@@ -447,7 +447,7 @@
 											{displayCategory(item.category || '')}
 										</span>
 									</div>
-									<h2 class="font-display text-sm font-bold text-(--ink) leading-snug line-clamp-2">
+									<h2 class="font-display text-base font-bold text-(--ink) leading-snug line-clamp-2">
 										{item.creativeTitle}
 									</h2>
 								</div>
@@ -925,9 +925,9 @@
 			</svg>
 		</div>
 		
-		<h3 class="font-display text-lg font-bold text-(--ink) mb-2">Delete product asset</h3>
+		<h3 class="font-display text-2xl font-bold text-(--ink) mb-2">Delete product asset</h3>
 		<p class="text-xs text-(--muted) mb-6 leading-relaxed">
-			Are you sure you want to delete <span class="font-semibold text-(--ink)">{styleCodeToDelete}</span>? This action cannot be undone and will remove the item from the catalog reference.
+			Are you sure you want to delete <span class="font-semibold text-(--ink)">{styleCodeToDelete}</span>? This cannot be undone.
 		</p>
 		
 		<div class="flex items-center justify-center gap-3">
