@@ -1377,14 +1377,13 @@ Line  Item Code      Description                  Qty  Unit Price
 
 	// Onboarding Tour logic
 	function startTour() {
-		activeView = 'workbench';
 		rightSidebarCollapsed = false;
 		setStep(1);
 		resetDemoState();
 		intakeText = samples.sourceEmail;
 		selectedSource = 'sourceEmail';
 
-		waitForElement('#intake-scratchpad', () => {
+		waitForElement('#sidebar-logo', () => {
 			const d = driver({
 				showProgress: true,
 				nextBtnText: t.tourNext,
@@ -1398,7 +1397,13 @@ Line  Item Code      Description                  Qty  Unit Price
 							title: t.tourWelcomeTitle,
 							description: t.tourWelcomeDesc,
 							side: 'right', 
-							align: 'start' 
+							align: 'start',
+							onNextClick: () => {
+								activeView = 'workbench';
+								waitForElement('#intake-scratchpad', () => {
+									d.moveNext();
+								});
+							}
 						} 
 					},
 					{ 
@@ -1406,7 +1411,13 @@ Line  Item Code      Description                  Qty  Unit Price
 						popover: { 
 							title: t.tourIntakeTitle,
 							description: t.tourIntakeDesc,
-							side: 'bottom' 
+							side: 'bottom',
+							onPrevClick: () => {
+								activeView = 'dashboard';
+								waitForElement('#sidebar-logo', () => {
+									d.movePrevious();
+								});
+							}
 						} 
 					},
 					{ 
