@@ -13,6 +13,7 @@
 		headerRightSidebarCollapsed,
 		headerOnToggleRightSidebar,
 		onReplayTour,
+		onClickLogo,
 		mainClass = '',
 		children
 	}: {
@@ -23,6 +24,7 @@
 		headerRightSidebarCollapsed?: boolean;
 		headerOnToggleRightSidebar?: () => void;
 		onReplayTour?: () => void;
+		onClickLogo?: () => void;
 		mainClass?: string;
 		children: Snippet;
 	} = $props();
@@ -88,6 +90,7 @@
 		onToggleSidebar={toggleSidebar}
 		onCloseMobileSidebar={closeMobileSidebar}
 		{onReplayTour}
+		{onClickLogo}
 	/>
 
 	<section class={`app-main ${mainClass}`}>

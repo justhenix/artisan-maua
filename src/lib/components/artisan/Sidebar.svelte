@@ -13,7 +13,8 @@
 		mobileSidebarOpen = $bindable(false),
 		onToggleSidebar,
 		onCloseMobileSidebar,
-		onReplayTour
+		onReplayTour,
+		onClickLogo
 	}: {
 		t: Messages;
 		currentLocale: 'en' | 'id';
@@ -23,6 +24,7 @@
 		onToggleSidebar: () => void;
 		onCloseMobileSidebar: () => void;
 		onReplayTour?: () => void;
+		onClickLogo?: () => void;
 	} = $props();
 
 	function isOrdersActive(path: string): boolean {
@@ -54,13 +56,18 @@
 		{#if !sidebarCollapsed}
 			<!-- Open State Header -->
 			<div class="flex w-full items-center justify-between">
-				<div class="sidebar-title flex items-center gap-2">
+				<a href={ordersHref} onclick={(e) => {
+					if (onClickLogo && (activePath === '/' || activePath === '/id' || activePath === '/id/')) {
+						e.preventDefault();
+						onClickLogo();
+					}
+				}} class="sidebar-title flex items-center gap-2 no-underline text-inherit cursor-pointer hover:opacity-85 transition">
 					<img src="/icon.webp" alt="Artisan Logo" class="w-8 h-8 object-contain" />
 					<div>
 						<p class="font-display text-xl leading-tight">Artisan</p>
 						<p class="text-[10px] text-(--muted)">Order-to-Production</p>
 					</div>
-				</div>
+				</a>
 				<div class="relative group">
 					<button
 						class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-(--surface-muted) text-(--muted) hover:text-(--ink) transition bg-transparent border-0 p-0 cursor-pointer"
@@ -78,9 +85,14 @@
 		{:else}
 			<!-- Collapsed State Header -->
 			<div class="relative w-10 h-10 flex items-center justify-center mx-auto group">
-				<div class="w-10 h-10 flex items-center justify-center transition-opacity duration-150 group-hover:opacity-0">
+				<a href={ordersHref} onclick={(e) => {
+					if (onClickLogo && (activePath === '/' || activePath === '/id' || activePath === '/id/')) {
+						e.preventDefault();
+						onClickLogo();
+					}
+				}} class="w-10 h-10 flex items-center justify-center transition-opacity duration-150 group-hover:opacity-0 cursor-pointer">
 					<img src="/icon.webp" alt="Artisan" class="w-10 h-10 object-contain" />
-				</div>
+				</a>
 				<button
 					class="absolute inset-0 w-10 h-10 flex items-center justify-center rounded-full hover:bg-(--surface-muted) text-(--muted) hover:text-(--ink) opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-transparent border-0 p-0 cursor-pointer"
 					type="button"

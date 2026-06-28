@@ -1877,6 +1877,7 @@ Heather Benjamin Jewelry`;
 			}
 		}}
 		onReplayTour={handleReplayTour}
+		onClickLogo={() => (activeView = 'dashboard')}
 		mainClass={`${activeView === 'dashboard' ? 'app-main-dashboard' : ''} ${activeView === 'workbench' ? 'app-main-workbench-status' : ''}`}
 	>
 		{#if activeView === 'dashboard'}
