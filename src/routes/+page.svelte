@@ -2560,7 +2560,7 @@ Line  Item Code      Description                  Qty  Unit Price
 					</section>
 				{:else if currentStep === 3}
 					<section class="px-4 py-6 md:px-8 md:py-8">
-						<div class="mx-auto max-w-7xl">
+						<div class="mx-auto max-w-[1440px]">
 							<div class="flex flex-wrap items-start justify-between gap-5 border-b border-(--line) pb-6">
 								<div>
 									<p class="text-sm font-medium text-(--muted)">
@@ -2577,22 +2577,22 @@ Line  Item Code      Description                  Qty  Unit Price
 											<i class="ri-checkbox-circle-line text-base" aria-hidden="true"></i>
 											{t.answersComplete}
 										</p>
-									{:else}
-										<div class="mt-5 inline-flex items-start gap-2 rounded-md border border-(--warning) bg-(--warning-bg) px-3 py-2 text-sm text-(--warning-ink) font-semibold max-w-2xl">
-											<i class="ri-error-warning-line text-base mt-0.5 shrink-0" aria-hidden="true"></i>
-											<div>
-												<strong class="block">{t.sheetsReviewNeeded || 'Review needed before production'}</strong>
-												{#if remainingAnswers > 0}
-													<span class="block text-xs font-medium mt-0.5">{answerCountLabel(remainingAnswers)} still required.</span>
-												{/if}
-												{#if blockingLineCount > 0}
-													<span class="block text-xs font-medium mt-0.5">{t.sheetsBlockingRows || 'Blocking rows'}: {blockingItemsList.join(', ')}</span>
-												{/if}
-											</div>
-										</div>
 									{/if}
 								</div>
 							</div>
+
+							{#if !allRequiredResolved}
+								<div class="mt-6 flex w-full items-start gap-2 rounded-md border border-(--warning) bg-(--warning-bg) p-4 text-sm text-(--warning-ink) font-semibold">
+									<i class="ri-error-warning-line text-base mt-0.5 shrink-0" aria-hidden="true"></i>
+									<div>
+										<strong class="block text-base">Review needed before production</strong>
+										<span class="block text-xs font-normal mt-1">Add the missing style code and finish for the highlighted rows.</span>
+										{#if blockingLineCount > 0}
+											<span class="block text-xs font-semibold mt-2">Blocking rows: {blockingItemsList.join(', ')}</span>
+										{/if}
+									</div>
+								</div>
+							{/if}
 
 							<div id="sheets-tabs" class="mt-9 flex gap-8 border-b border-(--line)">
 								{#each [
@@ -2608,6 +2608,27 @@ Line  Item Code      Description                  Qty  Unit Price
 										{tab[1]}
 									</button>
 								{/each}
+							</div>
+
+							<!-- Compact Action Row for Exports -->
+							<div class="mt-5 flex items-center justify-between border-b border-(--line) pb-4">
+								<div class="flex items-center gap-3">
+									<span class="text-xs font-bold text-(--muted) uppercase tracking-wider">Export:</span>
+									{#if activeTab === 'production'}
+										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadXlsx('production')}>XLSX</button>
+										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadPdf('production')}>PDF</button>
+										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadCsv('production')}>CSV</button>
+										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={copyTable}>Copy table</button>
+									{:else if activeTab === 'packing'}
+										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadXlsx('packing')}>XLSX</button>
+										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadPdf('packing')}>PDF</button>
+										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={() => downloadCsv('packing')}>CSV</button>
+										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={copyTable}>Copy table</button>
+									{:else}
+										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={copyCustomerUpdate}>Copy update</button>
+										<button class="px-3 py-1.5 text-xs font-bold border border-(--line) hover:border-(--brand) bg-white text-(--ink) rounded transition cursor-pointer" type="button" onclick={openEmailClient}>Open Email</button>
+									{/if}
+								</div>
 							</div>
 
 							<div class={`output-grid mt-7 ${rightSidebarCollapsed ? 'output-grid-collapsed' : ''}`}>
@@ -2714,90 +2735,6 @@ Line  Item Code      Description                  Qty  Unit Price
 													{/each}
 												</ul>
 											</div>
-
-											<div>
-												<h2 class="font-display text-xs font-bold text-(--muted) uppercase tracking-wider mb-3">{t.readyNext}</h2>
-											{#if activeTab === 'production'}
-												<div class="space-y-3">
-													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadXlsx('production')}>
-														<div>
-															<strong class="block font-bold text-sm text-(--ink)">{t.downloadProductionXlsx}</strong>
-															<span class="block text-[10px] text-(--muted) mt-0.5">XLSX</span>
-														</div>
-														<i class="ri-file-excel-2-line text-lg text-(--brand)" aria-hidden="true"></i>
-													</button>
-													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadPdf('production')}>
-														<div>
-															<strong class="block font-bold text-sm text-(--ink)">{t.downloadProductionPdf}</strong>
-															<span class="block text-[10px] text-(--muted) mt-0.5">PDF</span>
-														</div>
-														<i class="ri-file-pdf-2-line text-lg text-(--brand)" aria-hidden="true"></i>
-													</button>
-													<button id="export-dropdown-btn" class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadCsv('production')}>
-														<div>
-															<strong class="block font-bold text-sm text-(--ink)">{t.downloadProductionSheet}</strong>
-															<span class="block text-[10px] text-(--muted) mt-0.5">{t.csvFormat}</span>
-														</div>
-														<i class="ri-download-2-line text-lg text-(--brand)" aria-hidden="true"></i>
-													</button>
-													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={copyTable}>
-														<div>
-															<strong class="block font-bold text-sm text-(--ink)">{t.copyTable}</strong>
-															<span class="block text-[10px] text-(--muted) mt-0.5">{t.plainText}</span>
-														</div>
-														<i class="ri-file-copy-2-line text-lg text-(--brand)" aria-hidden="true"></i>
-													</button>
-												</div>
-											{:else if activeTab === 'packing'}
-												<div class="space-y-3">
-													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadXlsx('packing')}>
-														<div>
-															<strong class="block font-bold text-sm text-(--ink)">{t.downloadPackingXlsx}</strong>
-															<span class="block text-[10px] text-(--muted) mt-0.5">XLSX</span>
-														</div>
-														<i class="ri-file-excel-2-line text-lg text-(--brand)" aria-hidden="true"></i>
-													</button>
-													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadPdf('packing')}>
-														<div>
-															<strong class="block font-bold text-sm text-(--ink)">{t.downloadPackingPdf}</strong>
-															<span class="block text-[10px] text-(--muted) mt-0.5">PDF</span>
-														</div>
-														<i class="ri-file-pdf-2-line text-lg text-(--brand)" aria-hidden="true"></i>
-													</button>
-													<button id="export-dropdown-btn" class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadCsv('packing')}>
-														<div>
-															<strong class="block font-bold text-sm text-(--ink)">{t.downloadPackingChecklist}</strong>
-															<span class="block text-[10px] text-(--muted) mt-0.5">{t.csvFormat}</span>
-														</div>
-														<i class="ri-download-2-line text-lg text-(--brand)" aria-hidden="true"></i>
-													</button>
-													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={copyTable}>
-														<div>
-															<strong class="block font-bold text-sm text-(--ink)">{t.copyTable}</strong>
-															<span class="block text-[10px] text-(--muted) mt-0.5">{t.plainText}</span>
-														</div>
-														<i class="ri-file-copy-2-line text-lg text-(--brand)" aria-hidden="true"></i>
-													</button>
-												</div>
-											{:else}
-												<div class="space-y-3">
-													<button id="export-dropdown-btn" class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={copyCustomerUpdate}>
-														<div>
-															<strong class="block font-bold text-sm text-(--ink)">{t.copyUpdate}</strong>
-															<span class="block text-[10px] text-(--muted) mt-0.5">{t.plainText}</span>
-														</div>
-														<i class="ri-file-copy-2-line text-lg text-(--brand)" aria-hidden="true"></i>
-													</button>
-													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={openEmailClient}>
-														<div>
-															<strong class="block font-bold text-sm text-(--ink)">{t.openEmail}</strong>
-															<span class="block text-[10px] text-(--muted) mt-0.5">Mailto Link</span>
-														</div>
-														<i class="ri-mail-line text-lg text-(--brand)" aria-hidden="true"></i>
-													</button>
-												</div>
-											{/if}
-										</div>
 									</aside>
 								{/if}
 							</div>
@@ -2959,12 +2896,12 @@ Line  Item Code      Description                  Qty  Unit Price
 											{answerCountLabel(remainingAnswers)}
 										{/if}
 									{:else if currentStep === 3}
-										{allRequiredResolved ? t.readyToProduction : (t.sheetsReviewNeeded || 'Review needed before production')}
+										{allRequiredResolved ? 'Ready for customer update' : 'Complete highlighted rows to continue.'}
 									{:else}
 										{allRequiredResolved ? (sent ? t.markedAsSent : t.readyToCopy) : (t.sheetsReviewNeeded || 'Review needed before production')}
 									{/if}
 								</p>
-								{#if (currentStep === 3 || currentStep === 4) && !allRequiredResolved}
+								{#if currentStep === 4 && !allRequiredResolved}
 									<p id="footer-required-warning" class="text-sm text-(--warning-ink)">{t.reviewNeededHelp || 'Resolve required blockers and missing production fields.'}</p>
 								{/if}
 								{#if currentStep === 4}
@@ -2983,7 +2920,7 @@ Line  Item Code      Description                  Qty  Unit Price
 								<div class="continue-action">
 									{#if remainingAnswers > 0 || lineItems.length === 0}
 										<span id="continue-warning" class="footer-warning-bubble" role="status">
-											{lineItems.length === 0 ? 'Paste PO text or use sample order to continue.' : t.resolveToContinue}
+											{lineItems.length === 0 ? 'Paste PO text or use sample order to continue.' : 'Resolve all required review items to continue.'}
 										</span>
 									{/if}
 									<button
@@ -3002,7 +2939,7 @@ Line  Item Code      Description                  Qty  Unit Price
 									<div class="continue-action">
 										{#if !allRequiredResolved}
 											<span id="continue-update-warning" class="footer-warning-bubble" role="status">
-												{t.reviewNeededHelp || 'Resolve required production fields first.'}
+												Complete highlighted rows to continue.
 											</span>
 										{/if}
 										<button

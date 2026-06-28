@@ -263,6 +263,14 @@ a:focus-visible {
 		opacity 160ms ease;
 }
 
+.primary-button:disabled {
+	background: #cbd5e0 !important;
+	color: #718096 !important;
+	border-color: #cbd5e0 !important;
+	cursor: not-allowed;
+	opacity: 0.8;
+}
+
 .primary-button:hover:not(:disabled) {
 	background: var(--brand-dark);
 }
@@ -606,10 +614,6 @@ a:focus-visible {
 .output-side {
 	align-self: start;
 	padding: 20px;
-	position: sticky;
-	top: 16px;
-	max-height: calc(100vh - 120px);
-	overflow-y: auto;
 }
 
 .customer-grid {
