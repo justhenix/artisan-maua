@@ -28,6 +28,8 @@ In the demo, a purchase order becomes a production-ready workflow:
 6. Packing sheet is generated for fulfillment.
 7. Customer update draft is created from current order status.
 
+For the three-minute hackathon path, use **Try sample order**, resolve the required blockers, continue to sheets, edit production or packing rows, then export XLSX/PDF/CSV or copy a spreadsheet-safe table.
+
 ## Core Principle
 
 Artisan does not treat AI output as truth. AI creates a draft; the user reviews and resolves blockers before production.
@@ -49,6 +51,7 @@ Included:
 - unresolved-field review
 - production preparation
 - packing support
+- XLSX, PDF, CSV, and copy-table exports
 - customer update drafting
 - English/Indonesian localization foundation
 - guided onboarding tour for first-time users
@@ -64,7 +67,15 @@ Not included:
 
 ## AI Setup
 
-Default iteration uses Gemini from Google AI Studio. Final live demo can use B.AI with Claude Sonnet 4.6. The app must still work through fixture data if no API key is present.
+Default iteration can use Gemini from Google AI Studio. Final live demo can use B.AI with Claude Sonnet 4.6. The app still works through fixture data if no API key is present or a provider call fails.
+
+For the safest demo setup, use fixture mode:
+
+```env
+AI_PROVIDER=fixture
+```
+
+Required only for live AI mode:
 
 Required only for live AI mode:
 
@@ -90,6 +101,7 @@ Build check:
 ```bash
 bun run check
 bun run build
+bun test
 ```
 
 ## Data Safety

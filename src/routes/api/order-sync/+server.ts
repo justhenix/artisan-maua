@@ -30,7 +30,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			args: [
 				orderId,
 				orderId,
-				client || 'Driftwood Collective',
+				client || 'La Jolla Artisan Boutique',
 				status || 'Review',
 				sourceText || '',
 				JSON.stringify(uploadedFiles || []),
@@ -51,8 +51,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			const itemId = item.id || `item-${Math.random().toString(36).substr(2, 9)}`;
 			await db.execute({
 				sql: `
-					INSERT INTO order_items (id, po_id, item_name, style_code, qty, finish, notes, unit_price, image_url, source)
-					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+					INSERT INTO order_items (id, po_id, item_name, style_code, qty, finish, notes, unit_price, image_url, source, confidence_state, unresolved_fields)
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 				`,
 				args: [
 					itemId.startsWith(`${orderId}:`) ? itemId : `${orderId}:${itemId}`,
@@ -64,7 +64,9 @@ export const POST: RequestHandler = async ({ request }) => {
 					item.notes || '',
 					item.unitPrice || 0,
 					item.imageUrl || '',
-					item.source || ''
+					item.source || '',
+					item.confidenceState || (item.styleCode ? 'resolved' : 'unresolved'),
+					JSON.stringify(item.unresolvedFields || [])
 				]
 			});
 		}
@@ -98,7 +100,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		return json({ success: true });
 	} catch (err: any) {
-		console.error('Error syncing order data:', err);
-		return json({ success: false, error: err.message }, { status: 500 });
+		console.error('Error syncing order data.');
+		return json({ success: false, error: 'Unable to sync order data' }, { status: 500 });
 	}
 };

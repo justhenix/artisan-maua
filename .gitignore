@@ -59,3 +59,6 @@ scratch/
 # Database
 local.db
 local.db-journal
+
+.vercel
+.env*

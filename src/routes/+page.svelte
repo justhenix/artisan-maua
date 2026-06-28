@@ -2,7 +2,6 @@
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 	import { fade, scale } from 'svelte/transition';
-	import { enhance } from '$app/forms';
 	import { driver } from 'driver.js';
 	import 'driver.js/dist/driver.css';
 	import { resolve } from '$app/paths';
@@ -19,45 +18,31 @@
 	import idMessages from '../../messages/id.json';
 	import AppShell from '$lib/components/artisan/AppShell.svelte';
 	import { fallbackCatalog, type CatalogItem } from '$lib/data/fallbackCatalog';
+	import { buildBaliHandoffPdfRows, buildBaliHandoffText, canCreateBaliHandoff } from '$lib/artisan/baliHandoff';
+	import { fixtureBlockers, fixtureLineItems } from '$lib/artisan/fixtures';
+	import { generateCustomerUpdate } from '$lib/artisan/customerUpdate';
+	import { rowsToCopyTable, rowsToCsv } from '$lib/artisan/exports';
+	import { createPdfDocument, createBaliHandoffPdf } from '$lib/artisan/pdf';
+	import { buildPackingRows, buildProductionRows } from '$lib/artisan/sheets';
+	import { canCreateSheets, confidenceStateFor, unresolvedRequiredCount, unresolvedWarnings, allRequiredFieldsResolved } from '$lib/artisan/review';
+	import type { ReviewBlocker, SheetLineItem, TableCell } from '$lib/artisan/types';
+	import { createWorkbookXlsx } from '$lib/artisan/xlsx';
 
 	let { data }: { data: any } = $props();
 
 	type Step = 1 | 2 | 3 | 4;
 	type Tab = 'production' | 'packing' | 'customer';
 
-	type Blocker = {
-		id: string;
-		impact: 'High impact' | 'Medium impact';
-		impactKey: 'highImpact' | 'mediumImpact';
-		question: string;
-		questionKey: 'starburstQuestion' | 'horseQuestion';
-		evidence: string;
-		source: string;
-		risk: string;
-		riskKey: 'starburstRisk' | 'horseRisk';
-		options: string[];
-		answer: string;
-	};
-
-	type LineItem = {
-		id: string;
-		item: string;
-		styleCode: string;
-		qty: number;
-		finish: string;
-		notes: string;
-		source: string;
-		unitPrice: number; // Client PO price
-		imageUrl?: string;
-	};
+	type Blocker = ReviewBlocker;
+	type LineItem = SheetLineItem;
 
 	type Locale = 'en' | 'id';
 	type AppMessages = typeof enMessages;
 
 	const storageKey = 'artisan-demo-flow-v3';
-	let selectedOrderId = $state('HB-250416');
+	let selectedOrderId = $state('HB-259689');
 	const orderId = $derived(selectedOrderId);
-	let client = $state('Driftwood Collective');
+	let client = $state('La Jolla Artisan Boutique');
 
 	const messageCatalog: Record<Locale, AppMessages> = {
 		en: enMessages,
@@ -71,70 +56,69 @@
 		{ id: 4, label: 'Update customer' }
 	];
 
-	const sampleOrder = `From: Mia Chen <mia@driftwoodcollective.com>
-Subject: Re: New pieces for Summer
+	const sampleOrder = `From: La Jolla Artisan Boutique buyer [redacted]
+Subject: PO HB-259689 - late-summer resort delivery
 
 Hi Heather,
-Here's what we're hoping to get for our July drop.
-PO#: DC-0725
-Ship to: Driftwood Collective, 123 Ocean Ave, Santa Cruz, CA 95060
+Please prep this for our late-summer resort delivery.
+Shipping details confirmed separately [redacted].
 
-Item                   Qty   Finish             Notes
----------------------------------------------------------------
-Medium Silver Elephant Pin 12  Silver             Please match last order
-Mother of Pearl Gold Plated Silver Star Pin 6 MOP  Can we get with longer chain?
-Silver Water Buffalo "Long Horn" Pin 4 Silver      2 butterfly clutches
-Golden Love Shard Pin - Single 24 Gold Vermeil     12 pr per card?
-Black Lip Heart Hat Stud in Silver 20 Silver       Size 7 & 8 mix
+Item                                      Qty   Finish             Notes
+---------------------------------------------------------------------------
+Medium Silver Elephant Pin               12    Sterling Silver    Match approved sample card
+hb1 hat stud / mini star                  24                       Buyer wrote "small starburst hat stud"
+Mountain Pendant                          8                        New request, finish/material missing
+Black Lip Star with Bird of Prey Dangle   6                        star bird dangle
+Golden Bird of Prey Hat Stud              10    Gold               new smaller golden bird of prey
 
-CSV pasted below:
-Item,Qty,Material/Finish,Notes
-Wolf Pin - Silver Oxy,10,Silver Oxy,Need by 7/10
-Black Lip Star with Bird of Prey Dangle,8,Silver,star bird dangle
+Production note for Bali:
+Group sterling silver pieces for the next casting batch; hold unresolved variants until Heather confirms.
 
-Sent via Instagram DM 6/1: "Do you have more golden bird of prey hat studs in stock? We want to add 6 of the new smaller golden bird of prey studs."`;
+Packing note:
+Pack hat studs on individual cards; pendants in cotton pouches.`;
 
 	const samples: Record<(typeof sourceTypes)[number], string> = {
-		sourceEmail: `From: Mia Chen <mia@driftwoodcollective.com>
-Subject: Re: New pieces for Summer
+		sourceEmail: `From: La Jolla Artisan Boutique buyer [redacted]
+Subject: PO HB-259689 - late-summer resort delivery
 
 Hi Heather,
-Here's what we're hoping to get for our July drop.
-PO#: DC-0725
-Ship to: Driftwood Collective, 123 Ocean Ave, Santa Cruz, CA 95060
+Please prep this for our late-summer resort delivery.
+Shipping details confirmed separately [redacted].
 
-Item                   Qty   Finish             Notes
----------------------------------------------------------------
-Medium Silver Elephant Pin 12  Silver             Please match last order
-Mother of Pearl Gold Plated Silver Star Pin 6 MOP  Can we get with longer chain?
-Golden Love Shard Pin - Single 24 Gold Vermeil     12 pr per card?`,
+Item                                      Qty   Finish             Notes
+---------------------------------------------------------------------------
+Medium Silver Elephant Pin               12    Sterling Silver    Match approved sample card
+hb1 hat stud / mini star                  24                       Buyer wrote "small starburst hat stud"
+Mountain Pendant                          8                        New request, finish/material missing
+Black Lip Star with Bird of Prey Dangle   6                        star bird dangle
+Golden Bird of Prey Hat Stud              10    Gold               new smaller golden bird of prey`,
 
-		sourceDm: `Mia Chen [Instagram DM 6/1 14:22]
-Hey Heather! Do you have more water buffalo pins in stock?
-We'd love to order 4 of the Silver Water Buffalo "Long Horn" Pin in Silver (2 butterfly clutches if possible).
-Also, we want to add 8 of the Black Lip Star with Bird of Prey Dangle. star bird dangle.
-Let me know if we can add these to our July PO!`,
+		sourceDm: `La Jolla buyer [redacted channel note]
+Please add 6 Black Lip Star with Bird of Prey Dangle pieces.
+Buyer note says "star bird dangle" but does not specify gold or silver.
+Also add 10 Golden Bird of Prey Hat Studs; buyer wrote "new smaller golden bird of prey".`,
 
 		sourceSpreadsheet: `Item,Qty,Material/Finish,Notes
-Wolf Pin - Silver Oxy,10,Silver Oxy,Need by 7/10
-Black Lip Heart Hat Stud in Silver,20,Silver,Size 7 & 8 mix
-Golden Bird of Prey Hat Stud,6,Gold,new smaller golden bird of prey`,
+Medium Silver Elephant Pin,12,Sterling Silver,Match approved sample card
+hb1 hat stud / mini star,24,,small starburst hat stud
+Mountain Pendant,8,,finish/material missing
+Black Lip Star with Bird of Prey Dangle,6,,star bird dangle
+Golden Bird of Prey Hat Stud,10,Gold,new smaller golden bird of prey`,
 
 		sourcePoText: `PURCHASE ORDER
-DRIFTWOOD COLLECTIVE
-PO Number: DC-0725
-Date: June 27, 2026
+LA JOLLA ARTISAN BOUTIQUE
+PO Number: HB-259689
+Date: June 18, 2026
 
-Bill To: Driftwood Collective Account Payables
-Ship To: Driftwood Collective, 123 Ocean Ave, Santa Cruz, CA 95060
+Buyer and shipping details: redacted for demo
 
 Line  Item Code      Description                  Qty  Unit Price
 -----------------------------------------------------------------
 1     HB-40523-SIL   Medium Silver Elephant Pin   12   $185.00
-2     HB-P9015-GP    MOP Gold Plated Star Pin     6    $130.00
-3     HB-WATER-BUFFALO-LONG-HORN-PIN Silver Water Buffalo Pin 4 $350.00
-4     HE-4720-GP-1   Golden Love Shard Pin Single 24   $50.00
-5     HB-P9012-SIL   Black Lip Heart Stud Silver  20   $125.00`
+2     hb1           hat stud / mini star          24
+3     new           Mountain Pendant              8
+4     TBD           Star with Bird Dangle         6
+5     TBD           Golden Bird of Prey Hat Stud  10`
 	};
 
 	function detectSource(text: string): (typeof sourceTypes)[number] {
@@ -234,7 +218,7 @@ Line  Item Code      Description                  Qty  Unit Price
 				const qtyText = cols[finalQtyIdx] || '1';
 				const qty = parseInt(qtyText.replace(/[^\d]/g, ''), 10) || 1;
 
-				const finish = cols[finalFinishIdx] || 'Silver';
+				const finish = cols[finalFinishIdx] || '';
 				const notes = cols[finalNotesIdx] || '';
 				
 				let unitPrice = 0;
@@ -291,7 +275,7 @@ Line  Item Code      Description                  Qty  Unit Price
 					const qtyMatch = line.match(/\b(\d+)\b/);
 					const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
 
-					let finish = 'Silver';
+					let finish = '';
 					const finishes = ['Silver', 'Gold', 'Vermeil', 'Brass', 'Mother of Pearl'];
 					for (const f of finishes) {
 						if (line.toLowerCase().includes(f.toLowerCase())) {
@@ -391,6 +375,12 @@ Line  Item Code      Description                  Qty  Unit Price
 					}
 				}
 			}
+			if (item.styleCode && !catalog.some((entry) => entry.styleCode === item.styleCode)) {
+				item.styleCode = '';
+			}
+			const warnings = unresolvedWarnings(item);
+			item.unresolvedFields = warnings;
+			item.confidenceState = warnings.length > 0 ? 'unresolved' : 'resolved';
 		});
 
 		return parsedItems;
@@ -408,11 +398,6 @@ Line  Item Code      Description                  Qty  Unit Price
 
 	function removeUploadedFile(index: number) {
 		uploadedFiles = uploadedFiles.filter((_, i) => i !== index);
-		if (uploadedFiles.length === 0) {
-			intakeText = '';
-		} else {
-			intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + samples[selectedSource];
-		}
 		resetDemoState();
 		markAutoSaved();
 	}
@@ -421,136 +406,15 @@ Line  Item Code      Description                  Qty  Unit Price
 		data.catalogItems && data.catalogItems.length > 0 ? data.catalogItems : fallbackCatalog
 	);
 
-	const initialBlockers = (): Blocker[] => [
-		{
-			id: 'star-bird-finish',
-			impact: 'High impact',
-			impactKey: 'highImpact',
-			question: 'Which Black Lip Star with Bird of Prey Dangle finish should Bali make?',
-			questionKey: 'starburstQuestion',
-			evidence: 'star bird dangle',
-			source: 'Pasted DM',
-			risk: 'Finish changes the metal casting, material cost, and production scheduling.',
-			riskKey: 'starburstRisk',
-			options: ['Golden', 'Recycled Sterling Silver'],
-			answer: ''
-		},
-		{
-			id: 'bird-of-prey-size',
-			impact: 'Medium impact',
-			impactKey: 'mediumImpact',
-			question: 'Which Golden Bird of Prey Hat Stud size is this?',
-			questionKey: 'horseQuestion',
-			evidence: 'new smaller golden bird of prey',
-			source: 'Copied PO text',
-			risk: 'Size changes the bone carving template, casting mold, and unit price.',
-			riskKey: 'horseRisk',
-			options: ['Mini', 'Medium'],
-			answer: ''
-		}
-	];
+	const initialBlockers = (): Blocker[] => fixtureBlockers();
 
-	const initialLineItems = (): LineItem[] => [
-		{
-			id: 'elephant-medium',
-			item: 'Medium Silver Elephant Pin',
-			styleCode: 'HB-40523-SIL',
-			qty: 12,
-			finish: 'Silver',
-			notes: 'Match last order',
-			source: 'Copied PO text',
-			unitPrice: 185.00
-		},
-		{
-			id: 'star-mop',
-			item: 'Mother of Pearl Gold Plated Silver Star Pin',
-			styleCode: 'HB-P9015-GP',
-			qty: 6,
-			finish: 'Mother of Pearl',
-			notes: 'Confirm longer chain',
-			source: 'Copied PO text',
-			unitPrice: 130.00
-		},
-		{
-			id: 'water-buffalo',
-			item: 'Silver Water Buffalo "Long Horn" Pin',
-			styleCode: 'HB-WATER-BUFFALO-LONG-HORN-PIN',
-			qty: 4,
-			finish: 'Silver',
-			notes: '2 butterfly clutches if possible',
-			source: 'Copied PO text',
-			unitPrice: 350.00
-		},
-		{
-			id: 'love-shard-single',
-			item: 'Golden Love Shard Pin - Single',
-			styleCode: 'HE-4720-GP-1',
-			qty: 24,
-			finish: 'Gold Vermeil',
-			notes: 'Pack 12 pairs per card',
-			source: 'Copied PO text',
-			unitPrice: 50.00
-		},
-		{
-			id: 'black-lip-heart',
-			item: 'Black Lip Heart Hat Stud in Silver',
-			styleCode: 'HB-P9012-SIL',
-			qty: 20,
-			finish: 'Silver',
-			notes: 'Mix sizes 7 and 8',
-			source: 'Copied PO text',
-			unitPrice: 125.00
-		},
-		{
-			id: 'wolf-oxy',
-			item: 'Wolf Pin - Silver Oxy',
-			styleCode: 'HB-WOLF-PIN-SILVER-OXY',
-			qty: 10,
-			finish: 'Silver Oxy',
-			notes: 'Need by 7/10',
-			source: 'CSV row',
-			unitPrice: 200.00
-		},
-		{
-			id: 'star-dangle-unclear',
-			item: 'Black Lip Star with Bird of Prey Dangle (Finish Unresolved)',
-			styleCode: '',
-			qty: 8,
-			finish: 'Gold or Silver',
-			notes: "Awaiting finish resolution",
-			source: 'Pasted DM',
-			unitPrice: 175.00
-		},
-		{
-			id: 'bird-unclear',
-			item: 'Golden Bird of Prey Hat Stud (Size Unresolved)',
-			styleCode: '',
-			qty: 6,
-			finish: 'Gold',
-			notes: "Awaiting size resolution",
-			source: 'Copied PO text',
-			unitPrice: 85.00
-		}
-	];
+	const initialLineItems = (): LineItem[] => fixtureLineItems();
 
-	const initialCustomerUpdate = `Hi Mia,
-
-Thank you for your order. We reviewed the details and everything needed for production is now ready.
-
-Order summary
-- 8 items
-- Total quantity: 90
-- Finishes: Silver, Gold Vermeil, Mother of Pearl
-
-Timeline
-- Production start: June 3, 2026
-- Estimated completion: June 20, 2026
-- Need by: July 10, 2026
-
-We will send another update once production begins. Please reach out if anything needs to change.
-
-Thank you,
-Heather Benjamin Jewelry`;
+	const initialCustomerUpdate = generateCustomerUpdate({
+		client: 'La Jolla Artisan Boutique',
+		lineItems: fixtureLineItems(),
+		unresolvedCount: fixtureBlockers().length
+	});
 
 	let currentStep = $state<Step>(1);
 	let selectedSource = $state<(typeof sourceTypes)[number]>('sourceEmail');
@@ -569,7 +433,7 @@ Heather Benjamin Jewelry`;
 	let showWelcomeModal = $state(false);
 
 	let orders = $state<any[]>([]);
-	let activeView = $state<'dashboard' | 'workbench'>('dashboard');
+	let activeView = $state<'dashboard' | 'workbench'>('workbench');
 	let orderStatus = $state('Review');
 	let milestones = $state({
 		moldsChecked: false,
@@ -610,32 +474,16 @@ Heather Benjamin Jewelry`;
 	let packedItems = $state<Record<string, boolean>>({}); // Checkbox state for Packing checklist
 	let completedSteps = $state<number>(1);
 	let rightSidebarCollapsed = $state(false);
-	let activeIngestTab = $state<'paste' | 'upload'>('paste');
 	let sampleUsed = $state(false);
 	let processClicked = $state(false);
 	let isProcessing = $state(false);
 	let isDragging = $state(false);
 	let readyItemsExpanded = $state(false);
+	let handoffCreated = $state(false);
+	let handoffShared = $state(false);
 	const step1_item1 = $derived(intakeText.trim().length > 0 || uploadedFiles.length > 0);
 	const step1_item2 = $derived(sampleUsed);
 	const step1_item3 = $derived(processClicked);
-
-	// Global Operational Control Panel States
-	let isRightSidebarOpen = $state(false);
-	let silverSpotRate = $state(1.00);
-
-	$effect(() => {
-		if (isRightSidebarOpen) {
-			rightSidebarCollapsed = true;
-		} else {
-			rightSidebarCollapsed = false;
-		}
-	});
-	$effect(() => {
-		if (!rightSidebarCollapsed) {
-			isRightSidebarOpen = false;
-		}
-	});
 
 	$effect(() => {
 		function handleKeyDown(event: KeyboardEvent) {
@@ -649,8 +497,6 @@ Heather Benjamin Jewelry`;
 				event.preventDefault();
 				if (activeView === 'workbench') {
 					rightSidebarCollapsed = !rightSidebarCollapsed;
-				} else {
-					isRightSidebarOpen = !isRightSidebarOpen;
 				}
 			}
 		}
@@ -660,63 +506,34 @@ Heather Benjamin Jewelry`;
 		};
 	});
 
-	let wholesaleAccounts = $state([
-		{ name: 'Driftwood Collective', buyer: 'Mia Chen', region: 'Santa Cruz, CA', minThreshold: 2000 },
-		{ name: 'La Jolla Artisan Boutique', buyer: 'Sarah Jenkins', region: 'La Jolla, CA', minThreshold: 1500 },
-		{ name: 'Bali Grace Gallery', buyer: 'Wayan Sudarta', region: 'Seminyak, Bali', minThreshold: 1000 },
-		{ name: 'Uluwatu Sands Resort', buyer: 'Ketut Ariani', region: 'Pecatu, Bali', minThreshold: 3000 },
-		{ name: 'Nomad Luxe', buyer: 'Chloe Dubois', region: 'Brooklyn, NY', minThreshold: 2500 },
-		{ name: 'Pacific Coast Co-op', buyer: 'Marcus Vance', region: 'Portland, OR', minThreshold: 1500 },
-		{ name: 'Island Trade Winds', buyer: 'Leilani Kai', region: 'Honolulu, HI', minThreshold: 2000 },
-		{ name: 'Kyoto Artisanal Imports', buyer: 'Kenji Sato', region: 'Kyoto, Japan', minThreshold: 4000 }
+	const maxUploadBytes = 8 * 1024 * 1024;
+	const allowedUploadExtensions = new Set(['pdf', 'csv', 'xlsx', 'png', 'jpg', 'jpeg', 'txt']);
+	const allowedUploadTypes = new Set([
+		'application/pdf',
+		'text/csv',
+		'text/plain',
+		'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+		'image/png',
+		'image/jpeg'
 	]);
 
-	const orderTotalPrice = $derived(lineItems.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.unitPrice || 0), 0));
+	function isAllowedUpload(file: File) {
+		const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+		return (
+			file.size > 0 &&
+			file.size <= maxUploadBytes &&
+			allowedUploadExtensions.has(extension) &&
+			(!file.type || allowedUploadTypes.has(file.type))
+		);
+	}
 
-	const activeAccount = $derived(
-		wholesaleAccounts.find(acc => 
-			client.toLowerCase().includes(acc.name.toLowerCase()) || 
-			acc.name.toLowerCase().includes(client.toLowerCase())
-		)
-	);
-
-	const productionPieces = $derived({
-		goldVermeil: data.allItems
-			? data.allItems
-				.filter((item: any) => {
-					const order = orders.find(o => o.id === item.poId);
-					if (!order || order.status !== 'Production') return false;
-					const finishLower = (item.finish || '').toLowerCase();
-					const itemLower = (item.item || '').toLowerCase();
-					return finishLower.includes('gold') || finishLower.includes('vermeil') || itemLower.includes('gold') || itemLower.includes('vermeil');
-				})
-				.reduce((sum: number, item: any) => sum + (item.qty || 0), 0)
-			: 0,
-		silver: data.allItems
-			? data.allItems
-				.filter((item: any) => {
-					const order = orders.find(o => o.id === item.poId);
-					if (!order || order.status !== 'Production') return false;
-					const finishLower = (item.finish || '').toLowerCase();
-					const itemLower = (item.item || '').toLowerCase();
-					if (finishLower.includes('gold') || finishLower.includes('vermeil') || itemLower.includes('gold') || itemLower.includes('vermeil')) return false;
-					if (finishLower.includes('brass') || itemLower.includes('brass')) return false;
-					return true;
-				})
-				.reduce((sum: number, item: any) => sum + (item.qty || 0), 0)
-			: 0,
-		brass: data.allItems
-			? data.allItems
-				.filter((item: any) => {
-					const order = orders.find(o => o.id === item.poId);
-					if (!order || order.status !== 'Production') return false;
-					const finishLower = (item.finish || '').toLowerCase();
-					const itemLower = (item.item || '').toLowerCase();
-					return finishLower.includes('brass') || itemLower.includes('brass');
-				})
-				.reduce((sum: number, item: any) => sum + (item.qty || 0), 0)
-			: 0
-	});
+	function acceptedUploadFiles(files: File[]) {
+		const accepted = files.filter(isAllowedUpload);
+		if (accepted.length !== files.length) {
+			showToast(t.uploadRejected || 'Some files were rejected by type or size');
+		}
+		return accepted;
+	}
 
 	const isIndonesian = $derived(page.url.pathname.startsWith('/id'));
 	const currentLocale = $derived<Locale>(isIndonesian ? 'id' : 'en');
@@ -745,15 +562,13 @@ Heather Benjamin Jewelry`;
 		return t[source];
 	}
 
-	function extractEmail(text: string) {
-		return text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? '';
-	}
-
 	// Dynamic Blocker & Ready Tracking
-	const remainingAnswers = $derived(blockers.filter((blocker) => !blocker.answer).length);
-	const allAnswered = $derived(remainingAnswers === 0);
+	const remainingAnswers = $derived(unresolvedRequiredCount(blockers));
+	const allAnswered = $derived(canCreateSheets(blockers));
+	const handoffReady = $derived(allAnswered);
+	const allRequiredResolved = $derived(allRequiredFieldsResolved(lineItems, blockers));
 
-	const prodProgress = $derived((blockers.filter(b => b.answer).length / blockers.length) * 100);
+	const prodProgress = $derived(blockers.length === 0 ? 100 : (blockers.filter(b => b.answer).length / blockers.length) * 100);
 	const packingProgress = $derived(allAnswered ? 100 : 0);
 	const customerProgress = $derived(allAnswered ? 100 : 0);
 
@@ -776,7 +591,19 @@ Heather Benjamin Jewelry`;
 		Array.from(new Set(lineItems.map((item) => item.finish))).join(', ')
 	);
 	const packedCount = $derived(Object.values(packedItems).filter(Boolean).length);
-	const customerEmail = $derived(extractEmail(intakeText));
+	const baliHandoffText = $derived(
+		buildBaliHandoffText({
+			orderId,
+			client,
+			items: lineItems,
+			blockers,
+			packedItems,
+			sourceText: intakeText,
+			getTechnicalInstructions: technicalInstructionsFor,
+			getPackagingSpecifics,
+			isBackordered
+		})
+	);
 
 	const reviewOrders = $derived(orders.filter(o => o.status === 'Review').length);
 	const productionOrders = $derived(orders.filter(o => o.status === 'Production' || o.status === 'Packing').length);
@@ -808,9 +635,10 @@ Heather Benjamin Jewelry`;
 				packedItems = parsed.packedItems ?? {};
 				completedSteps = parsed.completedSteps ?? 1;
 				rightSidebarCollapsed = parsed.rightSidebarCollapsed ?? false;
-				activeIngestTab = parsed.activeIngestTab ?? 'paste';
 				sampleUsed = parsed.sampleUsed ?? false;
 				processClicked = parsed.processClicked ?? false;
+				handoffCreated = parsed.handoffCreated ?? false;
+				handoffShared = parsed.handoffShared ?? false;
 			} catch {
 				sessionStorage.removeItem(`${storageKey}-${orderId}`);
 			}
@@ -839,9 +667,10 @@ Heather Benjamin Jewelry`;
 				packedItems,
 				completedSteps,
 				rightSidebarCollapsed,
-				activeIngestTab,
 				sampleUsed,
-				processClicked
+				processClicked,
+				handoffCreated,
+				handoffShared
 			})
 		);
 	});
@@ -879,6 +708,8 @@ Heather Benjamin Jewelry`;
 		showOriginalDrawer = false;
 		packedItems = {};
 		readyItemsExpanded = false;
+		handoffCreated = false;
+		handoffShared = false;
 	}
 
 	function useSampleOrder() {
@@ -893,9 +724,9 @@ Heather Benjamin Jewelry`;
 	function handleFileUpload(event: Event) {
 		const target = event.target as HTMLInputElement;
 		if (target.files && target.files.length > 0) {
-			const files = Array.from(target.files);
+			const files = acceptedUploadFiles(Array.from(target.files));
+			if (files.length === 0) return;
 			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
-			intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + samples[selectedSource];
 			resetDemoState();
 			markAutoSaved();
 			showToast(`${files.length} ${t.fileUploaded}`);
@@ -903,8 +734,8 @@ Heather Benjamin Jewelry`;
 	}
 
 	function handleComposerPaste(event: ClipboardEvent) {
-		const files = Array.from(event.clipboardData?.files ?? []).filter((file) =>
-			file.type.startsWith('image/')
+		const files = acceptedUploadFiles(
+			Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/'))
 		);
 		if (files.length === 0) return;
 
@@ -914,7 +745,6 @@ Heather Benjamin Jewelry`;
 			return file.name || `Clipboard image ${uploadedFiles.length + index + 1}.${extension}`;
 		});
 		uploadedFiles = [...uploadedFiles, ...imageNames];
-		intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n${intakeText.trim() || samples[selectedSource]}`;
 		resetDemoState();
 		markAutoSaved();
 		showToast(`${files.length} ${t.clipboardImageAttached}`);
@@ -924,17 +754,17 @@ Heather Benjamin Jewelry`;
 		event.preventDefault();
 		isDragging = false;
 		if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
-			const files = Array.from(event.dataTransfer.files);
+			const files = acceptedUploadFiles(Array.from(event.dataTransfer.files));
+			if (files.length === 0) return;
 			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
-			intakeText = `[${t.filesSource}: ${uploadedFiles.join(', ')}]\n\n` + samples[selectedSource];
 			resetDemoState();
 			markAutoSaved();
 			showToast(`${files.length} ${t.fileUploaded}`);
 		}
 	}
 	async function processOrder() {
-		if (!intakeText.trim()) {
-			intakeText = samples[selectedSource];
+		if (!intakeText.trim() && uploadedFiles.length === 0) {
+			return;
 		}
 		processClicked = true;
 		resetDemoState();
@@ -953,44 +783,31 @@ Heather Benjamin Jewelry`;
 				const data = await res.json();
 				if (data.success) {
 					lineItems = data.lineItems;
-					// Map blocker keys for translation compatibility
 					blockers = data.blockers.map((b: any) => ({
 						id: b.id,
 						impact: b.impact || 'Medium impact',
 						impactKey: b.impact === 'High impact' ? 'highImpact' : 'mediumImpact',
 						question: b.question,
-						questionKey: b.id === 'star-bird-finish' ? 'starBirdQuestion' : 'birdOfPreyQuestion', // fallback mapping
+						questionKey: b.questionKey || (b.id === 'star-bird-finish' ? 'starBirdQuestion' : 'birdOfPreyQuestion'),
 						evidence: b.evidence || '',
 						source: b.source || 'Source',
 						risk: b.risk || '',
-						riskKey: b.id === 'star-bird-finish' ? 'starBirdRisk' : 'birdOfPreyRisk', // fallback mapping
+						riskKey: b.riskKey || (b.id === 'star-bird-finish' ? 'starBirdRisk' : 'birdOfPreyRisk'),
 						options: b.options || [],
-						answer: b.answer || ''
+						answer: b.answer || '',
+						required: b.required ?? true,
+						field: b.field
 					}));
 
-					// Generate customer update draft
-					customerUpdate = `Hi ${client.split(' ')[0] || 'there'},
-
-Thank you for your order. We reviewed the details and everything needed for production is now ready.
-
-Order summary
-- ${lineItems.length} items
-- Total quantity: ${lineItems.reduce((sum, item) => sum + item.qty, 0)}
-- Finishes: ${Array.from(new Set(lineItems.map(item => item.finish).filter(Boolean))).join(', ')}
-
-Timeline
-- Production start: June 3, 2026
-- Estimated completion: June 20, 2026
-- Need by: July 10, 2026
-
-We will send another update once production begins. Please reach out if anything needs to change.
-
-Thank you,
-Heather Benjamin Jewelry`;
+					customerUpdate = generateCustomerUpdate({
+						client,
+						lineItems,
+						unresolvedCount: unresolvedRequiredCount(blockers)
+					});
 					apiSuccess = true;
 				}
 			} catch (err) {
-				console.error('Failed to process via API, falling back to heuristics:', err);
+				console.warn('Order processing API fell back to local heuristics.');
 			} finally {
 				isProcessing = false;
 			}
@@ -1019,13 +836,15 @@ Heather Benjamin Jewelry`;
 							impact: 'High impact',
 							impactKey: 'highImpact',
 							question: 'Which Black Lip Star with Bird of Prey Dangle finish should Bali make?',
-							questionKey: 'starburstQuestion',
+							questionKey: 'starBirdQuestion',
 							evidence: parsed.find(item => (item.item.toLowerCase().includes('star') || item.item.toLowerCase().includes('dangle')))?.notes || 'star bird dangle',
 							source: parsed.find(item => (item.item.toLowerCase().includes('star') || item.item.toLowerCase().includes('dangle')))?.source || 'Source',
 							risk: 'Finish changes the metal casting, material cost, and production scheduling.',
-							riskKey: 'starburstRisk',
+							riskKey: 'starBirdRisk',
 							options: ['Golden', 'Recycled Sterling Silver'],
-							answer: ''
+							answer: '',
+							required: true,
+							field: 'finish'
 						});
 					}
 
@@ -1035,36 +854,24 @@ Heather Benjamin Jewelry`;
 							impact: 'Medium impact',
 							impactKey: 'mediumImpact',
 							question: 'Which Golden Bird of Prey Hat Stud size is this?',
-							questionKey: 'horseQuestion',
+							questionKey: 'birdOfPreyQuestion',
 							evidence: parsed.find(item => item.item.toLowerCase().includes('bird'))?.notes || 'new smaller golden bird of prey',
 							source: parsed.find(item => item.item.toLowerCase().includes('bird'))?.source || 'Source',
 							risk: 'Size changes the bone carving template, casting mold, and unit price.',
-							riskKey: 'horseRisk',
+							riskKey: 'birdOfPreyRisk',
 							options: ['Mini', 'Medium'],
-							answer: ''
+							answer: '',
+							required: true,
+							field: 'size'
 						});
 					}
 
 					blockers = activeBlockers;
-
-					customerUpdate = `Hi Mia,
-
-Thank you for your order. We reviewed the details and everything needed for production is now ready.
-
-Order summary
-- ${parsed.length} items
-- Total quantity: ${parsed.reduce((sum, item) => sum + item.qty, 0)}
-- Finishes: ${Array.from(new Set(parsed.map(item => item.finish))).join(', ')}
-
-Timeline
-- Production start: June 3, 2026
-- Estimated completion: June 20, 2026
-- Need by: July 10, 2026
-
-We will send another update once production begins. Please reach out if anything needs to change.
-
-Thank you,
-Heather Benjamin Jewelry`;
+					customerUpdate = generateCustomerUpdate({
+						client,
+						lineItems: parsed,
+						unresolvedCount: unresolvedRequiredCount(activeBlockers)
+					});
 				}
 			}
 		} else {
@@ -1113,7 +920,9 @@ Heather Benjamin Jewelry`;
 				bird.styleCode = answer === 'Mini' ? 'HB-HB1237GP' : 'HB-HB1239-GP';
 				bird.notes = `${t.resolvedSize}: ${answer}`;
 				bird.finish = 'Gold Vermeil';
-				bird.unitPrice = answer === 'Mini' ? 70.00 : 100.00;
+				bird.unitPrice = 0;
+				bird.confidenceState = 'resolved';
+				bird.unresolvedFields = [];
 				bird.imageUrl = answer === 'Mini' 
 					? 'https://cdn.shopify.com/s/files/1/0277/4286/3462/products/ScreenShot2022-09-27at2.37.29PM.png?v=1664311054'
 					: 'https://cdn.shopify.com/s/files/1/0277/4286/3462/files/Screenshot2025-12-09at12.22.01AM.png?v=1765261804';
@@ -1126,12 +935,20 @@ Heather Benjamin Jewelry`;
 				starBird.styleCode = answer === 'Golden' ? 'HB-P41239-GP' : 'HB-P41238-SIL';
 				starBird.notes = `Resolved finish: ${answer}`;
 				starBird.finish = answer === 'Golden' ? 'Gold Vermeil' : 'Silver';
-				starBird.unitPrice = answer === 'Golden' ? 195.00 : 175.00;
+				starBird.unitPrice = 0;
+				starBird.confidenceState = 'resolved';
+				starBird.unresolvedFields = [];
 				starBird.imageUrl = answer === 'Golden'
 					? 'https://cdn.shopify.com/s/files/1/0277/4286/3462/products/ScreenShot2022-09-28at3.35.10PM.png?v=1664400928'
 					: 'https://cdn.shopify.com/s/files/1/0277/4286/3462/products/ScreenShot2022-09-28at3.38.04PM.png?v=1664401090';
 			}
 		}
+		customerUpdate = generateCustomerUpdate({
+			client,
+			lineItems,
+			unresolvedCount: unresolvedRequiredCount(blockers)
+		});
+		handoffShared = false;
 		markAutoSaved();
 	}
 
@@ -1198,8 +1015,8 @@ Heather Benjamin Jewelry`;
 					milestones
 				})
 			});
-		} catch (err) {
-			console.error('Failed to sync to database:', err);
+		} catch {
+			console.error('Failed to sync to database.');
 		}
 	}
 
@@ -1216,6 +1033,8 @@ Heather Benjamin Jewelry`;
 		
 		lineItems = data.allItems.filter((item: any) => item.poId === selectedOrderId);
 		blockers = data.allBlockers.filter((bl: any) => bl.poId === selectedOrderId);
+		handoffCreated = false;
+		handoffShared = false;
 		
 		activeView = 'workbench';
 		
@@ -1241,7 +1060,7 @@ Heather Benjamin Jewelry`;
 		const newOrder = {
 			id: newId,
 			poNumber: newId,
-			clientName: 'New Boutique Partner',
+			clientName: 'Marin Coastal Goods',
 			status: 'Review',
 			sourceText: '',
 			customerUpdate: '',
@@ -1261,6 +1080,8 @@ Heather Benjamin Jewelry`;
 		milestones = { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false };
 		lineItems = [];
 		blockers = [];
+		handoffCreated = false;
+		handoffShared = false;
 		
 		activeView = 'workbench';
 		currentStep = 1;
@@ -1350,7 +1171,7 @@ Heather Benjamin Jewelry`;
 		syncToDatabase();
 	}
 
-	function updateLineItem(id: string, field: 'styleCode' | 'qty' | 'notes' | 'unitPrice', value: string | number) {
+	function updateLineItem(id: string, field: 'styleCode' | 'qty' | 'finish' | 'notes' | 'unitPrice', value: string | number) {
 		const item = lineItems.find((entry) => entry.id === id);
 		if (!item) return;
 		if (field === 'qty') {
@@ -1360,12 +1181,17 @@ Heather Benjamin Jewelry`;
 		} else {
 			item[field] = String(value);
 		}
+		const warnings = unresolvedWarnings(item);
+		item.unresolvedFields = warnings;
+		item.confidenceState = warnings.length > 0 ? 'unresolved' : item.confidenceState === 'needs_review' ? 'needs_review' : 'resolved';
+		handoffShared = false;
 		markDirty();
 		markAutoSaved();
 	}
 
 	function setPackedItem(id: string, checked: boolean) {
 		packedItems = { ...packedItems, [id]: checked };
+		handoffShared = false;
 		markDirty();
 		markAutoSaved();
 	}
@@ -1385,93 +1211,141 @@ Heather Benjamin Jewelry`;
 		markAutoSaved();
 	}
 
-	function sanitizeExportCell(value: string | number) {
-		const text = String(value ?? '');
-		if (/^[=+\-@\t\r]/.test(text)) return `'${text}`;
-		return text;
+	function sheetLabels() {
+		return {
+			item: t.item,
+			styleCode: t.styleCode,
+			qty: t.qty,
+			materialFinish: t.materialFinish,
+			confidence: t.confidence || 'Confidence',
+			unresolvedWarnings: t.unresolvedWarnings || 'Unresolved warnings',
+			sourceEvidence: t.sourceEvidence,
+			technicalInstructions: t.technicalInstructions,
+			orderNotes: t.orderNotes || 'Notes',
+			packed: t.packed,
+			packagingSpecifics: t.packagingSpecifics,
+			fulfillmentFlags: t.fulfillmentFlags,
+			pendingResolution: t.pendingResolution,
+			directShip: t.directShip,
+			backorder: t.backorder,
+			splitShipAfterCasting: t.splitShipAfterCasting,
+			resolved: t.resolved || 'Matched',
+			needsReview: t.needsReview || 'Needs Review',
+			unresolved: t.unresolved || 'Unresolved'
+		};
 	}
 
-	function csvEscape(value: string | number) {
-		const text = sanitizeExportCell(value);
-		return `"${text.replaceAll('"', '""')}"`;
+	function technicalInstructionsFor(item: LineItem) {
+		if (!item.styleCode) return t.pendingResolution;
+		const cat = catalog.find((entry) => entry.styleCode === item.styleCode);
+		if (!cat) return t.noInstructionsMapped;
+		return `${cat.notes_en} / ${cat.notes_id}`;
 	}
 
-	function productionRows() {
-		const warningRows = remainingAnswers
-			? [
-					[
-						t.pendingResolution,
-						reviewCountLabel(remainingAnswers),
-						'',
-						'',
-						'',
-						'',
-						''
-					]
-				]
-			: [];
-
-		return [
-			[t.item, t.styleCode, t.qty, t.unitPrice || 'Price', t.materialFinish, t.technicalInstructions, t.orderNotes || 'Notes'],
-			...warningRows,
-			...lineItems.map((item) => [
-				item.item,
-				item.styleCode,
-				item.qty,
-				item.unitPrice || 0,
-				item.finish,
-				item.notes,
-				item.source
-			])
-		];
+	function productionRows(): TableCell[][] {
+		return buildProductionRows({
+			items: lineItems,
+			blockers,
+			labels: sheetLabels(),
+			getTechnicalInstructions: technicalInstructionsFor
+		});
 	}
 
-	function packingRows() {
-		const warningRows = remainingAnswers
-			? [
-					[
-						t.pendingResolution,
-						reviewCountLabel(remainingAnswers),
-						'',
-						''
-					]
-				]
-			: [];
-
-		return [
-			[t.item, t.qty, t.packed, t.notes],
-			...warningRows,
-			...lineItems.map((item) => [
-				item.item,
-				item.qty,
-				t.packagingSpecifics,
-				item.notes
-			])
-		];
+	function packingRows(): TableCell[][] {
+		return buildPackingRows({
+			items: lineItems,
+			blockers,
+			packedItems,
+			labels: sheetLabels(),
+			getPackagingSpecifics,
+			isBackordered
+		});
 	}
 
-	function rowsToCsv(rows: (string | number)[][]) {
-		return rows.map((row) => row.map(csvEscape).join(',')).join('\n');
+	function downloadBlob(bytes: BlobPart[], type: string, filename: string) {
+		const blob = new Blob(bytes, { type });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = filename;
+		link.click();
+		URL.revokeObjectURL(url);
+		exportOpen = false;
+	}
+
+	function exportBaseName(kind: 'production' | 'packing') {
+		return `${orderId}-${kind === 'production' ? 'production-sheet' : 'packing-checklist'}`;
+	}
+
+	function createBaliHandoff() {
+		if (!handoffReady) {
+			showToast(t.resolveToContinue);
+			return;
+		}
+		handoffCreated = true;
+		handoffShared = false;
+		markAutoSaved();
+		showToast(t.baliHandoffCreated || 'Bali handoff created');
+	}
+
+	async function copyBaliHandoff() {
+		if (!handoffCreated) return;
+		await navigator.clipboard.writeText(baliHandoffText);
+		showToast(t.baliHandoffCopied || 'Bali handoff copied');
+	}
+
+	function downloadBaliHandoffPdf() {
+		if (!handoffCreated) return;
+		const bytes = createBaliHandoffPdf({
+			orderId,
+			client,
+			items: lineItems,
+			blockers,
+			packedItems,
+			sourceText: intakeText,
+			getTechnicalInstructions: technicalInstructionsFor,
+			getPackagingSpecifics,
+			isBackordered
+		});
+		downloadBlob([bytes], 'application/pdf', `${orderId}-bali-handoff.pdf`);
+		showToast(t.baliHandoffPdfDownloaded || 'Bali handoff PDF downloaded');
+	}
+
+	function markBaliHandoffShared() {
+		if (!allRequiredResolved || !handoffCreated) return;
+		handoffShared = true;
+		markAutoSaved();
+		showToast(t.baliHandoffShared || 'Bali handoff marked as shared');
 	}
 
 	function downloadCsv(kind: 'production' | 'packing') {
 		const rows = kind === 'production' ? productionRows() : packingRows();
-		const blob = new Blob([rowsToCsv(rows)], { type: 'text/csv;charset=utf-8' });
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement('a');
-		link.href = url;
-		link.download = `${orderId}-${kind === 'production' ? 'production-sheet' : 'packing-checklist'}.csv`;
-		link.click();
-		URL.revokeObjectURL(url);
-		exportOpen = false;
+		downloadBlob([rowsToCsv(rows)], 'text/csv;charset=utf-8', `${exportBaseName(kind)}.csv`);
 		showToast(kind === 'production' ? t.productionCsvDownloaded : t.packingCsvDownloaded);
+	}
+
+	function downloadXlsx(kind: 'production' | 'packing') {
+		const rows = kind === 'production' ? productionRows() : packingRows();
+		const bytes = createWorkbookXlsx(rows, kind === 'production' ? t.productionSheet : t.packingChecklist);
+		downloadBlob(
+			[bytes],
+			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+			`${exportBaseName(kind)}.xlsx`
+		);
+		showToast(kind === 'production' ? t.productionXlsxDownloaded : t.packingXlsxDownloaded);
+	}
+
+	function downloadPdf(kind: 'production' | 'packing') {
+		const rows = kind === 'production' ? productionRows() : packingRows();
+		const title = `${kind === 'production' ? t.productionSheet : t.packingChecklist} - ${orderId}`;
+		const bytes = createPdfDocument(title, rows);
+		downloadBlob([bytes], 'application/pdf', `${exportBaseName(kind)}.pdf`);
+		showToast(kind === 'production' ? t.productionPdfDownloaded : t.packingPdfDownloaded);
 	}
 
 	async function copyTable() {
 		const rows = activeTab === 'packing' ? packingRows() : productionRows();
-		await navigator.clipboard.writeText(
-			rows.map((row) => row.map((cell) => sanitizeExportCell(cell)).join('\t')).join('\n')
-		);
+		await navigator.clipboard.writeText(rowsToCopyTable(rows));
 		exportOpen = false;
 		showToast(t.tableCopied);
 	}
@@ -1481,12 +1355,10 @@ Heather Benjamin Jewelry`;
 		showToast(t.customerUpdateCopied);
 	}
 
-	function openEmailDraft() {
-		if (!browser) return;
-		const subject = `${t.customerUpdate}: ${orderId}`;
-		const mailto = `mailto:${customerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(customerUpdate)}`;
-		window.location.href = mailto;
-		showToast(t.emailDraftOpened);
+	function saveCustomerDraft() {
+		markDirty();
+		markAutoSaved();
+		showToast(t.draftSaved || 'Draft saved');
 	}
 
 	function markSent() {
@@ -1712,7 +1584,7 @@ Heather Benjamin Jewelry`;
 						element: '#sidebar-logo',
 						popover: {
 							title: 'Dashboard Overview',
-							description: 'Welcome to the Artisan dashboard \u2014 your command center for wholesale orders, Bali production tracking, and team coordination.',
+							description: 'Welcome to Artisan - order intake, blocker review, sheets, and customer updates.',
 							side: 'right',
 							align: 'start'
 						}
@@ -1788,15 +1660,6 @@ Heather Benjamin Jewelry`;
 							side: 'left',
 							align: 'start'
 						}
-					},
-					{
-						element: '#control-panel-btn',
-						popover: {
-							title: 'Control Panel',
-							description: 'Open the operations sidebar for deeper order filtering, status management, and bulk actions across all orders.',
-							side: 'left',
-							align: 'start'
-						}
 					}
 				]
 			});
@@ -1867,14 +1730,8 @@ Heather Benjamin Jewelry`;
 		{currentLocale}
 		currentPath={page.url.pathname}
 		headerLastSaved={lastSaved}
-		headerRightSidebarCollapsed={activeView === 'workbench' ? rightSidebarCollapsed : !isRightSidebarOpen}
-		headerOnToggleRightSidebar={() => {
-			if (activeView === 'workbench') {
-				rightSidebarCollapsed = !rightSidebarCollapsed;
-			} else {
-				isRightSidebarOpen = !isRightSidebarOpen;
-			}
-		}}
+		headerRightSidebarCollapsed={activeView === 'workbench' ? rightSidebarCollapsed : undefined}
+		headerOnToggleRightSidebar={activeView === 'workbench' ? () => (rightSidebarCollapsed = !rightSidebarCollapsed) : undefined}
 		onReplayTour={handleReplayTour}
 		onClickLogo={() => (activeView = 'dashboard')}
 		mainClass={`${activeView === 'dashboard' ? 'app-main-dashboard' : ''} ${activeView === 'workbench' ? 'app-main-workbench-status' : ''}`}
@@ -1924,7 +1781,7 @@ Heather Benjamin Jewelry`;
 
 						<!-- Kanban Grid -->
 						<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-							{#each ['Review', 'Production', 'Packing', 'Completed'] as colStatus}
+							{#each ['Review', 'Production', 'Packing', 'Completed'] as colStatus (colStatus)}
 								<div id="kanban-{colStatus.toLowerCase()}" class="flex flex-col bg-(--surface-soft) rounded-lg p-4 border border-(--line) min-h-100">
 									<div class="flex items-center justify-between mb-4 pb-2 border-b border-(--line)">
 										<div class="flex items-center gap-2">
@@ -2270,7 +2127,7 @@ Heather Benjamin Jewelry`;
 							<div class="mx-auto max-w-5xl">
 								<div class="flex flex-wrap items-start justify-between gap-4">
 									<div>
-										<p class="text-sm uppercase tracking-wide text-(--muted)">
+										<p class="text-sm font-medium text-(--muted)">
 											Order #{orderId}
 											<span class="ml-3 rounded border border-(--line) px-2 py-1 normal-case tracking-normal font-sans"
 												>Wholesale</span
@@ -2376,7 +2233,7 @@ Heather Benjamin Jewelry`;
 						<div class="mx-auto max-w-7xl">
 							<div class="flex flex-wrap items-start justify-between gap-5 border-b border-(--line) pb-6">
 								<div>
-									<p class="text-sm uppercase tracking-wide text-(--muted)">
+									<p class="text-sm font-medium text-(--muted)">
 										Order #{orderId}
 										<span class="ml-3 rounded border border-(--line) px-2 py-1 normal-case tracking-normal font-sans"
 											>Wholesale</span
@@ -2432,6 +2289,7 @@ Heather Benjamin Jewelry`;
 											{getPackagingSpecifics}
 											{isBackordered}
 											onTogglePacked={setPackedItem}
+											onUpdateItem={(id, field, value) => updateLineItem(id, field, value)}
 										/>
 									{:else}
 										<h2 class="font-display text-2xl">{t.customerUpdateDraft}</h2>
@@ -2490,21 +2348,67 @@ Heather Benjamin Jewelry`;
 										<div>
 											<h2 class="font-display text-xs font-bold text-(--muted) uppercase tracking-wider mb-3">{t.readyNext}</h2>
 											{#if activeTab === 'production'}
-												<button id="export-dropdown-btn" class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadCsv('production')}>
-													<div>
-														<strong class="block font-bold text-sm text-(--ink)">{t.downloadProductionSheet}</strong>
-														<span class="block text-[10px] text-(--muted) mt-0.5">{t.csvFormat}</span>
-													</div>
-													<i class="ri-download-2-line text-lg text-(--brand)" aria-hidden="true"></i>
-												</button>
+												<div class="space-y-3">
+													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadXlsx('production')}>
+														<div>
+															<strong class="block font-bold text-sm text-(--ink)">{t.downloadProductionXlsx}</strong>
+															<span class="block text-[10px] text-(--muted) mt-0.5">XLSX</span>
+														</div>
+														<i class="ri-file-excel-2-line text-lg text-(--brand)" aria-hidden="true"></i>
+													</button>
+													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadPdf('production')}>
+														<div>
+															<strong class="block font-bold text-sm text-(--ink)">{t.downloadProductionPdf}</strong>
+															<span class="block text-[10px] text-(--muted) mt-0.5">PDF</span>
+														</div>
+														<i class="ri-file-pdf-2-line text-lg text-(--brand)" aria-hidden="true"></i>
+													</button>
+													<button id="export-dropdown-btn" class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadCsv('production')}>
+														<div>
+															<strong class="block font-bold text-sm text-(--ink)">{t.downloadProductionSheet}</strong>
+															<span class="block text-[10px] text-(--muted) mt-0.5">{t.csvFormat}</span>
+														</div>
+														<i class="ri-download-2-line text-lg text-(--brand)" aria-hidden="true"></i>
+													</button>
+													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={copyTable}>
+														<div>
+															<strong class="block font-bold text-sm text-(--ink)">{t.copyTable}</strong>
+															<span class="block text-[10px] text-(--muted) mt-0.5">{t.plainText}</span>
+														</div>
+														<i class="ri-file-copy-2-line text-lg text-(--brand)" aria-hidden="true"></i>
+													</button>
+												</div>
 											{:else if activeTab === 'packing'}
-												<button id="export-dropdown-btn" class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadCsv('packing')}>
-													<div>
-														<strong class="block font-bold text-sm text-(--ink)">{t.downloadPackingChecklist}</strong>
-														<span class="block text-[10px] text-(--muted) mt-0.5">{t.csvFormat}</span>
-													</div>
-													<i class="ri-download-2-line text-lg text-(--brand)" aria-hidden="true"></i>
-												</button>
+												<div class="space-y-3">
+													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadXlsx('packing')}>
+														<div>
+															<strong class="block font-bold text-sm text-(--ink)">{t.downloadPackingXlsx}</strong>
+															<span class="block text-[10px] text-(--muted) mt-0.5">XLSX</span>
+														</div>
+														<i class="ri-file-excel-2-line text-lg text-(--brand)" aria-hidden="true"></i>
+													</button>
+													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadPdf('packing')}>
+														<div>
+															<strong class="block font-bold text-sm text-(--ink)">{t.downloadPackingPdf}</strong>
+															<span class="block text-[10px] text-(--muted) mt-0.5">PDF</span>
+														</div>
+														<i class="ri-file-pdf-2-line text-lg text-(--brand)" aria-hidden="true"></i>
+													</button>
+													<button id="export-dropdown-btn" class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={() => downloadCsv('packing')}>
+														<div>
+															<strong class="block font-bold text-sm text-(--ink)">{t.downloadPackingChecklist}</strong>
+															<span class="block text-[10px] text-(--muted) mt-0.5">{t.csvFormat}</span>
+														</div>
+														<i class="ri-download-2-line text-lg text-(--brand)" aria-hidden="true"></i>
+													</button>
+													<button class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={copyTable}>
+														<div>
+															<strong class="block font-bold text-sm text-(--ink)">{t.copyTable}</strong>
+															<span class="block text-[10px] text-(--muted) mt-0.5">{t.plainText}</span>
+														</div>
+														<i class="ri-file-copy-2-line text-lg text-(--brand)" aria-hidden="true"></i>
+													</button>
+												</div>
 											{:else}
 												<button id="export-dropdown-btn" class="side-action transition flex items-center justify-between gap-3 w-full bg-white hover:border-(--brand) text-left cursor-pointer border border-(--line) rounded-lg p-4" type="button" onclick={copyCustomerUpdate}>
 													<div>
@@ -2518,13 +2422,99 @@ Heather Benjamin Jewelry`;
 									</aside>
 								{/if}
 							</div>
+
+													<section class="mt-6 rounded-lg border border-(--line) bg-white p-5 shadow-sm" aria-labelledby="bali-handoff-title">
+							<div class="flex flex-wrap items-start justify-between gap-4">
+								<div class="max-w-2xl">
+									<h2 id="bali-handoff-title" class="font-display text-2xl text-(--ink)">{t.baliHandoff}</h2>
+									<p class="mt-2 text-sm leading-6 text-(--muted)">{t.handoffSubtitle}</p>
+								</div>
+								<div class="flex flex-wrap items-center gap-2">
+									<button
+										class="primary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+										type="button"
+										disabled={!handoffReady}
+										onclick={createBaliHandoff}
+									>
+										<i class="ri-file-list-3-line" aria-hidden="true"></i> {t.createBaliHandoff}
+									</button>
+									{#if handoffShared}
+										<span class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+											{t.handoffSharedLocal}
+										</span>
+									{/if}
+								</div>
+							</div>
+
+							{#if !handoffReady}
+								<p class="mt-3 text-sm text-(--warning-ink)">{t.handoffBlocked}</p>
+							{/if}
+
+							{#if handoffCreated}
+								<div class="mt-5 border-t border-(--line) pt-5">
+									<div class="flex items-center justify-between gap-2">
+										<h3 class="font-semibold text-sm text-(--ink)">{t.packetPreview}</h3>
+										{#if allRequiredResolved}
+											<span class="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5">
+												{t.handoffReadyStatus || 'Ready for Bali handoff'}
+											</span>
+										{:else}
+											<span class="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
+												{t.handoffReviewStatus || 'Review needed before Bali handoff'}
+											</span>
+										{/if}
+									</div>
+									<div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+										<textarea
+											class="min-h-64 w-full resize-y rounded-md border border-(--line) bg-(--surface-soft) p-4 font-mono text-xs leading-6 text-(--ink) outline-none focus:border-(--brand) focus:bg-white"
+											readonly
+											value={baliHandoffText}
+											aria-label={t.baliHandoff}
+										></textarea>
+										<div class="flex flex-wrap gap-2 lg:w-44 lg:flex-col">
+											<button
+												class="secondary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+												type="button"
+												disabled={!handoffCreated}
+												onclick={copyBaliHandoff}
+											>
+												<i class="ri-file-copy-line" aria-hidden="true"></i> {t.copyHandoff}
+											</button>
+											<button
+												class="secondary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+												type="button"
+												disabled={!handoffCreated}
+												onclick={downloadBaliHandoffPdf}
+											>
+												<i class="ri-file-pdf-2-line" aria-hidden="true"></i> {t.downloadPdf}
+											</button>
+											<button
+												class="secondary-button flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+												type="button"
+												disabled={!handoffCreated || !allRequiredResolved}
+												onclick={markBaliHandoffShared}
+											>
+												<i class="ri-checkbox-circle-line" aria-hidden="true"></i> {t.markAsShared}
+											</button>
+										</div>
+									</div>
+									<p class="mt-3 text-xs text-(--muted)">
+										{#if allRequiredResolved}
+											{t.handoffReadyDesc}
+										{:else}
+											{t.handoffHelperText}
+										{/if}
+									</p>
+								</div>
+							{/if}
+						</section>
 						</div>
 					</section>
 				{:else}
 					<section class="px-4 py-6 md:px-10 md:py-9">
 						<div>
 							<div class="mx-auto max-w-5xl">
-								<p class="text-sm uppercase tracking-wide text-(--muted)">
+								<p class="text-sm font-medium text-(--muted)">
 									Order #{orderId}
 									<span class="ml-3 rounded border border-(--line) px-2 py-1 normal-case tracking-normal font-sans"
 										>Wholesale</span
@@ -2540,8 +2530,8 @@ Heather Benjamin Jewelry`;
 										<button class="secondary-button flex items-center justify-center gap-1.5" type="button" onclick={copyCustomerUpdate}>
 											<i class="ri-file-copy-line" aria-hidden="true"></i> {t.copyUpdate}
 										</button>
-										<button class="secondary-button flex items-center justify-center gap-1.5" type="button" onclick={openEmailDraft}>
-											<i class="ri-mail-send-line" aria-hidden="true"></i> {t.openEmailDraft}
+										<button class="secondary-button flex items-center justify-center gap-1.5" type="button" onclick={saveCustomerDraft}>
+											<i class="ri-save-3-line" aria-hidden="true"></i> {t.saveDraft}
 										</button>
 									</div>
 								</div>
@@ -2629,196 +2619,6 @@ Heather Benjamin Jewelry`;
 			{/if}
 			{/if}
 	</AppShell>
-
-	<!-- Global Operational Control Panel (Right Sidebar) -->
-	{#if isRightSidebarOpen}
-		<!-- Overlay to close on backdrop click -->
-		<div 
-			class="fixed inset-0 bg-black/10 z-30 transition-opacity" 
-			onclick={() => (isRightSidebarOpen = false)}
-			role="presentation"
-		></div>
-	{/if}
-
-	<aside 
-		class={`fixed right-0 top-0 h-full w-80 bg-white border-l border-(--line) shadow-2xl z-40 transform transition-transform duration-300 flex flex-col ${isRightSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}
-		aria-label="Global Operational Control Panel"
-	>
-		<!-- Header -->
-		<div class="flex items-center justify-between p-4 border-b border-(--line) bg-white">
-			<div>
-				<h2 class="font-display text-lg font-bold tracking-tight text-(--ink)">Control Panel</h2>
-				<p class="text-[10px] text-(--muted) font-sans">Global Operational Settings</p>
-			</div>
-			<button 
-				type="button" 
-				class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-(--surface-soft) text-(--muted) hover:text-(--ink) transition cursor-pointer bg-transparent border-0 p-0"
-				onclick={() => (isRightSidebarOpen = false)}
-				aria-label="Close panel"
-			>
-				<i class="ri-close-line text-lg"></i>
-			</button>
-		</div>
-
-		<!-- Sections -->
-		<div class="flex-1 overflow-y-auto p-4 space-y-6 font-sans">
-			<!-- Section 1: Live Commodities Auditor & Pricing Formula -->
-			<div class="space-y-4">
-				<div class="flex items-center justify-between">
-					<h3 class="text-xs font-bold text-(--muted) uppercase tracking-wider">Commodities Auditor</h3>
-					<span class="px-2 py-0.5 text-[9px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 rounded">Manual Input</span>
-				</div>
-				
-				<div class="space-y-3">
-					<div class="space-y-1">
-						<label for="silver-spot-input" class="text-xs font-medium text-(--muted)">Silver Spot Rate (USD/g)</label>
-						<div class="relative rounded-md shadow-sm">
-							<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-								<span class="text-xs text-(--muted)">$</span>
-							</div>
-							<input 
-								type="number" 
-								id="silver-spot-input" 
-								step="0.01" 
-								min="0.1" 
-								max="5.0" 
-								class="w-full pl-7 pr-3 py-1.5 text-sm border border-(--line) rounded-md focus:outline-none focus:ring-1 focus:ring-(--brand) focus:border-(--brand) bg-white text-(--ink)"
-								bind:value={silverSpotRate}
-							/>
-						</div>
-					</div>
-					
-					<div class="flex items-center gap-3">
-						<input 
-							type="range" 
-							min="0.1" 
-							max="5.0" 
-							step="0.01" 
-							class="flex-1 accent-(--brand) h-1 bg-(--line) rounded-lg appearance-none cursor-pointer"
-							bind:value={silverSpotRate}
-						/>
-						<span class="text-xs font-mono text-(--muted)">${silverSpotRate.toFixed(2)}/g</span>
-					</div>
-
-					<div class="bg-(--surface-muted) border border-(--line) p-3 rounded text-[11px] font-mono space-y-1 text-(--muted) leading-normal">
-						<div class="text-(--ink) font-semibold text-xs">Pricing Formula</div>
-						<div>
-							Wholesale Price = Artisan Labor + (Silver Mass (g) * Current Spot Rate) * Markup Margin
-						</div>
-						<div class="text-[10px] text-amber-700 mt-1">
-							* Markup Margin: 2.0x
-						</div>
-					</div>
-
-					<form method="POST" action="?/recalculate" use:enhance={() => {
-						return async ({ result, update }) => {
-							await update();
-							if (data.allItems) {
-								lineItems = data.allItems.filter((item: any) => item.poId === selectedOrderId);
-								orders = data.orders;
-							}
-							toast = 'Cost parameters recalculated!';
-							setTimeout(() => toast = '', 3000);
-						};
-					}}>
-						<input type="hidden" name="silverSpotRate" value={silverSpotRate} />
-						<button 
-							type="submit"
-							class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-xs font-semibold text-white bg-(--brand) hover:bg-(--brand-dark) focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-(--brand) transition cursor-pointer"
-						>
-							Apply & Recalculate
-						</button>
-					</form>
-				</div>
-			</div>
-
-			<!-- Section 2: Wholesale Contractual Guardrails -->
-			<div class="space-y-4 pt-4 border-t border-(--line)">
-				<h3 class="text-xs font-bold text-(--muted) uppercase tracking-wider">Contractual Guardrails</h3>
-				
-				<div class="space-y-3">
-					{#each wholesaleAccounts as account}
-						{@const isActiveClient = client.toLowerCase().includes(account.name.toLowerCase()) || account.name.toLowerCase().includes(client.toLowerCase())}
-						{@const meetsThreshold = orderTotalPrice >= account.minThreshold}
-						<div class={`p-3 rounded-lg border transition-all ${isActiveClient ? 'bg-(--brand)/5 border-(--brand)' : 'bg-white border-(--line)'}`}>
-							<div class="flex items-start justify-between gap-2">
-								<div>
-									<h4 class="text-xs font-semibold text-(--ink)">{account.name}</h4>
-									<p class="text-[10px] text-(--muted)">Buyer: {account.buyer} &middot; {account.region}</p>
-								</div>
-								{#if isActiveClient}
-									<span class={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${meetsThreshold ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-										{meetsThreshold ? 'Pass' : 'Low PO'}
-									</span>
-								{/if}
-							</div>
-							
-							<div class="mt-2 flex items-center justify-between gap-4">
-								<label class="text-[10px] font-medium text-(--muted)" for={`min-threshold-${account.name}`}>Min Order Threshold</label>
-								<div class="relative rounded-md shadow-sm w-24">
-									<div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-										<span class="text-[10px] text-(--muted)">$</span>
-									</div>
-									<input 
-										type="number" 
-										id={`min-threshold-${account.name}`}
-										class="w-full pl-5 pr-1.5 py-0.5 text-xs border border-(--line) rounded focus:outline-none focus:ring-1 focus:ring-(--brand) bg-white text-(--ink)"
-										bind:value={account.minThreshold}
-									/>
-								</div>
-							</div>
-
-							{#if isActiveClient}
-								<div class="mt-1 text-[10px] font-mono flex justify-between">
-									<span class="text-(--muted)">Current PO Total:</span>
-									<span class={`font-semibold ${meetsThreshold ? 'text-emerald-700' : 'text-rose-700'}`}>
-										${orderTotalPrice.toFixed(2)}
-									</span>
-								</div>
-							{/if}
-						</div>
-					{/each}
-				</div>
-			</div>
-
-			<!-- Section 3: Bali Production Sheet Status Preview -->
-			<div class="space-y-4 pt-4 border-t border-(--line)">
-				<h3 class="text-xs font-bold text-(--muted) uppercase tracking-wider">Production Status Preview</h3>
-				
-				<div class="space-y-2">
-					<div class="flex items-center justify-between p-2.5 rounded-lg border border-(--line) bg-white">
-						<div class="flex items-center gap-2">
-							<span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-							<span class="text-xs font-medium text-(--ink)">Gold Vermeil</span>
-						</div>
-						<span class="px-2 py-0.5 text-xs font-mono font-bold bg-(--surface-muted) text-(--ink) rounded-md">
-							{productionPieces.goldVermeil} pcs
-						</span>
-					</div>
-					
-					<div class="flex items-center justify-between p-2.5 rounded-lg border border-(--line) bg-white">
-						<div class="flex items-center gap-2">
-							<span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
-							<span class="text-xs font-medium text-(--ink)">Silver</span>
-						</div>
-						<span class="px-2 py-0.5 text-xs font-mono font-bold bg-(--surface-muted) text-(--ink) rounded-md">
-							{productionPieces.silver} pcs
-						</span>
-					</div>
-
-					<div class="flex items-center justify-between p-2.5 rounded-lg border border-(--line) bg-white">
-						<div class="flex items-center gap-2">
-							<span class="w-2.5 h-2.5 rounded-full bg-yellow-600"></span>
-							<span class="text-xs font-medium text-(--ink)">Brass</span>
-						</div>
-						<span class="px-2 py-0.5 text-xs font-mono font-bold bg-(--surface-muted) text-(--ink) rounded-md">
-							{productionPieces.brass} pcs
-						</span>
-					</div>
-				</div>
-			</div>
-		</div>
-	</aside>
 
 	{#if showOriginalDrawer}
 		<OriginalOrderDrawer

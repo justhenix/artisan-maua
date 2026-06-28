@@ -7,7 +7,7 @@ export const load: PageServerLoad = async () => {
 		const catalogItems = await getCachedCatalog();
 		return { catalogItems };
 	} catch (err) {
-		console.error('Failed to load catalog data:', err);
+		console.error('Failed to load catalog data.');
 		return { catalogItems: [] };
 	}
 };
@@ -42,8 +42,8 @@ export const actions: Actions = {
 			invalidateCatalogCache();
 			return { success: true };
 		} catch (err: any) {
-			console.error('Failed to create catalog item:', err);
-			return { success: false, error: err.message || 'Database error' };
+			console.error('Failed to create catalog item.');
+			return { success: false, error: 'Database error' };
 		}
 	},
 
@@ -79,8 +79,8 @@ export const actions: Actions = {
 			invalidateCatalogCache();
 			return { success: true };
 		} catch (err: any) {
-			console.error('Failed to update catalog item:', err);
-			return { success: false, error: err.message || 'Database error' };
+			console.error('Failed to update catalog item.');
+			return { success: false, error: 'Database error' };
 		}
 	},
 
@@ -100,8 +100,8 @@ export const actions: Actions = {
 			invalidateCatalogCache();
 			return { success: true };
 		} catch (err: any) {
-			console.error('Failed to delete catalog item:', err);
-			return { success: false, error: err.message || 'Database error' };
+			console.error('Failed to delete catalog item.');
+			return { success: false, error: 'Database error' };
 		}
 	}
 };

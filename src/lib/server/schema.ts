@@ -28,7 +28,9 @@ export async function initDb() {
 			notes TEXT,
 			unit_price REAL,
 			image_url TEXT,
-			source TEXT
+			source TEXT,
+			confidence_state TEXT,
+			unresolved_fields TEXT
 		)
 	`);
 
@@ -76,6 +78,16 @@ export async function initDb() {
 	}
 	try {
 		await db.execute('ALTER TABLE order_items ADD COLUMN image_url TEXT');
+	} catch (e) {
+		// Ignore if column already exists
+	}
+	try {
+		await db.execute('ALTER TABLE order_items ADD COLUMN confidence_state TEXT');
+	} catch (e) {
+		// Ignore if column already exists
+	}
+	try {
+		await db.execute('ALTER TABLE order_items ADD COLUMN unresolved_fields TEXT');
 	} catch (e) {
 		// Ignore if column already exists
 	}
@@ -706,105 +718,240 @@ export async function initDb() {
 
 	if (poCount === 0) {
 		const now = Date.now();
+		const day = 86400000;
+		const redacted = 'Buyer and shipping details are redacted for demo.';
+		const primarySource = `Subject: Production order HB-259689 - La Jolla Artisan Boutique
+Date: June 18, 2026
 
-		// 1. Seed Order HB-250416 (Reviewing status)
-		await db.execute({
-			sql: `
-				INSERT INTO purchase_orders (id, po_number, client_name, status, source_text, uploaded_files, customer_update, milestones, created_at, updated_at)
-				VALUES ('HB-250416', 'HB-250416', 'Mia - Driftwood Collective', 'Review', ?, '[]', ?, ?, ?, ?)
-			`,
-			args: [
-				`Subject: Production order Driftwood Collective\nDate: April 16, 2026\n\nHi Heather,\nHere is our order details for the upcoming summer boutique delivery:\n- 12x Medium Silver Elephant Pin (HB-40523-SIL) - silver\n- 6x Mother of Pearl Gold Plated Silver Star Pin (HB-P9015-GP) - pearl accent\n- 4x Silver Water Buffalo "Long Horn" Pin (HB-WATER-BUFFALO-LONG-HORN-PIN) - silver, size 2 butterfly clutches\n- 24x Golden Love Shard Pin - Single (HE-4720-GP-1) - gold vermeil\n- 20x Black Lip Heart Hat Stud in Silver (HB-P9012-SIL) - silver\n- 10x Wolf Pin - Silver Oxy (HB-WOLF-PIN-SILVER-OXY)\n- 8x Black Lip Star with Bird of Prey Dangle (star bird dangle)\n- 6x Golden Bird of Prey Hat Stud (new smaller golden bird of prey)`,
-				`Hi Mia,\n\nThank you for your order. We reviewed the details and everything needed for production is now ready.\n\nOrder summary\n- 8 items\n- Total quantity: 90\n- Finishes: Silver, Gold Vermeil, Mother of Pearl, Black Lip\n\nTimeline\n- Production start: June 3, 2026\n- Estimated completion: June 20, 2026\n- Need by: July 10, 2026\n\nWe will send another update once production begins. Please reach out if anything needs to change.\n\nThank you,\nHeather Benjamin Jewelry`,
-				JSON.stringify({
-					moldsChecked: false,
-					silverCast: false,
-					qualityChecked: false,
-					readyForShipping: false
-				}),
-				now,
-				now
-			]
-		});
+Hi Heather,
+Please prep this for our late-summer resort delivery.
+${redacted}
 
-		const defaultItems = [
-			{ id: 'elephant-medium', item: 'Medium Silver Elephant Pin', styleCode: 'HB-40523-SIL', qty: 12, finish: 'Silver', notes: 'Match last order', source: 'Copied PO text', unitPrice: 185.00, imageUrl: 'https://cdn.shopify.com/s/files/1/0277/4286/3462/products/ScreenShot2022-09-27at12.37.23PM.png?v=1664303848' },
-			{ id: 'star-mop', item: 'Mother of Pearl Gold Plated Silver Star Pin', styleCode: 'HB-P9015-GP', qty: 6, finish: 'Mother of Pearl', notes: 'Confirm longer chain', source: 'Copied PO text', unitPrice: 130.00, imageUrl: 'https://cdn.shopify.com/s/files/1/0277/4286/3462/products/ScreenShot2022-09-29at9.20.00PM.png?v=1664508004' },
-			{ id: 'water-buffalo', item: 'Silver Water Buffalo "Long Horn" Pin', styleCode: 'HB-WATER-BUFFALO-LONG-HORN-PIN', qty: 4, finish: 'Silver', notes: '2 butterfly clutches if possible', source: 'Copied PO text', unitPrice: 350.00, imageUrl: 'https://cdn.shopify.com/s/files/1/0277/4286/3462/products/ScreenShot2021-12-06at10.35.47PM.png?v=1638848173' },
-			{ id: 'love-shard-single', item: 'Golden Love Shard Pin - Single', styleCode: 'HE-4720-GP-1', qty: 24, finish: 'Gold Vermeil', notes: 'Pack 12 pairs per card', source: 'Copied PO text', unitPrice: 50.00, imageUrl: 'https://cdn.shopify.com/s/files/1/0277/4286/3462/products/ScreenShot2020-03-25at7.15.57PM.png?v=1590122461' },
-			{ id: 'black-lip-heart', item: 'Black Lip Heart Hat Stud in Silver', styleCode: 'HB-P9012-SIL', qty: 20, finish: 'Silver', notes: 'Mix sizes 7 and 8', source: 'Copied PO text', unitPrice: 125.00, imageUrl: 'https://cdn.shopify.com/s/files/1/0277/4286/3462/products/ScreenShot2022-09-29at9.25.59PM.png?v=1664508363' },
-			{ id: 'wolf-oxy', item: 'Wolf Pin - Silver Oxy', styleCode: 'HB-WOLF-PIN-SILVER-OXY', qty: 10, finish: 'Silver Oxy', notes: 'Need by 7/10', source: 'CSV row', unitPrice: 200.00, imageUrl: 'https://cdn.shopify.com/s/files/1/0277/4286/3462/files/Screenshot2025-12-09at12.19.03AM.png?v=1765261186' },
-			{ id: 'star-dangle-unclear', item: 'Black Lip Star with Bird of Prey Dangle (Finish Unresolved)', styleCode: '', qty: 8, finish: 'Gold or Silver', notes: 'Awaiting finish resolution', source: 'Pasted DM', unitPrice: 175.00, imageUrl: 'https://cdn.shopify.com/s/files/1/0277/4286/3462/products/ScreenShot2022-09-28at3.35.10PM.png?v=1664400928' },
-			{ id: 'bird-unclear', item: 'Golden Bird of Prey Hat Stud (Size Unresolved)', styleCode: '', qty: 6, finish: 'Gold', notes: 'Awaiting size resolution', source: 'Copied PO text', unitPrice: 85.00, imageUrl: 'https://cdn.shopify.com/s/files/1/0277/4286/3462/files/Screenshot2025-12-09at12.22.01AM.png?v=1765261804' }
+Line items:
+- 12x Medium Silver Elephant Pin (HB-40523-SIL) - sterling silver, match approved sample card
+- 24x hb1 hat stud / mini star - buyer wrote "small starburst hat stud"; finish not specified
+- 8x Mountain Pendant - new request, finish/material missing
+- 6x Black Lip Star with Bird of Prey Dangle - note says "star bird dangle"
+- 10x Golden Bird of Prey Hat Stud - buyer wrote "new smaller golden bird of prey"
+
+Production note for Bali: group sterling silver pieces for the next casting batch; hold unresolved variants until Heather confirms.
+Packing note: pack hat studs on individual cards; pendants in cotton pouches.`;
+
+		const orders = [
+			{
+				id: 'HB-259689',
+				client: 'La Jolla Artisan Boutique',
+				status: 'Review',
+				source: primarySource,
+				update: `Hi La Jolla Artisan Boutique,
+
+We reviewed PO HB-259689 and have the order drafted.
+
+Order summary
+- 5 items
+- Total quantity: 60
+- 2 required production questions remain.
+
+Open questions
+- Finish for Black Lip Star with Bird of Prey Dangle
+- Mini vs medium Golden Bird of Prey Hat Stud
+
+Production note for Bali
+- Group sterling silver pieces for the next casting batch once blockers are resolved.
+
+Packing note
+- Hat studs on individual cards; pendants in cotton pouches.
+
+Thank you,
+Heather Benjamin Jewelry`,
+				milestones: { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false },
+				age: 0,
+				items: [
+					{ id: 'elephant-medium', item: 'Medium Silver Elephant Pin', styleCode: 'HB-40523-SIL', qty: 12, finish: 'Sterling Silver', notes: 'Match approved sample card. Bali: cast with sterling batch.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] },
+					{ id: 'starburst-hat-stud', item: 'hb1 hat stud / mini star', styleCode: '', qty: 24, finish: '', notes: 'Buyer wrote "small starburst hat stud"; confirm exact hat stud variant.', source: 'PO line', confidenceState: 'needs_review', unresolvedFields: ['style code', 'finish'] },
+					{ id: 'mountain-new', item: 'Mountain Pendant', styleCode: '', qty: 8, finish: '', notes: 'New request. Missing finish/material; hold until confirmed.', source: 'PO line', confidenceState: 'unresolved', unresolvedFields: ['style code', 'finish'] },
+					{ id: 'star-dangle-unclear', item: 'Black Lip Star with Bird of Prey Dangle', styleCode: '', qty: 6, finish: '', notes: 'Evidence: "star bird dangle". Finish required before casting.', source: 'PO note', confidenceState: 'unresolved', unresolvedFields: ['style code', 'finish'] },
+					{ id: 'bird-unclear', item: 'Golden Bird of Prey Hat Stud', styleCode: '', qty: 10, finish: 'Gold', notes: 'Evidence: "new smaller golden bird of prey". Confirm mini vs medium.', source: 'Buyer note', confidenceState: 'unresolved', unresolvedFields: ['style code', 'size'] }
+				],
+				blockers: [
+					{ id: 'star-bird-finish', impact: 'High impact', question: 'Which finish should Bali make for the Black Lip Star with Bird of Prey Dangle?', evidence: 'star bird dangle', source: 'PO note', risk: 'Finish changes the metal casting, material cost, and production scheduling.', options: ['Golden', 'Recycled Sterling Silver'] },
+					{ id: 'bird-of-prey-size', impact: 'Medium impact', question: 'Which Golden Bird of Prey Hat Stud size is this?', evidence: 'new smaller golden bird of prey', source: 'Buyer note', risk: 'Size changes the bone carving template, casting mold, and unit price.', options: ['Mini', 'Medium'] }
+				]
+			},
+			{
+				id: 'HB-259701',
+				client: 'Marin Coastal Goods',
+				status: 'Review',
+				source: `Subject: PO HB-259701 - coastal capsule\n${redacted}\n\n- 16x Black Lip Heart Hat Stud in Silver - size mix not specified\n- 6x Feather Necklace - standard silver\nPacking note: small cards for hat studs.`,
+				update: 'Draft pending size mix confirmation for hat studs.',
+				milestones: { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false },
+				age: 1,
+				items: [
+					{ id: 'marin-heart-stud', item: 'Black Lip Heart Hat Stud in Silver', styleCode: 'HB-P9012-SIL', qty: 16, finish: 'Silver', notes: 'Size mix not specified.', source: 'PO line', confidenceState: 'needs_review', unresolvedFields: ['size mix'] },
+					{ id: 'marin-feather-neck', item: 'Feather Necklace', styleCode: 'HB-FEATHER-NECKLAC', qty: 6, finish: 'Silver', notes: 'Standard pouch.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] }
+				],
+				blockers: []
+			},
+			{
+				id: 'HB-259714',
+				client: 'Canyon & Cove Market',
+				status: 'Review',
+				source: `Subject: PO HB-259714 - canyon edit\n${redacted}\n\n- 10x Wolf Pendant Necklace - chain length not shown\n- 8x Silver Oxy Arrowhead Pin - packing: kraft cards`,
+				update: 'Draft pending chain length confirmation.',
+				milestones: { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false },
+				age: 2,
+				items: [
+					{ id: 'canyon-wolf-pendant', item: 'Wolf Pendant Necklace', styleCode: 'HB-WOLF-PENDANT-NE', qty: 10, finish: 'Silver', notes: 'Chain length not shown.', source: 'PO line', confidenceState: 'needs_review', unresolvedFields: ['chain length'] },
+					{ id: 'canyon-arrowhead', item: 'Silver Oxy Arrowhead Pin', styleCode: 'HB-SILVER-OXY-ARRO', qty: 8, finish: 'Silver Oxy', notes: 'Kraft cards.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] }
+				],
+				blockers: []
+			},
+			{
+				id: 'HB-259728',
+				client: 'North Shore Studio',
+				status: 'Review',
+				source: `Subject: PO HB-259728 - shore collection\n${redacted}\n\n- 6x Peruvian Opal Beaded Necklace - length unclear\n- 12x Golden Arrowhead Hat Pin - gold`,
+				update: 'Draft pending necklace length confirmation.',
+				milestones: { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false },
+				age: 3,
+				items: [
+					{ id: 'north-opal-necklace', item: 'Peruvian Opal Beaded Necklace', styleCode: 'HB-PERUVIAN-OPAL-B', qty: 6, finish: 'Silver', notes: 'Length unclear.', source: 'PO line', confidenceState: 'needs_review', unresolvedFields: ['length'] },
+					{ id: 'north-arrowhead-pin', item: 'Golden Arrowhead Hat Pin', styleCode: 'HB-GOLDEN-ARROWHEA', qty: 12, finish: 'Gold', notes: 'Standard hat pin card.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] }
+				],
+				blockers: []
+			},
+			{
+				id: 'HB-259735',
+				client: 'Blue Heron Gallery',
+				status: 'Production',
+				source: `Subject: PO HB-259735 - gallery case\n${redacted}\n\n- 6x Large Impala Necklace - 18 inch chain\n- 8x Solid Metal Feather Ring - sizes 6-8 mix`,
+				update: 'Order is in Bali production. Casting batch grouped with sterling silver pieces.',
+				milestones: { moldsChecked: true, silverCast: true, qualityChecked: false, readyForShipping: false },
+				age: 4,
+				items: [
+					{ id: 'heron-impala-neck', item: 'Large Impala Necklace', styleCode: 'HB-LARGE-IMPALA-PE', qty: 6, finish: 'Silver', notes: '18 inch chain.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] },
+					{ id: 'heron-feather-ring', item: 'Solid Metal Feather Ring', styleCode: 'HB-SOLID-METAL-FEA', qty: 8, finish: 'Silver', notes: 'Sizes 6-8 mix.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] }
+				],
+				blockers: []
+			},
+			{
+				id: 'HB-259742',
+				client: 'Makai Resort Shop',
+				status: 'Production',
+				source: `Subject: PO HB-259742 - resort case refresh\n${redacted}\n\n- 10x Mother of Pearl Gold Plated Silver Star Pin\n- 12x Golden Large Deer Antler Hat Pin`,
+				update: 'Order is in production. MOP and gold-plated pieces are grouped for finishing review.',
+				milestones: { moldsChecked: true, silverCast: false, qualityChecked: false, readyForShipping: false },
+				age: 5,
+				items: [
+					{ id: 'makai-mop-star', item: 'Mother of Pearl Gold Plated Silver Star Pin', styleCode: 'HB-P9015-GP', qty: 10, finish: 'Mother of Pearl / Gold Plated', notes: 'Standard card.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] },
+					{ id: 'makai-deer-pin', item: 'Golden Large Deer Antler Hat Pin', styleCode: 'HB-GOLDEN-LARGE-DE', qty: 12, finish: 'Gold', notes: 'Resort display cards.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] }
+				],
+				blockers: []
+			},
+			{
+				id: 'HB-259756',
+				client: 'Juniper House',
+				status: 'Packing',
+				source: `Subject: PO HB-259756 - ready-to-ship sample set\n${redacted}\n\n- 8x Turquoise Adjustable Bracelet\n- 6x Colorful Shell Ring\nPacking note: cotton pouches, no price tags.`,
+				update: 'Production is complete. Packing checklist is ready for final review.',
+				milestones: { moldsChecked: true, silverCast: true, qualityChecked: true, readyForShipping: true },
+				age: 6,
+				items: [
+					{ id: 'juniper-turquoise-bracelet', item: 'Turquoise Adjustable Bracelet', styleCode: 'HB-TURQUOISE-ADJUS', qty: 8, finish: 'Silver', notes: 'Cotton pouch.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] },
+					{ id: 'juniper-shell-ring', item: 'Colorful Shell Ring', styleCode: 'HB-COLORFUL-SHELL-', qty: 6, finish: 'Silver', notes: 'No price tags.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] }
+				],
+				blockers: []
+			},
+			{
+				id: 'HB-259762',
+				client: 'Driftwood Collective',
+				status: 'Completed',
+				source: `Subject: PO HB-259762 - event replenishment\n${redacted}\n\n- 12x Black Lip Heart Hat Stud in Silver\n- 5x Feather Necklace`,
+				update: 'Order shipped. Tracking details handled outside demo data.',
+				milestones: { moldsChecked: true, silverCast: true, qualityChecked: true, readyForShipping: true },
+				age: 7,
+				items: [
+					{ id: 'driftwood-heart-stud', item: 'Black Lip Heart Hat Stud in Silver', styleCode: 'HB-P9012-SIL', qty: 12, finish: 'Silver', notes: 'Individual cards.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] },
+					{ id: 'driftwood-feather-neck', item: 'Feather Necklace', styleCode: 'HB-FEATHER-NECKLAC', qty: 5, finish: 'Silver', notes: 'Cotton pouches.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] }
+				],
+				blockers: []
+			},
+			{
+				id: 'HB-259779',
+				client: 'Laurel Market',
+				status: 'Completed',
+				source: `Subject: PO HB-259779 - market display order\n${redacted}\n\n- 6x Oyster Red Ring\n- 4x Steer Pendant with Chain`,
+				update: 'Order shipped. Customer update sent from Artisan draft.',
+				milestones: { moldsChecked: true, silverCast: true, qualityChecked: true, readyForShipping: true },
+				age: 8,
+				items: [
+					{ id: 'laurel-oyster-ring', item: 'Oyster Red Ring', styleCode: 'HB-OYSTER-RED-RING', qty: 6, finish: 'Silver', notes: 'Ring boxes.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] },
+					{ id: 'laurel-steer-pendant', item: 'Steer Pendant with Chain', styleCode: 'HB-STEER-PENDANT-W', qty: 4, finish: 'Silver', notes: 'Cotton pouches.', source: 'PO line', confidenceState: 'resolved', unresolvedFields: [] }
+				],
+				blockers: []
+			}
 		];
 
-		for (const item of defaultItems) {
+		for (const order of orders) {
 			await db.execute({
 				sql: `
-					INSERT INTO order_items (id, po_id, item_name, style_code, qty, finish, notes, unit_price, image_url, source)
-					VALUES (?, 'HB-250416', ?, ?, ?, ?, ?, ?, ?, ?)
+					INSERT INTO purchase_orders (id, po_number, client_name, status, source_text, uploaded_files, customer_update, milestones, created_at, updated_at)
+					VALUES (?, ?, ?, ?, ?, '[]', ?, ?, ?, ?)
 				`,
-				args: [item.id, item.item, item.styleCode, item.qty, item.finish, item.notes, item.unitPrice, item.imageUrl, item.source]
+				args: [
+					order.id,
+					order.id,
+					order.client,
+					order.status,
+					order.source,
+					order.update,
+					JSON.stringify(order.milestones),
+					now - order.age * day,
+					now - order.age * day
+				]
 			});
+
+			for (const item of order.items) {
+				await db.execute({
+					sql: `
+						INSERT INTO order_items (id, po_id, item_name, style_code, qty, finish, notes, unit_price, image_url, source, confidence_state, unresolved_fields)
+						VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+					`,
+					args: [
+						`${order.id}:${item.id}`,
+						order.id,
+						item.item,
+						item.styleCode,
+						item.qty,
+						item.finish,
+						item.notes,
+						0,
+						'',
+						item.source,
+						item.confidenceState,
+						JSON.stringify(item.unresolvedFields)
+					]
+				});
+			}
+
+			for (const blocker of order.blockers) {
+				await db.execute({
+					sql: `
+						INSERT INTO blockers (id, po_id, impact, question, evidence, source, risk, options, answer)
+						VALUES (?, ?, ?, ?, ?, ?, ?, ?, '')
+					`,
+					args: [
+						`${order.id}:${blocker.id}`,
+						order.id,
+						blocker.impact,
+						blocker.question,
+						blocker.evidence,
+						blocker.source,
+						blocker.risk,
+						JSON.stringify(blocker.options)
+					]
+				});
+			}
 		}
-
-		await db.execute({
-			sql: `
-				INSERT INTO blockers (id, po_id, impact, question, evidence, source, risk, options, answer)
-				VALUES 
-				('star-bird-finish', 'HB-250416', 'High impact', 'Which Black Lip Star with Bird of Prey Dangle finish should Bali make?', 'star bird dangle', 'Pasted DM', 'Finish changes the metal casting, material cost, and production scheduling.', '["Golden", "Recycled Sterling Silver"]', ''),
-				('bird-of-prey-size', 'HB-250416', 'Medium impact', 'Which Golden Bird of Prey Hat Stud size is this?', 'new smaller golden bird of prey', 'Copied PO text', 'Size changes the bone carving template, casting mold, and unit price.', '["Mini", "Medium"]', '')
-			`
-		});
-
-		// 2. Seed Order HB-250417 (In Production status)
-		await db.execute({
-			sql: `
-				INSERT INTO purchase_orders (id, po_number, client_name, status, source_text, uploaded_files, customer_update, milestones, created_at, updated_at)
-				VALUES ('HB-250417', 'HB-250417', 'La Jolla Artisan Boutique', 'Production', 'La Jolla order 12wave cuff', '[]', '', ?, ?, ?)
-			`,
-			args: [
-				JSON.stringify({
-					moldsChecked: true,
-					silverCast: true,
-					qualityChecked: false,
-					readyForShipping: false
-				}),
-				now - 86400000,
-				now - 86400000
-			]
-		});
-
-		await db.execute({
-			sql: `
-				INSERT INTO order_items (id, po_id, item_name, style_code, qty, finish, notes, unit_price, image_url, source)
-				VALUES ('lajolla-1', 'HB-250417', 'Silver Water Buffalo "Long Horn" Pin', 'HB-WATER-BUFFALO-LONG-HORN-PIN', 12, 'Silver', 'Urgent production', 350.00, 'https://cdn.shopify.com/s/files/1/0277/4286/3462/products/ScreenShot2021-12-06at10.35.47PM.png?v=1638848173', 'Email')
-			`
-		});
-
-		// 3. Seed Order HB-250418 (Completed/Shipped status)
-		await db.execute({
-			sql: `
-				INSERT INTO purchase_orders (id, po_number, client_name, status, source_text, uploaded_files, customer_update, milestones, created_at, updated_at)
-				VALUES ('HB-250418', 'HB-250418', 'Driftwood Collective (Stock)', 'Completed', 'Stock replenish wave studs', '[]', '', ?, ?, ?)
-			`,
-			args: [
-				JSON.stringify({
-					moldsChecked: true,
-					silverCast: true,
-					qualityChecked: true,
-					readyForShipping: true
-				}),
-				now - 172800000,
-				now - 172800000
-			]
-		});
-
-		await db.execute({
-			sql: `
-				INSERT INTO order_items (id, po_id, item_name, style_code, qty, finish, notes, unit_price, image_url, source)
-				VALUES ('stock-1', 'HB-250418', 'Mother of Pearl Silver Star Hat Stud', 'HB-P9014-SIL', 50, 'Silver', 'Standard packaging', 125.00, 'https://cdn.shopify.com/s/files/1/0277/4286/3462/products/ScreenShot2022-09-29at9.22.09PM.png?v=1664508134', 'System')
-			`
-		});
 	}
 }

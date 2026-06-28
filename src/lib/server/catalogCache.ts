@@ -40,7 +40,7 @@ export async function getCachedCatalog(): Promise<CatalogItem[]> {
 		}));
 		return cachedCatalog;
 	} catch (err) {
-		console.error('Failed to load catalog cache:', err);
+		console.error('Failed to load catalog cache.');
 		return [];
 	}
 }

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { confidenceStateFor } from '$lib/artisan/review';
+
 	type ProductionGrouping = 'material' | 'category';
 
 	type LineItem = {
@@ -10,6 +12,9 @@
 		notes: string;
 		unitPrice?: number;
 		imageUrl?: string;
+		source: string;
+		confidenceState?: 'resolved' | 'needs_review' | 'unresolved';
+		unresolvedFields?: string[];
 	};
 
 	type CatalogItem = {
@@ -44,7 +49,7 @@
 		categoryGroups: ProductionGroup[];
 		catalog: CatalogItem[];
 		onGroupingChange: (grouping: ProductionGrouping) => void;
-		onUpdateItem: (id: string, field: 'styleCode' | 'qty' | 'notes' | 'unitPrice', value: string | number) => void;
+		onUpdateItem: (id: string, field: 'styleCode' | 'qty' | 'finish' | 'notes' | 'unitPrice', value: string | number) => void;
 	} = $props();
 
 	const groups = $derived(grouping === 'material' ? materialGroups : categoryGroups);
@@ -94,13 +99,15 @@
 							<th class="w-16 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.preview || 'Preview'}</th>
 							<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.itemDescription}</th>
 							<th class="w-20 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.qty}</th>
-							<th class="w-24 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.unitPrice || 'Price'}</th>
+							<th class="w-36 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.materialFinish}</th>
+							<th class="w-28 px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.confidence || 'Confidence'}</th>
 							<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.technicalInstructions}</th>
 							<th class="px-3 py-2 text-xs font-bold text-[var(--muted)]">{t.orderNotes}</th>
 						</tr>
 					</thead>
 					<tbody>
 						{#each group.items as item (item.id)}
+							{@const state = confidenceStateFor(item)}
 							<tr class="border-t border-[var(--line)]">
 								<td class="px-2 py-2">
 									<input
@@ -133,19 +140,24 @@
 									/>
 								</td>
 								<td class="px-2 py-2">
-									<div class="flex items-center gap-1">
-										<span class="text-xs text-[var(--muted)]">$</span>
-										<input
-											class="cell-input w-16 text-xs text-right"
-											type="number"
-											step="0.01"
-											min="0"
-											aria-label={`${t.unitPrice || 'Price'}: ${item.item}`}
-											autocomplete="off"
-											value={item.unitPrice || 0}
-											oninput={(event) => onUpdateItem(item.id, 'unitPrice', Number(inputValue(event)))}
-										/>
-									</div>
+									<input
+										class="cell-input text-xs"
+										aria-label={`${t.materialFinish}: ${item.item}`}
+										autocomplete="off"
+										value={item.finish}
+										oninput={(event) => onUpdateItem(item.id, 'finish', inputValue(event))}
+									/>
+								</td>
+								<td class="px-3 py-2">
+									<span class={`inline-flex items-center rounded border px-2 py-1 text-[10px] font-bold ${
+										state === 'resolved'
+											? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+											: state === 'needs_review'
+												? 'border-amber-200 bg-amber-50 text-amber-800'
+												: 'border-red-200 bg-red-50 text-red-700'
+									}`}>
+										{t[state] || state}
+									</span>
 								</td>
 								<td class="px-3 py-2 text-xs leading-relaxed">
 									{#if item.styleCode}

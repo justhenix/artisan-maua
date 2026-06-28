@@ -4,11 +4,11 @@
 		impact: 'High impact' | 'Medium impact';
 		impactKey: 'highImpact' | 'mediumImpact';
 		question: string;
-		questionKey: 'starburstQuestion' | 'horseQuestion';
+		questionKey: 'starBirdQuestion' | 'birdOfPreyQuestion';
 		evidence: string;
 		source: string;
 		risk: string;
-		riskKey: 'starburstRisk' | 'horseRisk';
+		riskKey: 'starBirdRisk' | 'birdOfPreyRisk';
 		options: string[];
 		answer: string;
 	};

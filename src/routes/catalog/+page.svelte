@@ -96,6 +96,7 @@
 	let isSubmitting = $state(false);
 	let toastMessage = $state('');
 	let toastTimeout: any;
+	let handledForm: any = $state(null);
 
 	function showToast(msg: string) {
 		toastMessage = msg;
@@ -105,13 +106,17 @@
 		}, 3000);
 	}
 
-	if (form) {
-		if (form.success) {
-			showToast(form.action === 'create' ? t.productAdded : form.action === 'edit' ? t.productUpdated : t.productDeleted);
-		} else if (form.error) {
-			showToast(form.error);
+	$effect(() => {
+		const currentForm = form;
+		if (!currentForm || currentForm === handledForm) return;
+
+		handledForm = currentForm;
+		if (currentForm.success) {
+			showToast(currentForm.action === 'create' ? t.productAdded : currentForm.action === 'edit' ? t.productUpdated : t.productDeleted);
+		} else if (currentForm.error) {
+			showToast(currentForm.error);
 		}
-	}
+	});
 
 	function openCreateModal() {
 		modalMode = 'create';
@@ -267,8 +272,8 @@
 			const optimizedBase64 = await optimizeImage(file);
 			formImageUrl = optimizedBase64;
 			showToast('Image attached and optimized (compressed offline)');
-		} catch (err) {
-			console.error('Image optimization failed:', err);
+		} catch {
+			console.error('Image optimization failed.');
 			showToast('Failed to optimize image');
 		}
 	}
@@ -438,7 +443,7 @@
 					<div>
 						<label class="block text-xs font-semibold text-(--muted) uppercase tracking-wider mb-2" for="depFilter">Department</label>
 						<select id="depFilter" bind:value={departmentFilter} class="cell-input w-full border border-(--line) rounded px-2.5 py-1.5 text-xs bg-white">
-							{#each departments as dep}
+							{#each departments as dep (dep)}
 								<option value={dep}>{dep === 'all' ? 'All departments' : dep}</option>
 							{/each}
 						</select>
@@ -448,7 +453,7 @@
 					<div>
 						<label class="block text-xs font-semibold text-(--muted) uppercase tracking-wider mb-2" for="catFilter">Category / Type</label>
 						<select id="catFilter" bind:value={categoryFilter} class="cell-input w-full border border-(--line) rounded px-2.5 py-1.5 text-xs bg-white">
-							{#each categories as cat}
+							{#each categories as cat (cat)}
 								<option value={cat}>{cat === 'all' ? 'All categories' : cat}</option>
 							{/each}
 						</select>
@@ -458,7 +463,7 @@
 					<div>
 						<label class="block text-xs font-semibold text-(--muted) uppercase tracking-wider mb-2" for="colFilter">Collection</label>
 						<select id="colFilter" bind:value={collectionFilter} class="cell-input w-full border border-(--line) rounded px-2.5 py-1.5 text-xs bg-white">
-							{#each collections as col}
+							{#each collections as col (col)}
 								<option value={col}>{col === 'all' ? 'All collections' : col}</option>
 							{/each}
 						</select>
@@ -791,7 +796,7 @@
 							Category / Type
 						</label>
 						<select id="formCat" name="category" bind:value={formCategory} class="cell-input w-full border border-(--line) rounded p-2 text-xs bg-white">
-							{#each categories.filter(c => c !== 'all') as cat}
+							{#each categories.filter(c => c !== 'all') as cat (cat)}
 								<option value={cat}>{cat}</option>
 							{/each}
 						</select>
@@ -803,7 +808,7 @@
 							Collection
 						</label>
 						<select id="formCol" name="collection" bind:value={formCollection} class="cell-input w-full border border-(--line) rounded p-2 text-xs bg-white">
-							{#each collections.filter(c => c !== 'all') as col}
+							{#each collections.filter(c => c !== 'all') as col (col)}
 								<option value={col}>{col}</option>
 							{/each}
 						</select>

@@ -5,7 +5,7 @@ import { initDb } from '$lib/server/schema';
 
 // Run database initialization on server start
 initDb().catch((err) => {
-	console.error('Failed to initialize database:', err);
+	console.error('Failed to initialize database.');
 });
 
 const handleParaglide: Handle = ({ event, resolve }) => paraglideMiddleware(event.request, ({ request, locale }) => {

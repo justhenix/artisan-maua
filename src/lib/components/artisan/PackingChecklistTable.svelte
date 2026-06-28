@@ -1,11 +1,17 @@
 <script lang="ts">
+	import { confidenceStateFor, unresolvedWarnings } from '$lib/artisan/review';
+
 	type LineItem = {
 		id: string;
 		item: string;
 		styleCode: string;
 		qty: number;
+		finish: string;
 		notes: string;
+		source: string;
 		imageUrl?: string;
+		confidenceState?: 'resolved' | 'needs_review' | 'unresolved';
+		unresolvedFields?: string[];
 	};
 
 	type Messages = Record<string, string>;
@@ -18,7 +24,8 @@
 		packedItems,
 		getPackagingSpecifics,
 		isBackordered,
-		onTogglePacked
+		onTogglePacked,
+		onUpdateItem
 	}: {
 		t: Messages;
 		orderId: string;
@@ -28,7 +35,12 @@
 		getPackagingSpecifics: (styleCode: string) => string;
 		isBackordered: (styleCode: string) => boolean;
 		onTogglePacked: (id: string, checked: boolean) => void;
+		onUpdateItem: (id: string, field: 'qty' | 'notes', value: string | number) => void;
 	} = $props();
+
+	function inputValue(event: Event) {
+		return (event.currentTarget as HTMLInputElement).value;
+	}
 </script>
 
 <div class="mb-5">
@@ -47,12 +59,15 @@
 				<th class="w-20 px-3 py-3 text-center text-xs font-bold text-[var(--muted)]">{t.qty}</th>
 				<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.packagingSpecifics}</th>
 				<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.fulfillmentFlags}</th>
+				<th class="w-32 px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.confidence || 'Confidence'}</th>
 				<th class="px-3 py-3 text-xs font-bold text-[var(--muted)]">{t.orderNotes}</th>
 			</tr>
 		</thead>
 		<tbody>
 			{#each lineItems as item (item.id)}
 				{@const isBack = isBackordered(item.styleCode)}
+				{@const state = confidenceStateFor(item)}
+				{@const warnings = unresolvedWarnings(item)}
 				<tr class={`border-t border-[var(--line)] transition ${packedItems[item.id] ? 'bg-emerald-50/40' : ''}`}>
 					<td class="px-3 py-3 text-center">
 						<input
@@ -77,7 +92,17 @@
 							</span>
 						</div>
 					</td>
-					<td class="px-3 py-3 text-center font-bold">{item.qty}</td>
+					<td class="px-2 py-3 text-center">
+						<input
+							class="cell-input w-16 text-center"
+							type="number"
+							min="0"
+							aria-label={`${t.qty}: ${item.item}`}
+							autocomplete="off"
+							value={item.qty}
+							oninput={(event) => onUpdateItem(item.id, 'qty', Number(inputValue(event)))}
+						/>
+					</td>
 					<td class="px-3 py-3 text-xs text-[var(--muted)]">{getPackagingSpecifics(item.styleCode)}</td>
 					<td class="px-3 py-3">
 						{#if isBack}
@@ -93,7 +118,31 @@
 							</span>
 						{/if}
 					</td>
-					<td class="px-3 py-3 text-xs text-[var(--muted)] italic">{item.notes}</td>
+					<td class="px-3 py-3">
+						<div class="flex flex-col gap-1">
+							<span class={`inline-flex w-fit items-center rounded border px-2 py-1 text-[10px] font-bold ${
+								state === 'resolved'
+									? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+									: state === 'needs_review'
+										? 'border-amber-200 bg-amber-50 text-amber-800'
+										: 'border-red-200 bg-red-50 text-red-700'
+							}`}>
+								{t[state] || state}
+							</span>
+							{#if warnings.length > 0}
+								<span class="text-[10px] text-red-700">{warnings.join(', ')}</span>
+							{/if}
+						</div>
+					</td>
+					<td class="px-2 py-3">
+						<input
+							class="cell-input cell-input-wide text-xs"
+							aria-label={`${t.orderNotes}: ${item.item}`}
+							autocomplete="off"
+							value={item.notes}
+							oninput={(event) => onUpdateItem(item.id, 'notes', inputValue(event))}
+						/>
+					</td>
 				</tr>
 			{/each}
 		</tbody>
