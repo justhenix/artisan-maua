@@ -26,6 +26,7 @@
 	},
 	"dependencies": {
 		"@libsql/client": "^0.17.4",
-		"driver.js": "^1.6.0"
+		"driver.js": "^1.6.0",
+		"unpdf": "^1.6.2"
 	}
 }

@@ -281,4 +281,131 @@ Wave Ring                                 4    Silver              standard size
 		expect(text).toContain('Production note: group sterling silver pieces.');
 		expect(text).not.toContain('Estimated completion');
 	});
+
+	test('TXT file content extraction parses items and assigns correct source filename', () => {
+		const result = parsePastedOrder(`
+---
+Source file: artisan_po_HB-260314_north_shore.txt
+Source type: text/plain
+Client: North Shore Studio
+PO: HB-260314
+
+Item                                      Qty   Finish             Notes
+---------------------------------------------------------------------------
+Medium Silver Elephant Pin               12    Sterling Silver    Match approved sample card
+hb1 hat stud / mini star                  24                       Buyer wrote "small starburst hat stud"
+Mountain Pendant                          8                        handwritten note says "new mountain"
+------------------------------------------------------
+		`, 'Unresolved');
+
+		expect(result.mode).toBe('deterministic');
+		expect(result.client).toBe('North Shore Studio');
+		expect(result.poNumber).toBe('HB-260314');
+		expect(result.lineItems).toHaveLength(3);
+		expect(result.lineItems[0].source).toBe('artisan_po_HB-260314_north_shore.txt');
+		expect(result.lineItems[0].item).toBe('Medium Elephant Pin');
+		expect(result.lineItems[1].source).toBe('artisan_po_HB-260314_north_shore.txt');
+		expect(result.lineItems[1].item).toBe('hb1 hat stud / mini star');
+		expect(result.blockers).toHaveLength(2);
+		expect(result.blockers[0].source).toBe('artisan_po_HB-260314_north_shore.txt');
+	});
+
+	test('CSV file content extraction parses items and assigns correct source filename', () => {
+		const result = parsePastedOrder(`
+---
+Source file: artisan_po_HB-260314_north_shore.csv
+Source type: text/csv
+Client: North Shore Studio
+PO: HB-260314
+Item,Qty,Finish,Notes
+Medium Silver Elephant Pin,12,Sterling Silver,Match approved sample card
+hb1 hat stud / mini star,24,,Buyer wrote "small starburst hat stud"
+Mountain Pendant,8,,handwritten note says "new mountain"
+------------------------------------------------------
+		`, 'Unresolved');
+
+		expect(result.mode).toBe('deterministic');
+		expect(result.client).toBe('North Shore Studio');
+		expect(result.poNumber).toBe('HB-260314');
+		expect(result.lineItems).toHaveLength(3);
+		expect(result.lineItems[0].source).toBe('artisan_po_HB-260314_north_shore.csv');
+		expect(result.lineItems[0].item).toBe('Medium Silver Elephant Pin');
+		expect(result.lineItems[1].source).toBe('artisan_po_HB-260314_north_shore.csv');
+		expect(result.lineItems[1].item).toBe('hb1 hat stud / mini star');
+		expect(result.blockers).toHaveLength(2);
+		expect(result.blockers[0].source).toBe('artisan_po_HB-260314_north_shore.csv');
+	});
+
+	test('PDF text page extraction parses items and page markers', () => {
+		const result = parsePastedOrder(`
+---
+Source file: artisan_po_HB-260314_north_shore.pdf
+Source type: application/pdf
+
+## For PDF pages:
+Source file: artisan_po_HB-260314_north_shore.pdf
+Page: 1
+Client: North Shore Studio
+PO: HB-260314
+Item Qty Finish Notes
+Medium Silver Elephant Pin               12    Sterling Silver    Match approved sample card
+hb1 hat stud / mini star                  24                       Buyer wrote "small starburst hat stud"
+-------------------
+## For PDF pages:
+Source file: artisan_po_HB-260314_north_shore.pdf
+Page: 2
+Mountain Pendant                          8                        handwritten note says "new mountain"
+-------------------
+------------------------------------------------------
+		`, 'Unresolved');
+
+		expect(result.mode).toBe('deterministic');
+		expect(result.client).toBe('North Shore Studio');
+		expect(result.poNumber).toBe('HB-260314');
+		expect(result.lineItems).toHaveLength(3);
+		expect(result.lineItems[0].source).toBe('artisan_po_HB-260314_north_shore.pdf');
+		expect(result.lineItems[0].item).toBe('Medium Elephant Pin');
+		expect(result.lineItems[2].source).toBe('artisan_po_HB-260314_north_shore.pdf');
+		expect(result.lineItems[2].item).toBe('Mountain Pendant');
+		expect(result.blockers).toHaveLength(2);
+		expect(result.blockers[1].source).toBe('artisan_po_HB-260314_north_shore.pdf');
+	});
+
+	test('do it is ignored when file content exists', () => {
+		const result = parsePastedOrder(`do it
+---
+Source file: artisan_po_HB-260314_north_shore.txt
+Source type: text/plain
+Client: North Shore Studio
+PO: HB-260314
+Item,Qty,Finish,Notes
+Medium Silver Elephant Pin,12,Sterling Silver,Match approved sample card
+------------------------------------------------------
+		`, 'Unresolved');
+		expect(result.mode).toBe('deterministic');
+		expect(result.client).toBe('North Shore Studio');
+		expect(result.poNumber).toBe('HB-260314');
+		expect(result.lineItems).toHaveLength(1);
+		expect(result.lineItems[0].source).toBe('artisan_po_HB-260314_north_shore.txt');
+	});
+
+	test('no fixture leakage for uploaded files', () => {
+		const result = parsePastedOrder(`
+---
+Source file: custom_file.txt
+Source type: text/plain
+Client: Custom Client
+PO: HB-999999
+Item,Qty,Finish,Notes
+Feather Necklace,10,Silver oxy,custom order
+------------------------------------------------------
+		`, 'Unresolved');
+
+		expect(result.mode).toBe('deterministic');
+		expect(result.client).toBe('Custom Client');
+		expect(result.poNumber).toBe('HB-999999');
+		expect(result.lineItems).toHaveLength(1);
+		expect(result.lineItems[0].item).toBe('Feather Necklace');
+		expect(JSON.stringify(result)).not.toContain('Golden Bird');
+	});
 });

@@ -19,6 +19,7 @@ export type ExtractionResult = {
 	client?: string;
 	poNumber?: string;
 	helperMessage?: string;
+	combinedText?: string;
 	lineItems: SheetLineItem[];
 	blockers: ReviewBlocker[];
 };
@@ -246,7 +247,7 @@ function lineLooksLikeItem(line: string) {
 	const lower = line.toLowerCase();
 	if (!line.trim()) return false;
 	if (/^-{3,}$/.test(line.trim())) return false;
-	if (/^(from|subject|date|client|customer|account|buyer|shipping|ship to|po number|production note|packing note)\b/i.test(line)) {
+	if (/^(from|subject|date|client|customer|account|buyer|shipping|ship to|po number|production note|packing note|source type)\b/i.test(line)) {
 		return false;
 	}
 	if (/\b(item|description)\b.*\b(qty|quantity)\b/i.test(line)) return false;
@@ -444,7 +445,9 @@ function deterministicBlockersForItems(items: SheetLineItem[], catalog: CatalogC
 				impactKey: 'highImpact',
 				question: 'Which exact hat stud / mini star style should Bali make?',
 				evidence: 'buyer wrote "small starburst hat stud" - exact hat stud variant unclear',
-				source: sourceEvidenceFor(item).toLowerCase().includes('small starburst hat stud') ? 'Buyer note' : 'Extracted line item',
+				source: item.source && !['pasted text', 'csv row', 'tsv row', 'buyer note', 'extracted line item'].includes(item.source.toLowerCase())
+					? item.source
+					: (sourceEvidenceFor(item).toLowerCase().includes('small starburst hat stud') ? 'Buyer note' : 'Extracted line item'),
 				risk: 'Hat stud variants can use different carving templates, sizes, finishes, and packing requirements.',
 				options: options.length > 0 ? options : ['Type exact style'],
 				answer: '',
@@ -461,7 +464,9 @@ function deterministicBlockersForItems(items: SheetLineItem[], catalog: CatalogC
 				impactKey: 'highImpact',
 				question: 'What finish/material should Bali use for Mountain Pendant?',
 				evidence: 'handwritten note says "new mountain" but no style code or finish',
-				source: 'Extracted line item',
+				source: item.source && !['pasted text', 'csv row', 'tsv row', 'buyer note', 'extracted line item'].includes(item.source.toLowerCase())
+					? item.source
+					: 'Extracted line item',
 				risk: 'Mountain Pendant cannot be production-ready without source-backed material or finish.',
 				options: options.length > 0 ? options : ['Type material/finish'],
 				answer: '',
@@ -507,37 +512,107 @@ function sanitizeBlockersForItems(blockers: ReviewBlocker[], items: SheetLineIte
 	return [...generated, ...providerWithoutGeneratedDuplicates].slice(0, items.length);
 }
 
+interface TextSection {
+	filename: string;
+	content: string;
+}
+
+function splitIntoSections(text: string): TextSection[] {
+	const sections: TextSection[] = [];
+	const lines = text.split(/\r?\n/);
+	let currentFilename = '';
+	let currentLines: string[] = [];
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i].trim();
+		if (line === '---' && i + 1 < lines.length && lines[i + 1].trim().toLowerCase().startsWith('source file:')) {
+			if (currentLines.length > 0) {
+				sections.push({
+					filename: currentFilename,
+					content: currentLines.join('\n')
+				});
+				currentLines = [];
+			}
+			const sourceFileLine = lines[i + 1].trim();
+			currentFilename = sourceFileLine.substring(12).trim();
+			i++; // Skip "Source file:"
+		} else if (line.startsWith('---------------------')) {
+			continue;
+		} else {
+			currentLines.push(lines[i]);
+		}
+	}
+
+	if (currentLines.length > 0) {
+		sections.push({
+			filename: currentFilename,
+			content: currentLines.join('\n')
+		});
+	}
+
+	return sections;
+}
+
 export function parsePastedOrder(text: string, client = '', catalog: CatalogContext[] = []): ExtractionResult {
 	const trimmed = text.trim();
 	if (!trimmed) return buildSafeExtractionFailure('empty_input');
 
-	const lines = trimmed.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-	const delimitedItems = parseDelimitedItems(lines);
-	const looseItems =
-		delimitedItems.length > 0
-			? []
-			: lines
-					.filter(lineLooksLikeItem)
-					.map(parseLooseItemLine)
-					.filter((item): item is SheetLineItem => Boolean(item));
-	const lineItems = delimitedItems.length > 0 ? delimitedItems : looseItems;
+	const sections = splitIntoSections(trimmed);
+	let allLineItems: SheetLineItem[] = [];
+	let detectedClient = client;
+	let detectedPoNumber = '';
 
-	if (lineItems.length === 0) {
+	for (const section of sections) {
+		const sectionTrimmed = section.content.trim();
+		if (!sectionTrimmed) continue;
+
+		if (!detectedClient || detectedClient === 'Unresolved') {
+			detectedClient = detectClient(sectionTrimmed, detectedClient);
+		}
+		if (!detectedPoNumber) {
+			detectedPoNumber = detectPoNumber(sectionTrimmed);
+		}
+
+		const lines = sectionTrimmed.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+		const delimitedItems = parseDelimitedItems(lines);
+		const looseItems =
+			delimitedItems.length > 0
+				? []
+				: lines
+						.filter(lineLooksLikeItem)
+						.map((line, idx) => parseLooseItemLine(line, idx))
+						.filter((item): item is SheetLineItem => Boolean(item));
+		const lineItems = delimitedItems.length > 0 ? delimitedItems : looseItems;
+
+		if (section.filename) {
+			lineItems.forEach((item) => {
+				item.source = section.filename;
+			});
+		}
+
+		allLineItems = [...allLineItems, ...lineItems];
+	}
+
+	if (allLineItems.length === 0) {
 		return {
 			...buildSafeExtractionFailure('no_line_items'),
-			client: detectClient(trimmed, client) || 'Unresolved',
-			poNumber: detectPoNumber(trimmed)
+			client: detectedClient || 'Unresolved',
+			poNumber: detectedPoNumber
 		};
 	}
+
+	allLineItems.forEach((item, index) => {
+		item.id = stableId(item.item || item.source, index);
+	});
 
 	return {
 		success: true,
 		mode: 'deterministic',
 		provider: 'fixture',
-		client: detectClient(trimmed, client) || 'Unresolved',
-		poNumber: detectPoNumber(trimmed),
-		lineItems,
-		blockers: deterministicBlockersForItems(lineItems, catalog)
+		client: detectedClient || 'Unresolved',
+		poNumber: detectedPoNumber,
+		lineItems: allLineItems,
+		blockers: deterministicBlockersForItems(allLineItems, catalog)
 	};
 }
 

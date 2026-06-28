@@ -88,7 +88,7 @@
 	"blockedByProductionSheet": "Terhambat oleh lembar produksi",
 	"needsLineItems": "Perlu item baris",
 	"needsOrderDetails": "Perlu detail pesanan",
-	"intakeFileNote": "Tempel teks PO untuk hasil terbaik. Unggahan file disimpan sebagai referensi sumber saat ekstraksi teks tidak tersedia.",
+	"intakeFileNote": "Unggah file PDF, CSV, atau TXT berbasis teks, atau tempel teks pesanan.",
 	"sheetsDesc": "Dokumen produksi dan pengemasan yang dapat diedit dari pesanan yang telah ditinjau.",
 	"answersComplete": "Semua jawaban wajib telah dilengkapi.",
 	"reviewNeededBeforeProduction": "Perlu tinjauan sebelum produksi",

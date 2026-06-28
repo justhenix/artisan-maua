@@ -88,7 +88,7 @@
 	"blockedByProductionSheet": "Blocked by production sheet",
 	"needsLineItems": "Needs line items",
 	"needsOrderDetails": "Needs order details",
-	"intakeFileNote": "Paste PO text for best results. File uploads are kept as source references when text extraction is unavailable.",
+	"intakeFileNote": "Upload text-based PDF, CSV, or TXT files, or paste order text.",
 	"sheetsDesc": "Editable production and packing documents from the reviewed order.",
 	"answersComplete": "All required answers complete.",
 	"reviewNeededBeforeProduction": "Review needed before production",

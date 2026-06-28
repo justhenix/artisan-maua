@@ -144,183 +144,224 @@ Line  Item Code      Description                  Qty  Unit Price
 	}
 
 	function parseMessyInput(text: string): LineItem[] {
-		const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
-		if (lines.length === 0) return [];
+		const sections: { filename: string; content: string }[] = [];
+		const lines = text.split(/\r?\n/);
+		let currentFilename = '';
+		let currentLines: string[] = [];
 
-		const parsedItems: LineItem[] = [];
-		const cleanField = (f: string) => f.replace(/^["']|["']$/g, '').trim();
-
-		const firstLine = lines[0];
-		const isCsv = firstLine.includes(',') && lines.some(l => l.includes(','));
-		const isTsv = firstLine.includes('\t') && lines.some(l => l.includes('\t'));
-
-		if (isCsv || isTsv) {
-			const sep = isTsv ? '\t' : ',';
-			const parseRow = (rowText: string): string[] => {
-				const result: string[] = [];
-				let current = '';
-				let inQuotes = false;
-				for (let i = 0; i < rowText.length; i++) {
-					const char = rowText[i];
-					if (char === '"') {
-						inQuotes = !inQuotes;
-					} else if (char === sep && !inQuotes) {
-						result.push(current);
-						current = '';
-					} else {
-						current += char;
-					}
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i].trim();
+			if (line === '---' && i + 1 < lines.length && lines[i + 1].trim().toLowerCase().startsWith('source file:')) {
+				if (currentLines.length > 0) {
+					sections.push({
+						filename: currentFilename,
+						content: currentLines.join('\n')
+					});
+					currentLines = [];
 				}
-				result.push(current);
-				return result.map(cleanField);
-			};
-
-			const headerRow = parseRow(lines[0]);
-			let itemIdx = -1;
-			let qtyIdx = -1;
-			let finishIdx = -1;
-			let priceIdx = -1;
-			let notesIdx = -1;
-			let imageIdx = -1;
-
-			headerRow.forEach((col, idx) => {
-				const c = col.toLowerCase();
-				if (c.includes('item') || c.includes('description') || c.includes('style') || c.includes('code') || c.includes('product') || c === 'name') {
-					if (itemIdx === -1) itemIdx = idx;
-				} else if (c.includes('qty') || c.includes('quantity') || c.includes('count') || c === 'q') {
-					if (qtyIdx === -1) qtyIdx = idx;
-				} else if (c.includes('finish') || c.includes('material') || c.includes('metal')) {
-					if (finishIdx === -1) finishIdx = idx;
-				} else if (c.includes('price') || c.includes('rate') || c.includes('cost')) {
-					if (priceIdx === -1) priceIdx = idx;
-				} else if (c.includes('note') || c.includes('instruction') || c.includes('comment')) {
-					if (notesIdx === -1) notesIdx = idx;
-				} else if (c.includes('image') || c.includes('pic') || c.includes('photo') || c.includes('url') || c.includes('file')) {
-					if (imageIdx === -1) imageIdx = idx;
-				}
-			});
-
-			const startRowIdx = (itemIdx !== -1 || qtyIdx !== -1) ? 1 : 0;
-			let finalItemIdx = itemIdx !== -1 ? itemIdx : 0;
-			let finalQtyIdx = qtyIdx !== -1 ? qtyIdx : 1;
-			let finalFinishIdx = finishIdx !== -1 ? finishIdx : 2;
-			let finalNotesIdx = notesIdx !== -1 ? notesIdx : 3;
-			let finalPriceIdx = priceIdx;
-			let finalImageIdx = imageIdx;
-
-			for (let i = startRowIdx; i < lines.length; i++) {
-				if (lines[i].startsWith('---') || lines[i].startsWith('===')) continue;
-				const cols = parseRow(lines[i]);
-				if (cols.length < 2) continue;
-
-				const itemText = cols[finalItemIdx] || '';
-				if (!itemText) continue;
-
-				const qtyText = cols[finalQtyIdx] || '1';
-				const qty = parseInt(qtyText.replace(/[^\d]/g, ''), 10) || 1;
-
-				const finish = cols[finalFinishIdx] || '';
-				const notes = cols[finalNotesIdx] || '';
-				
-				let unitPrice = 0;
-				if (finalPriceIdx !== undefined && finalPriceIdx !== -1 && cols[finalPriceIdx]) {
-					unitPrice = parseFloat(cols[finalPriceIdx].replace(/[^\d.]/g, '')) || 0;
-				}
-
-				let imageUrl = '';
-				if (finalImageIdx !== undefined && finalImageIdx !== -1 && cols[finalImageIdx]) {
-					imageUrl = cols[finalImageIdx];
-				}
-
-				const id = `item-${Math.random().toString(36).substr(2, 9)}`;
-
-				parsedItems.push({
-					id,
-					item: itemText,
-					styleCode: '',
-					qty,
-					finish,
-					notes,
-					source: isCsv ? 'CSV row' : 'TSV row',
-					unitPrice,
-					imageUrl
-				});
+				const sourceFileLine = lines[i + 1].trim();
+				currentFilename = sourceFileLine.substring(12).trim();
+				i++; // Skip "Source file:"
+			} else if (line.startsWith('---------------------')) {
+				continue;
+			} else {
+				currentLines.push(lines[i]);
 			}
 		}
+		if (currentLines.length > 0) {
+			sections.push({
+				filename: currentFilename,
+				content: currentLines.join('\n')
+			});
+		}
 
-		if (parsedItems.length === 0) {
-			lines.forEach((line) => {
-				if (
-					line.startsWith('From:') || 
-					line.startsWith('Subject:') || 
-					line.startsWith('PO#') || 
-					line.startsWith('Ship to:') || 
-					line.startsWith('Item ') || 
-					line.startsWith('---') || 
-					line.startsWith('===') ||
-					line.toLowerCase().includes('csv pasted below')
-				) return;
+		let allParsedItems: LineItem[] = [];
 
-				let matchedCatalog: CatalogItem | undefined;
-				for (const cat of catalog) {
-					if (
-						line.toLowerCase().includes(cat.styleCode.toLowerCase()) ||
-						line.toLowerCase().includes(cat.creativeTitle.toLowerCase())
-					) {
-						matchedCatalog = cat;
-						break;
-					}
-				}
+		for (const section of sections) {
+			const sectionTrimmed = section.content.trim();
+			if (!sectionTrimmed) continue;
 
-				if (matchedCatalog) {
-					const qtyMatch = line.match(/\b(\d+)\b/);
-					const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+			const sectionLines = sectionTrimmed.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+			if (sectionLines.length === 0) continue;
 
-					let finish = '';
-					const finishes = ['Silver', 'Gold', 'Vermeil', 'Brass', 'Mother of Pearl'];
-					for (const f of finishes) {
-						if (line.toLowerCase().includes(f.toLowerCase())) {
-							finish = f === 'Vermeil' ? 'Gold Vermeil' : f;
-							break;
+			const parsedItems: LineItem[] = [];
+			const cleanField = (f: string) => f.replace(/^["']|["']$/g, '').trim();
+
+			const firstLine = sectionLines[0];
+			const isCsv = firstLine.includes(',') && sectionLines.some(l => l.includes(','));
+			const isTsv = firstLine.includes('\t') && sectionLines.some(l => l.includes('\t'));
+
+			if (isCsv || isTsv) {
+				const sep = isTsv ? '\t' : ',';
+				const parseRow = (rowText: string): string[] => {
+					const result: string[] = [];
+					let current = '';
+					let inQuotes = false;
+					for (let i = 0; i < rowText.length; i++) {
+						const char = rowText[i];
+						if (char === '"') {
+							inQuotes = !inQuotes;
+						} else if (char === sep && !inQuotes) {
+							result.push(current);
+							current = '';
+						} else {
+							current += char;
 						}
 					}
+					result.push(current);
+					return result.map(cleanField);
+				};
 
-					const priceMatch = line.match(/\$(\d+(\.\d{2})?)/);
-					const unitPrice = priceMatch ? parseFloat(priceMatch[1]) : 0;
+				const headerRow = parseRow(sectionLines[0]);
+				let itemIdx = -1;
+				let qtyIdx = -1;
+				let finishIdx = -1;
+				let priceIdx = -1;
+				let notesIdx = -1;
+				let imageIdx = -1;
 
-					let notes = '';
-					const noteQuotes = line.match(/["']([^"']+)["']/);
-					if (noteQuotes) {
-						notes = noteQuotes[1];
-					} else {
-						const parts = line.split(/\s{2,}/);
-						if (parts.length > 2) {
-							notes = parts[parts.length - 1];
-						}
+				headerRow.forEach((col, idx) => {
+					const c = col.toLowerCase();
+					if (c.includes('item') || c.includes('description') || c.includes('style') || c.includes('code') || c.includes('product') || c === 'name') {
+						if (itemIdx === -1) itemIdx = idx;
+					} else if (c.includes('qty') || c.includes('quantity') || c.includes('count') || c === 'q') {
+						if (qtyIdx === -1) qtyIdx = idx;
+					} else if (c.includes('finish') || c.includes('material') || c.includes('metal')) {
+						if (finishIdx === -1) finishIdx = idx;
+					} else if (c.includes('price') || c.includes('rate') || c.includes('cost')) {
+						if (priceIdx === -1) priceIdx = idx;
+					} else if (c.includes('note') || c.includes('instruction') || c.includes('comment')) {
+						if (notesIdx === -1) notesIdx = idx;
+					} else if (c.includes('image') || c.includes('pic') || c.includes('photo') || c.includes('url') || c.includes('file')) {
+						if (imageIdx === -1) imageIdx = idx;
+					}
+				});
+
+				const startRowIdx = (itemIdx !== -1 || qtyIdx !== -1) ? 1 : 0;
+				let finalItemIdx = itemIdx !== -1 ? itemIdx : 0;
+				let finalQtyIdx = qtyIdx !== -1 ? qtyIdx : 1;
+				let finalFinishIdx = finishIdx !== -1 ? finishIdx : 2;
+				let finalNotesIdx = notesIdx !== -1 ? notesIdx : 3;
+				let finalPriceIdx = priceIdx;
+				let finalImageIdx = imageIdx;
+
+				for (let i = startRowIdx; i < sectionLines.length; i++) {
+					if (sectionLines[i].startsWith('---') || sectionLines[i].startsWith('===') || sectionLines[i].toLowerCase().startsWith('source type:')) continue;
+					const cols = parseRow(sectionLines[i]);
+					if (cols.length < 2) continue;
+
+					const itemText = cols[finalItemIdx] || '';
+					if (!itemText) continue;
+
+					const qtyText = cols[finalQtyIdx] || '1';
+					const qty = parseInt(qtyText.replace(/[^\d]/g, ''), 10) || 1;
+
+					const finish = cols[finalFinishIdx] || '';
+					const notes = cols[finalNotesIdx] || '';
+
+					let unitPrice = 0;
+					if (finalPriceIdx !== undefined && finalPriceIdx !== -1 && cols[finalPriceIdx]) {
+						unitPrice = parseFloat(cols[finalPriceIdx].replace(/[^\d.]/g, '')) || 0;
 					}
 
 					let imageUrl = '';
-					const imgMatch = line.match(/\b\S+\.(png|jpg|jpeg)\b/i);
-					if (imgMatch) {
-						imageUrl = imgMatch[0];
+					if (finalImageIdx !== undefined && finalImageIdx !== -1 && cols[finalImageIdx]) {
+						imageUrl = cols[finalImageIdx];
 					}
 
+					const id = `item-${Math.random().toString(36).substr(2, 9)}`;
+
 					parsedItems.push({
-						id: `item-${Math.random().toString(36).substr(2, 9)}`,
-						item: matchedCatalog.creativeTitle,
-						styleCode: matchedCatalog.styleCode,
+						id,
+						item: itemText,
+						styleCode: '',
 						qty,
 						finish,
 						notes,
-						source: 'Pasted text',
+						source: section.filename || (isCsv ? 'CSV row' : 'TSV row'),
 						unitPrice,
 						imageUrl
 					});
 				}
-			});
+			}
+
+			if (parsedItems.length === 0) {
+				sectionLines.forEach((line) => {
+					if (
+						line.startsWith('From:') ||
+						line.startsWith('Subject:') ||
+						line.startsWith('PO#') ||
+						line.startsWith('Ship to:') ||
+						line.startsWith('Item ') ||
+						line.startsWith('---') ||
+						line.startsWith('===') ||
+						line.toLowerCase().startsWith('source type:') ||
+						line.toLowerCase().includes('csv pasted below')
+					) return;
+
+					let matchedCatalog: CatalogItem | undefined;
+					for (const cat of catalog) {
+						if (
+							line.toLowerCase().includes(cat.styleCode.toLowerCase()) ||
+							line.toLowerCase().includes(cat.creativeTitle.toLowerCase())
+						) {
+							matchedCatalog = cat;
+							break;
+						}
+					}
+
+					if (matchedCatalog) {
+						const qtyMatch = line.match(/\b(\d+)\b/);
+						const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+
+						let finish = '';
+						const finishes = ['Silver', 'Gold', 'Vermeil', 'Brass', 'Mother of Pearl'];
+						for (const f of finishes) {
+							if (line.toLowerCase().includes(f.toLowerCase())) {
+								finish = f === 'Vermeil' ? 'Gold Vermeil' : f;
+								break;
+							}
+						}
+
+						const priceMatch = line.match(/\$([\d,]+(\.\d{2})?)/);
+						const unitPrice = priceMatch ? parseFloat(priceMatch[1].replace(/,/g, '')) : 0;
+
+						let notes = '';
+						const noteQuotes = line.match(/["']([^"']+)["']/);
+						if (noteQuotes) {
+							notes = noteQuotes[1];
+						} else {
+							const parts = line.split(/\s{2,}/);
+							if (parts.length > 2) {
+								notes = parts[parts.length - 1];
+							}
+						}
+
+						let imageUrl = '';
+						const imgMatch = line.match(/\b\S+\.(png|jpg|jpeg)\b/i);
+						if (imgMatch) {
+							imageUrl = imgMatch[0];
+						}
+
+						parsedItems.push({
+							id: `item-${Math.random().toString(36).substr(2, 9)}`,
+							item: matchedCatalog.creativeTitle,
+							styleCode: matchedCatalog.styleCode,
+							qty,
+							finish,
+							notes,
+							source: section.filename || 'Pasted text',
+							unitPrice,
+							imageUrl
+						});
+					}
+				});
+			}
+
+			allParsedItems = [...allParsedItems, ...parsedItems];
 		}
 
-		parsedItems.forEach((item) => {
+		allParsedItems.forEach((item) => {
 			if (!item.styleCode) {
 				const name = item.item.toLowerCase();
 				const exactMatch = catalog.find(
@@ -421,13 +462,14 @@ Line  Item Code      Description                  Qty  Unit Price
 			item.confidenceState = warnings.length > 0 ? 'unresolved' : 'resolved';
 		});
 
-		return parsedItems;
+		return allParsedItems;
 	}
 
 	function loadSampleType(source: (typeof sourceTypes)[number]) {
 		selectedSource = source;
 		intakeText = samples[source];
 		uploadedFiles = [];
+		uploadedFileObjects = [];
 		sampleUsed = true;
 		client = 'La Jolla Artisan Boutique';
 		selectedOrderId = 'HB-259689';
@@ -438,8 +480,9 @@ Line  Item Code      Description                  Qty  Unit Price
 
 	function removeUploadedFile(index: number) {
 		uploadedFiles = uploadedFiles.filter((_, i) => i !== index);
+		uploadedFileObjects = uploadedFileObjects.filter((_, i) => i !== index);
 		sampleUsed = false;
-		clearExtractionState(uploadedFiles.length > 0 ? 'Uploaded file kept as source metadata.' : '');
+		clearExtractionState('');
 		markAutoSaved();
 	}
 
@@ -533,6 +576,7 @@ Line  Item Code      Description                  Qty  Unit Price
 
 	// New States
 	let uploadedFiles = $state<string[]>([]);
+	let uploadedFileObjects = $state<File[]>([]);
 	let showOriginalDrawer = $state(false);
 	let productionGrouping = $state<'material' | 'category'>('material'); // Production group toggle
 	let packedItems = $state<Record<string, boolean>>({}); // Checkbox state for Packing checklist
@@ -572,14 +616,11 @@ Line  Item Code      Description                  Qty  Unit Price
 	});
 
 	const maxUploadBytes = 8 * 1024 * 1024;
-	const allowedUploadExtensions = new Set(['pdf', 'csv', 'xlsx', 'png', 'jpg', 'jpeg', 'txt']);
+	const allowedUploadExtensions = new Set(['pdf', 'csv', 'txt']);
 	const allowedUploadTypes = new Set([
 		'application/pdf',
 		'text/csv',
-		'text/plain',
-		'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-		'image/png',
-		'image/jpeg'
+		'text/plain'
 	]);
 
 	function isAllowedUpload(file: File) {
@@ -692,19 +733,13 @@ Line  Item Code      Description                  Qty  Unit Price
 	const displayWorkflowStatus = $derived(
 		sent
 			? 'Completed'
-			: currentStep === 4
-				? (allRequiredResolved ? 'Customer update ready' : 'Review required')
-				: currentStep === 3
-					? (!allRequiredResolved
-						? 'Review required'
-						: handoffShared || handoffCreated
-							? 'Bali handoff ready'
-							: 'Sheets ready')
-					: currentStep === 2
-						? (allRequiredResolved ? 'Sheets ready' : 'Review required')
-						: allRequiredResolved
-							? 'Sheets ready'
-							: (remainingAnswers > 0 ? 'Review required' : t.reviewRequiredOption)
+			: !allRequiredResolved
+				? 'Review required'
+				: currentStep === 4
+					? 'Customer update ready'
+					: currentStep === 3
+						? (handoffCreated || handoffShared ? 'Bali handoff ready' : 'Sheets ready')
+						: 'Sheets ready'
 	);
 
 	const blockingLineCount = $derived(
@@ -899,6 +934,7 @@ Line  Item Code      Description                  Qty  Unit Price
 	function useSampleOrder() {
 		intakeText = samples[selectedSource];
 		uploadedFiles = [];
+		uploadedFileObjects = [];
 		sampleUsed = true;
 		client = 'La Jolla Artisan Boutique';
 		selectedOrderId = 'HB-259689';
@@ -913,8 +949,9 @@ Line  Item Code      Description                  Qty  Unit Price
 			const files = acceptedUploadFiles(Array.from(target.files));
 			if (files.length === 0) return;
 			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
+			uploadedFileObjects = [...uploadedFileObjects, ...files];
 			sampleUsed = false;
-			clearExtractionState('Uploaded file kept as source metadata.');
+			clearExtractionState('');
 			markAutoSaved();
 			showToast(`${files.length} ${t.fileUploaded}`);
 		}
@@ -945,12 +982,25 @@ Line  Item Code      Description                  Qty  Unit Price
 			const files = acceptedUploadFiles(Array.from(event.dataTransfer.files));
 			if (files.length === 0) return;
 			uploadedFiles = [...uploadedFiles, ...files.map(f => f.name)];
+			uploadedFileObjects = [...uploadedFileObjects, ...files];
 			sampleUsed = false;
-			clearExtractionState('Uploaded file kept as source metadata.');
+			clearExtractionState('');
 			markAutoSaved();
 			showToast(`${files.length} ${t.fileUploaded}`);
 		}
 	}
+	function isShortOrDoIt(text: string): boolean {
+		const trimmed = text.trim().toLowerCase().replace(/[.,!]/g, '');
+		return (
+			trimmed === 'do it' ||
+			trimmed === 'doit' ||
+			trimmed === 'process' ||
+			trimmed === 'go' ||
+			trimmed === 'extract' ||
+			trimmed.length < 10
+		);
+	}
+
 	async function processOrder() {
 		if (!intakeText.trim() && uploadedFiles.length === 0) {
 			return;
@@ -963,20 +1013,50 @@ Line  Item Code      Description                  Qty  Unit Price
 			client = 'Unresolved';
 			selectedOrderId = 'Unresolved';
 			clearExtractionState('');
-			if (!intakeText.trim() && uploadedFiles.length > 0) {
-				extractionNotice = 'Image/PDF extraction needs live AI/OCR. Paste the PO text or use sample order. Uploaded file kept as source metadata.';
-				markAutoSaved();
-				setStep(2);
-				return;
+
+			// Read text contents from txt and csv files on the client side
+			let combinedText = '';
+			let fileContents = '';
+			let hasTxtOrCsvOrPdf = false;
+			let hasPdf = false;
+
+			for (const file of uploadedFileObjects) {
+				const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+				if (['txt', 'csv'].includes(extension)) {
+					hasTxtOrCsvOrPdf = true;
+					const content = await file.text();
+					fileContents += `\n---\nSource file: ${file.name}\nSource type: ${file.type || extension}\n${content}\n------------------------------------------------------\n`;
+				} else if (extension === 'pdf') {
+					hasTxtOrCsvOrPdf = true;
+					hasPdf = true;
+				}
+			}
+
+			const trimmedText = intakeText.trim();
+			if (hasTxtOrCsvOrPdf && fileContents) {
+				if (trimmedText && !isShortOrDoIt(trimmedText)) {
+					combinedText = trimmedText + '\n' + fileContents;
+				} else {
+					combinedText = fileContents.trim();
+				}
+			} else {
+				combinedText = trimmedText;
 			}
 
 			isProcessing = true;
 			let apiSuccess = false;
 			try {
+				const formData = new FormData();
+				formData.append('text', intakeText);
+				formData.append('client', client);
+				formData.append('sourceChannel', selectedSource);
+				for (const file of uploadedFileObjects) {
+					formData.append('files', file);
+				}
+
 				const res = await fetch('/api/process-order', {
 					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ text: intakeText, client })
+					body: formData
 				});
 				const data = await res.json();
 				if (data.success) {
@@ -999,6 +1079,7 @@ Line  Item Code      Description                  Qty  Unit Price
 					})) : [];
 					if (data.client && data.client !== 'Unresolved') client = data.client;
 					if (data.poNumber) selectedOrderId = data.poNumber;
+					if (data.combinedText) intakeText = data.combinedText;
 					extractionNotice = data.helperMessage || (lineItems.length === 0 ? 'Artisan could not read line items from this source. Paste the PO text or use the sample order for the demo.' : '');
 					customerUpdate = generateCustomerUpdate({
 						client: client || 'Unresolved',
@@ -1007,32 +1088,40 @@ Line  Item Code      Description                  Qty  Unit Price
 					});
 					apiSuccess = true;
 				}
-			} catch {
-				console.warn('Order processing API fell back to local heuristics.');
+			} catch (err) {
+				console.warn('Order processing API fell back to local heuristics:', err);
 			} finally {
 				isProcessing = false;
 			}
 
 			if (!apiSuccess) {
-				const parsed = parseMessyInput(intakeText);
-				if (parsed.length > 0) {
-					parsed.forEach((item) => {
-						if (item.styleCode) {
-							const cat = catalog.find(c => c.styleCode === item.styleCode);
-							if (cat && cat.imageUrl && !item.imageUrl) {
-								item.imageUrl = cat.imageUrl;
-							}
-						}
-					});
-					lineItems = parsed;
-					blockers = fallbackBlockersForItems(parsed);
-					customerUpdate = generateCustomerUpdate({
-						client: client || 'Unresolved',
-						lineItems: parsed,
-						unresolvedCount: unresolvedRequiredCount(blockers)
-					});
+				// Fallback client-side PDF scan warning
+				if (hasPdf && !fileContents && (!trimmedText || isShortOrDoIt(trimmedText))) {
+					extractionNotice = 'This file does not contain readable text. Upload a text-based PDF/CSV/TXT or paste the PO text.';
+					lineItems = [];
+					blockers = [];
 				} else {
-					extractionNotice = 'Artisan could not read line items from this source. Paste the PO text or use the sample order for the demo.';
+					const parsed = parseMessyInput(combinedText);
+					if (parsed.length > 0) {
+						parsed.forEach((item) => {
+							if (item.styleCode) {
+								const cat = catalog.find(c => c.styleCode === item.styleCode);
+								if (cat && cat.imageUrl && !item.imageUrl) {
+									item.imageUrl = cat.imageUrl;
+								}
+							}
+						});
+						lineItems = parsed;
+						blockers = fallbackBlockersForItems(parsed);
+						if (combinedText) intakeText = combinedText;
+						customerUpdate = generateCustomerUpdate({
+							client: client || 'Unresolved',
+							lineItems: parsed,
+							unresolvedCount: unresolvedRequiredCount(blockers)
+						});
+					} else {
+						extractionNotice = 'Artisan could not read line items from this source. Paste the PO text or use the sample order for the demo.';
+					}
 				}
 			}
 		} else {
@@ -1196,6 +1285,7 @@ Line  Item Code      Description                  Qty  Unit Price
 		intakeText = order.sourceText;
 		customerUpdate = order.customerUpdate;
 		uploadedFiles = order.uploadedFiles;
+		uploadedFileObjects = [];
 		orderStatus = order.status;
 		milestones = order.milestones || { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false };
 		
@@ -1244,6 +1334,7 @@ Line  Item Code      Description                  Qty  Unit Price
 		intakeText = '';
 		customerUpdate = '';
 		uploadedFiles = [];
+		uploadedFileObjects = [];
 		orderStatus = 'Review';
 		milestones = { moldsChecked: false, silverCast: false, qualityChecked: false, readyForShipping: false };
 		lineItems = [];
@@ -1329,43 +1420,6 @@ Line  Item Code      Description                  Qty  Unit Price
 		markAutoSaved();
 	}
 
-	function onDisplayWorkflowChange(event: Event) {
-		const value = (event.currentTarget as HTMLSelectElement).value;
-		if (value === 'Completed') {
-			sent = true;
-			orderStatus = 'Completed';
-			setStep(4);
-		} else if (value === 'Customer update ready') {
-			if (!allRequiredResolved) {
-				showToast(t.reviewNeededHelp || 'Resolve required production fields first.');
-				return;
-			}
-			sent = false;
-			orderStatus = 'Packing';
-			setStep(4);
-		} else if (value === 'Bali handoff ready') {
-			if (!allRequiredResolved) {
-				showToast(t.reviewNeededHelp || 'Resolve required production fields first.');
-				return;
-			}
-			orderStatus = 'Production';
-			setStep(3);
-		} else if (value === 'Sheets ready') {
-			if (!canContinueToSheets) {
-				showToast(t.resolveToContinue);
-				return;
-			}
-			sent = false;
-			orderStatus = 'Production';
-			setStep(3);
-		} else {
-			sent = false;
-			orderStatus = 'Review';
-			setStep(2);
-		}
-		markDirty();
-		markAutoSaved();
-	}
 
 	function markDirty() {
 		sheetDirty = true;
@@ -2141,21 +2195,10 @@ Line  Item Code      Description                  Qty  Unit Price
 										? 'border-indigo-200 bg-indigo-50 text-indigo-800'
 										: displayWorkflowStatus === 'Customer update ready'
 											? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-											: 'border-(--line) bg-white text-(--ink)'
+											: displayWorkflowStatus === 'Completed'
+												? 'border-gray-300 bg-gray-100 text-gray-800'
+												: 'border-(--line) bg-white text-(--ink)'
 						}`} aria-live="polite">{displayWorkflowStatus}</span>
-						<select
-							value={displayWorkflowStatus}
-							onchange={onDisplayWorkflowChange}
-							class="rounded border border-(--line) bg-white px-2 py-0.5 text-[10px] font-semibold focus:border-(--brand) outline-none cursor-pointer text-(--muted)"
-							aria-label="Workflow status"
-							title={t.workflowHelp}
-						>
-							<option value="Review required">Review required</option>
-							<option value="Sheets ready">Sheets ready</option>
-							<option value="Bali handoff ready">Bali handoff ready</option>
-							<option value="Customer update ready">Customer update ready</option>
-							<option value="Completed">Completed</option>
-						</select>
 					</div>
 				</div>
 
